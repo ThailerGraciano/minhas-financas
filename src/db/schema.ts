@@ -16,6 +16,8 @@ export const accounts = pgTable('accounts', {
 export const categories = pgTable('categories', {
   id: serial('id').primaryKey(),
   name: varchar('name', { length: 255 }).notNull(),
+  type: varchar('type', { length: 50 }).notNull().default('expense'), // income, expense
+  icon: varchar('icon', { length: 50 }).notNull().default('Tag'),
 });
 
 export const subcategories = pgTable('subcategories', {
@@ -38,6 +40,7 @@ export const transactions = pgTable('transactions', {
   accountId: integer('account_id').references(() => accounts.id),
   creditCardId: integer('credit_card_id').references(() => creditCards.id),
   categoryId: integer('category_id').references(() => categories.id).notNull(),
+  subcategoryId: integer('subcategory_id').references(() => subcategories.id),
   amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
   description: varchar('description', { length: 255 }).notNull(),
   date: date('date').notNull(),
@@ -63,10 +66,18 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
     fields: [transactions.categoryId],
     references: [categories.id],
   }),
+  subcategory: one(subcategories, {
+    fields: [transactions.subcategoryId],
+    references: [subcategories.id],
+  }),
   parentTransaction: one(transactions, {
     fields: [transactions.parentTransactionId],
     references: [transactions.id],
   }),
+}));
+
+export const categoriesRelations = relations(categories, ({ many }) => ({
+  subcategories: many(subcategories),
 }));
 
 export const subcategoriesRelations = relations(subcategories, ({ one }) => ({

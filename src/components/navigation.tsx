@@ -11,6 +11,7 @@ const navItems = [
   { name: 'Contas', href: '/accounts', icon: Landmark },
   { name: 'Cartões', href: '/credit-cards', icon: CreditCard },
   { name: 'Transações', href: '/transactions', icon: Receipt },
+  { name: 'Categorias', href: '/categories', icon: PieChart },
   { name: 'Ajustes', href: '/settings', icon: Settings },
 ];
 

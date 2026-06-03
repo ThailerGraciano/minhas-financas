@@ -1,65 +1,102 @@
-import Image from "next/image";
+import { getDashboardData } from '@/app/actions/dashboard';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowUpCircle, ArrowDownCircle, Wallet, CreditCard as CreditCardIcon } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
-export default function Home() {
+export default async function DashboardPage() {
+  const data = await getDashboardData();
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  };
+  
+  // Format the month to a readable string (e.g., "Junho 2026")
+  const currentMonthDate = parseISO(`${data.currentMonth}-01`);
+  const monthName = format(currentMonthDate, 'MMMM yyyy', { locale: ptBR });
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="container mx-auto p-4 md:p-8 space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-2">
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground capitalize">Competência: {monthName}</p>
+      </div>
+
+      {/* Resumo do Mês */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="bg-primary/5 border-primary/20">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Saldo Consolidado</CardTitle>
+            <Wallet className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{formatCurrency(data.totalBalance)}</div>
+            <p className="text-xs text-muted-foreground mt-1">Soma de todas as contas</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Receitas do Mês</CardTitle>
+            <ArrowUpCircle className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{formatCurrency(data.totalIncome)}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Despesas do Mês</CardTitle>
+            <ArrowDownCircle className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{formatCurrency(data.totalExpense)}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Contas e Faturas */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="col-span-1">
+          <CardHeader>
+            <CardTitle>Saldos por Conta</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {data.accounts.map(acc => (
+              <div key={acc.id} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
+                <span className="font-medium">{acc.name}</span>
+                <span className={Number(acc.currentBalance) < 0 ? "text-red-500" : ""}>
+                  {formatCurrency(Number(acc.currentBalance))}
+                </span>
+              </div>
+            ))}
+            {data.accounts.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma conta cadastrada.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="col-span-1">
+          <CardHeader>
+            <CardTitle>Faturas Abertas (Este Mês)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {data.cardInvoices.map(invoice => (
+              <div key={invoice.card.id} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
+                <div className="flex items-center gap-2">
+                  <CreditCardIcon className="h-4 w-4 text-orange-500" />
+                  <span className="font-medium">{invoice.card.name}</span>
+                </div>
+                <span className="text-red-500 font-medium">{formatCurrency(invoice.invoiceTotal)}</span>
+              </div>
+            ))}
+            {data.cardInvoices.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma fatura com gastos neste mês.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

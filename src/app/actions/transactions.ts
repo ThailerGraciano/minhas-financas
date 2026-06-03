@@ -4,20 +4,33 @@ import { db } from '@/db';
 import { transactions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { addMonths, format, parseISO } from 'date-fns';
+import { revalidatePath } from 'next/cache';
 
 type NewTransaction = typeof transactions.$inferInsert;
+
+export async function getTransactions(month?: string) {
+  const currentMonth = month || format(new Date(), 'yyyy-MM');
+  
+  return await db.query.transactions.findMany({
+    where: eq(transactions.competencyMonth, currentMonth),
+    with: {
+      account: true,
+      category: true,
+      creditCard: true,
+    },
+    orderBy: (t, { desc }) => [desc(t.date)],
+  });
+}
 
 export async function createTransaction(data: NewTransaction) {
   try {
     if (data.installmentTotal && data.installmentTotal > 1) {
-      // Create the first transaction to be the parent
       const [parentTx] = await db.insert(transactions).values({
         ...data,
         installmentCurrent: 1,
       }).returning();
 
       const installmentsToInsert: NewTransaction[] = [];
-      // Assume date is a string in YYYY-MM-DD format
       const baseDate = parseISO(data.date);
 
       for (let i = 2; i <= data.installmentTotal; i++) {
@@ -36,10 +49,13 @@ export async function createTransaction(data: NewTransaction) {
         await db.insert(transactions).values(installmentsToInsert);
       }
 
+      revalidatePath('/transactions');
+      revalidatePath('/');
       return { success: true, parentId: parentTx.id };
     } else {
-      // Single transaction
       await db.insert(transactions).values(data);
+      revalidatePath('/transactions');
+      revalidatePath('/');
       return { success: true };
     }
   } catch (error) {
@@ -54,6 +70,8 @@ export async function markTransactionAsPaid(id: number) {
       .set({ status: 'paid' })
       .where(eq(transactions.id, id));
     
+    revalidatePath('/transactions');
+    revalidatePath('/');
     return { success: true };
   } catch (error) {
     console.error('Error updating transaction status:', error);

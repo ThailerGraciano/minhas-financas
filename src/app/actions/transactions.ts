@@ -64,11 +64,11 @@ export async function createTransaction(data: NewTransaction) {
   }
 }
 
-export async function markTransactionAsPaid(id: number) {
+export async function markTransactionAsPaid(id: string | number) {
   try {
     await db.update(transactions)
       .set({ status: 'paid' })
-      .where(eq(transactions.id, id));
+      .where(eq(transactions.id, Number(id)));
     
     revalidatePath('/transactions');
     revalidatePath('/');

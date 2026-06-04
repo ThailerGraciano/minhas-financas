@@ -14,10 +14,23 @@ export async function getCategories() {
 
 export async function createCategory(name: string, type: 'income' | 'expense', icon?: string) {
   try {
-    const [category] = await db.insert(categories).values({ name, type, icon: icon || 'Tag' }).returning();
+    const result = await db.transaction(async (tx) => {
+      const [category] = await tx
+        .insert(categories)
+        .values({ name, type, icon: icon || 'Tag' })
+        .returning();
+
+      // Toda categoria nasce com a subcategoria padrão "Geral"
+      await tx
+        .insert(subcategories)
+        .values({ name: 'Geral', categoryId: category.id });
+
+      return category;
+    });
+
     revalidatePath('/categories');
     revalidatePath('/'); // Dashboard where form is
-    return { success: true, category };
+    return { success: true, category: result };
   } catch (error) {
     console.error('Error creating category:', error);
     return { success: false, error: 'Failed to create category' };

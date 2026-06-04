@@ -5,8 +5,8 @@ import { accounts, creditCards, transactions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { format } from 'date-fns';
 
-export async function getDashboardData() {
-  const currentMonth = format(new Date(), 'yyyy-MM');
+export async function getDashboardData(month?: string) {
+  const currentMonth = month || format(new Date(), 'yyyy-MM');
 
   // Saldos
   const allAccounts = await db.select().from(accounts);
@@ -41,7 +41,7 @@ export async function getDashboardData() {
     totalBalance,
     totalIncome,
     totalExpense,
-    cardInvoices: cardInvoices.filter(i => i.invoiceTotal > 0), // Mostra apenas se tiver gasto
+    cardInvoices: cardInvoices.filter(i => i.invoiceTotal > 0),
     accounts: allAccounts,
   };
 }

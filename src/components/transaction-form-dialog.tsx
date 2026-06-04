@@ -4,13 +4,15 @@ import { getTransactionFormData } from "@/app/actions/form-data";
 import { createTransaction } from "@/app/actions/transactions";
 import { CategoryIcon } from "@/components/category-icon";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { transactions } from "@/db/schema";
-import { format } from "date-fns";
+import { addMonths, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -26,11 +28,15 @@ export function TransactionFormDialog() {
   const [open, setOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [formData, setFormData] = useState<FormData | null>(null);
+  const [formError, setFormError] = useState("");
 
   const [tab, setTab] = useState("expense");
   const [expenseType, setExpenseType] = useState("single");
   const [paymentMethod, setPaymentMethod] = useState("account");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("");
+  const [selectedCreditCardId, setSelectedCreditCardId] = useState("");
+  const [selectedInvoiceMonth, setSelectedInvoiceMonth] = useState("");
 
   const router = useRouter();
 
@@ -40,20 +46,65 @@ export function TransactionFormDialog() {
     }
   }, [open, formData]);
 
+  // Calcula o mês da fatura padrão com base no closing_day do cartão
+  const getDefaultInvoiceMonth = (closingDay: number): string => {
+    const today = new Date();
+    // Se hoje é ANTES ou NO dia de fechamento, a compra cai na fatura do mês atual
+    // Se hoje é DEPOIS do fechamento, cai na fatura do próximo mês
+    if (today.getDate() > closingDay) {
+      const next = addMonths(today, 1);
+      return format(next, "yyyy-MM");
+    }
+    return format(today, "yyyy-MM");
+  };
+
+  // Gera opções de fatura: mês atual do cartão + 6 meses futuros
+  const invoiceOptions = useMemo(() => {
+    if (!selectedCreditCardId || !formData?.creditCards) return [];
+    const card = formData.creditCards.find((c: CreditCard) => c.id === Number(selectedCreditCardId));
+    if (!card) return [];
+
+    const defaultMonth = getDefaultInvoiceMonth(card.closingDay);
+    const [year, month] = defaultMonth.split("-").map(Number);
+    const baseDate = new Date(year, month - 1, 1);
+
+    const options: { value: string; label: string }[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = addMonths(baseDate, i);
+      const value = format(d, "yyyy-MM");
+      const label = format(d, "MMMM/yyyy", { locale: ptBR });
+      // Capitaliza a primeira letra do mês
+      const capitalizedLabel = label.charAt(0).toUpperCase() + label.slice(1);
+      options.push({ value, label: capitalizedLabel });
+    }
+    return options;
+  }, [selectedCreditCardId, formData?.creditCards]);
+
+  // Auto-selecionar a fatura padrão quando o cartão muda
+  useEffect(() => {
+    if (!selectedCreditCardId || !formData?.creditCards) {
+      setSelectedInvoiceMonth("");
+      return;
+    }
+    const card = formData.creditCards.find((c: CreditCard) => c.id === Number(selectedCreditCardId));
+    if (card) {
+      setSelectedInvoiceMonth(getDefaultInvoiceMonth(card.closingDay));
+    }
+  }, [selectedCreditCardId, formData?.creditCards]);
 
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsPending(true);
+    setFormError("");
 
     const form = new FormData(e.currentTarget);
     const description = form.get("description") as string;
     const amount = form.get("amount") as string;
     const date = form.get("date") as string;
     const categoryId = form.get("categoryId") as string;
-    const subcategoryId = form.get("subcategoryId") as string;
 
-    // Extrai YYYY-MM
+    // Extrai YYYY-MM (para transações que não são cartão de crédito)
     const competencyMonth = date.substring(0, 7);
 
     const baseData: Partial<NewTransaction> & Record<string, unknown> = {
@@ -62,7 +113,7 @@ export function TransactionFormDialog() {
       date,
       competencyMonth,
       categoryId: Number(categoryId),
-      subcategoryId: subcategoryId ? Number(subcategoryId) : null,
+      subcategoryId: selectedSubcategoryId ? Number(selectedSubcategoryId) : null,
       status: "pending",
     };
 
@@ -71,7 +122,11 @@ export function TransactionFormDialog() {
       baseData.type = isCreditCard ? "credit_card_expense" : "expense";
 
       if (isCreditCard) {
-        baseData.creditCardId = Number(form.get("creditCardId"));
+        baseData.creditCardId = Number(selectedCreditCardId);
+        // Usa a competência da fatura selecionada
+        if (selectedInvoiceMonth) {
+          baseData.competencyMonth = selectedInvoiceMonth;
+        }
       } else {
         baseData.accountId = Number(form.get("accountId"));
       }
@@ -97,7 +152,7 @@ export function TransactionFormDialog() {
       setOpen(false);
       router.refresh();
     } else {
-      alert("Erro ao salvar a transação.");
+      setFormError(res.error || "Erro ao salvar a transação.");
     }
   };
 
@@ -115,16 +170,28 @@ export function TransactionFormDialog() {
     return cat?.subcategories || [];
   }, [formData, selectedCategoryId]);
 
+  // Auto-selecionar a primeira subcategoria ao mudar de categoria
+  useEffect(() => {
+    if (activeSubcategories.length > 0) {
+      setSelectedSubcategoryId(String(activeSubcategories[0].id));
+    } else {
+      setSelectedSubcategoryId("");
+    }
+  }, [activeSubcategories]);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="fixed bottom-20 md:bottom-8 right-4 md:right-8 rounded-full h-14 w-14 shadow-lg p-0 bg-primary hover:bg-primary/90 transition-transform hover:scale-105 z-50">
-          <Plus className="h-6 w-6 text-white" />
+        <Button className="cursor-pointer fixed bottom-20 md:bottom-8 right-4 md:right-8 rounded-full h-14 w-14 shadow-2xl p-0 bg-gradient-to-br from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 transition-all hover:scale-110 active:scale-95 z-[100] border-none flex items-center justify-center">
+          <Plus className="h-7 w-7 text-white pointer-events-none" />
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Nova Transação</DialogTitle>
+          <DialogDescription className="sr-only">
+            Preencha os detalhes para registrar uma nova transação financeira.
+          </DialogDescription>
         </DialogHeader>
 
         {formData ? (
@@ -133,6 +200,8 @@ export function TransactionFormDialog() {
             onValueChange={(val) => {
               setTab(val);
               setSelectedCategoryId("");
+              setSelectedSubcategoryId("");
+              setFormError("");
             }}
             className="w-full"
           >
@@ -151,7 +220,7 @@ export function TransactionFormDialog() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="amount">Valor</Label>
-                  <Input id="amount" name="amount" type="number" step="0.01" required placeholder="0,00" />
+                  <CurrencyInput id="amount" name="amount" required />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="date">Data</Label>
@@ -183,10 +252,15 @@ export function TransactionFormDialog() {
                   <Label htmlFor="subcategoryId">Subcategoria</Label>
                   <select
                     name="subcategoryId"
+                    value={selectedSubcategoryId}
+                    onChange={(e) => setSelectedSubcategoryId(e.target.value)}
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
                     disabled={!selectedCategoryId || activeSubcategories.length === 0}
+                    required={tab !== "transfer"}
                   >
-                    <option value="">Nenhuma</option>
+                    {activeSubcategories.length === 0 && (
+                      <option value="">Selecione uma categoria primeiro</option>
+                    )}
                     {activeSubcategories.map((sc: Subcategory) => (
                       <option key={sc.id} value={sc.id}>
                         {sc.name}
@@ -274,20 +348,44 @@ export function TransactionFormDialog() {
                 )}
 
                 {paymentMethod === "credit_card" && (
-                  <div className="grid gap-2">
-                    <Label htmlFor="creditCardId">Cartão de Crédito</Label>
-                    <select
-                      name="creditCardId"
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      required
-                    >
-                      {formData.creditCards.map((c: CreditCard) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <>
+                    <div className="grid gap-2">
+                      <Label htmlFor="creditCardId">Cartão de Crédito</Label>
+                      <select
+                        name="creditCardId"
+                        value={selectedCreditCardId}
+                        onChange={(e) => setSelectedCreditCardId(e.target.value)}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        required
+                      >
+                        <option value="">Selecione...</option>
+                        {formData.creditCards.map((c: CreditCard) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {selectedCreditCardId && invoiceOptions.length > 0 && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="invoiceMonth">Fatura</Label>
+                        <select
+                          name="invoiceMonth"
+                          value={selectedInvoiceMonth}
+                          onChange={(e) => setSelectedInvoiceMonth(e.target.value)}
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          required
+                        >
+                          {invoiceOptions.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </>
                 )}
               </TabsContent>
 
@@ -341,6 +439,10 @@ export function TransactionFormDialog() {
                   </select>
                 </div>
               </TabsContent>
+
+              {formError && (
+                <p className="text-sm text-destructive text-center">{formError}</p>
+              )}
 
               <div className="pt-4 flex justify-end">
                 <Button type="submit" disabled={isPending} className="w-full sm:w-auto">

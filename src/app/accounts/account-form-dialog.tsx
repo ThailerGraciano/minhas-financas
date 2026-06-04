@@ -1,14 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import { createAccount } from '@/app/actions/accounts';
+import { createAccount, updateAccount } from '@/app/actions/accounts';
 import { Button } from '@/components/ui/button';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus } from 'lucide-react';
 
-export function AccountFormDialog() {
+type Account = {
+  id: number;
+  name: string;
+  type: string;
+  currentBalance: string;
+};
+
+export function AccountFormDialog({ accountToEdit, trigger }: { accountToEdit?: Account, trigger?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState('');
@@ -23,45 +31,52 @@ export function AccountFormDialog() {
     const type = formData.get('type') as string;
     const currentBalance = formData.get('currentBalance') as string;
 
-    const result = await createAccount({
-      name,
-      type,
-      currentBalance,
-    });
+    const result = accountToEdit 
+      ? await updateAccount(accountToEdit.id, {
+          name,
+          type,
+          currentBalance,
+        })
+      : await createAccount({
+          name,
+          type,
+          currentBalance,
+        });
     
     setIsPending(false);
 
     if (result.success) {
       setOpen(false);
     } else {
-      setError(result.error || 'Erro ao criar conta');
+      setError(result.error || `Erro ao ${accountToEdit ? 'atualizar' : 'criar'} conta`);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button><Plus className="w-4 h-4 mr-2 md:mr-2" /><span className="hidden md:inline">Nova Conta</span><span className="md:hidden">Conta</span></Button>
+        {trigger || <Button className="cursor-pointer"><Plus className="w-4 h-4 mr-2 md:mr-2 pointer-events-none" /><span className="hidden md:inline pointer-events-none">Nova Conta</span><span className="md:hidden pointer-events-none">Conta</span></Button>}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Nova Conta</DialogTitle>
+            <DialogTitle>{accountToEdit ? 'Editar Conta' : 'Nova Conta'}</DialogTitle>
             <DialogDescription>
-              Adicione uma nova conta bancária ou carteira.
+              {accountToEdit ? 'Altere as informações da sua conta bancária.' : 'Adicione uma nova conta bancária ou carteira.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="name">Nome da Conta</Label>
-              <Input id="name" name="name" required placeholder="Ex: Nubank, Itaú..." />
+              <Input id="name" name="name" required placeholder="Ex: Nubank, Itaú..." defaultValue={accountToEdit?.name} />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="type">Tipo</Label>
-              <select 
+              <select
                 id="type" 
                 name="type" 
                 required
+                defaultValue={accountToEdit?.type || 'checking'}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="checking">Conta Corrente</option>
@@ -70,8 +85,8 @@ export function AccountFormDialog() {
               </select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="currentBalance">Saldo Atual Inicial</Label>
-              <Input id="currentBalance" name="currentBalance" type="number" step="0.01" defaultValue="0" required />
+              <Label htmlFor="currentBalance">{accountToEdit ? 'Saldo Atual' : 'Saldo Atual Inicial'}</Label>
+              <CurrencyInput id="currentBalance" name="currentBalance" required value={accountToEdit ? Number(accountToEdit.currentBalance) : undefined} />
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>

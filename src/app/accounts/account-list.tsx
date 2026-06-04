@@ -1,7 +1,9 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Wallet, PiggyBank, Landmark } from 'lucide-react';
+import { Wallet, PiggyBank, Landmark, Pencil } from 'lucide-react';
+import { AccountFormDialog } from './account-form-dialog';
+import { Button } from '@/components/ui/button';
 
 type Account = {
   id: number;
@@ -36,8 +38,18 @@ export function AccountList({ accounts }: { accounts: Account[] }) {
       {accounts.map((account) => (
         <Card key={account.id} className="transition-all hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{account.name}</CardTitle>
-            {getTypeIcon(account.type)}
+            <div className="flex items-center gap-2">
+              {getTypeIcon(account.type)}
+              <CardTitle className="text-sm font-medium">{account.name}</CardTitle>
+            </div>
+            <AccountFormDialog 
+              accountToEdit={account} 
+              trigger={
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              } 
+            />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(account.currentBalance)}</div>

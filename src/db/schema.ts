@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, integer, boolean, numeric, date, AnyPgColumn } from 'drizzle-orm/pg-core';
+import { pgTable, serial, varchar, integer, boolean, numeric, date, uuid, timestamp, jsonb, AnyPgColumn } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 export const settings = pgTable('settings', {
@@ -50,6 +50,17 @@ export const transactions = pgTable('transactions', {
   installmentCurrent: integer('installment_current'),
   installmentTotal: integer('installment_total'),
   parentTransactionId: integer('parent_transaction_id').references((): AnyPgColumn => transactions.id),
+  observations: varchar('observations', { length: 500 }),
+});
+
+export const importLogs = pgTable('import_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  filename: varchar('filename', { length: 255 }).notNull(),
+  totalRows: integer('total_rows').notNull(),
+  successRows: integer('success_rows').notNull(),
+  errorRows: integer('error_rows').notNull(),
+  errorsDetail: jsonb('errors_detail'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 // Relations

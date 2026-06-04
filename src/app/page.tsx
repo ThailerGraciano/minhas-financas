@@ -1,25 +1,32 @@
 import { getDashboardData } from '@/app/actions/dashboard';
+import { getSettings } from '@/app/actions/settings';
+import { CompetencyFilter } from '@/components/competency-filter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { format } from 'date-fns';
 import { ArrowUpCircle, ArrowDownCircle, Wallet, CreditCard as CreditCardIcon } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { Suspense } from 'react';
 
-export default async function DashboardPage() {
-  const data = await getDashboardData();
+export default async function DashboardPage(props: { searchParams?: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const searchParams = await props.searchParams;
+  const monthParam = searchParams?.month as string | undefined;
+  const currentMonth = monthParam || format(new Date(), 'yyyy-MM');
+
+  const [data, settingsData] = await Promise.all([
+    getDashboardData(currentMonth),
+    getSettings(),
+  ]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
-  
-  // Format the month to a readable string (e.g., "Junho 2026")
-  const currentMonthDate = parseISO(`${data.currentMonth}-01`);
-  const monthName = format(currentMonthDate, 'MMMM yyyy', { locale: ptBR });
 
   return (
     <div className="container mx-auto p-4 md:p-8 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-2">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground capitalize">Competência: {monthName}</p>
+        <Suspense fallback={null}>
+          <CompetencyFilter closingDay={settingsData.closingDay} />
+        </Suspense>
       </div>
 
       {/* Resumo do Mês */}
@@ -79,7 +86,7 @@ export default async function DashboardPage() {
 
         <Card className="col-span-1">
           <CardHeader>
-            <CardTitle>Faturas Abertas (Este Mês)</CardTitle>
+            <CardTitle>Faturas Abertas</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {data.cardInvoices.map(invoice => (

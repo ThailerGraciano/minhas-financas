@@ -5,8 +5,22 @@ import { transactions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { addMonths, format, parseISO } from 'date-fns';
 import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
 
 type NewTransaction = typeof transactions.$inferInsert;
+
+const transactionSchema = z.object({
+  description: z.string().min(1, 'Descrição é obrigatória'),
+  amount: z.string().refine((val) => Number(val) > 0, 'Valor deve ser maior que zero'),
+  date: z.string().min(1, 'Data é obrigatória'),
+  competencyMonth: z.string().min(1),
+  categoryId: z.number().int().positive('Categoria é obrigatória'),
+  type: z.string().min(1),
+  status: z.string().min(1),
+}).passthrough();
+
+// Regra: receitas e despesas DEVEM ter subcategoria
+const subcategoryRequiredTypes = ['income', 'expense', 'credit_card_expense'];
 
 export async function getTransactions(month?: string) {
   const currentMonth = month || format(new Date(), 'yyyy-MM');
@@ -23,6 +37,21 @@ export async function getTransactions(month?: string) {
 }
 
 export async function createTransaction(data: NewTransaction) {
+  // Validação Zod
+  const parsed = transactionSchema.safeParse(data);
+  if (!parsed.success) {
+    const firstError = parsed.error.issues[0]?.message || 'Dados inválidos';
+    return { success: false, error: firstError };
+  }
+
+  // Subcategoria obrigatória para receitas e despesas
+  if (
+    subcategoryRequiredTypes.includes(data.type) &&
+    (!data.subcategoryId || data.subcategoryId <= 0)
+  ) {
+    return { success: false, error: 'Subcategoria é obrigatória para receitas e despesas' };
+  }
+
   try {
     if (data.installmentTotal && data.installmentTotal > 1) {
       const [parentTx] = await db.insert(transactions).values({
@@ -77,4 +106,34 @@ export async function markTransactionAsPaid(id: string | number) {
     console.error('Error updating transaction status:', error);
     return { success: false, error: 'Failed to update transaction' };
   }
+}
+
+export async function getCreditCardInvoices(creditCardId: number, month?: string) {
+  const currentMonth = month || format(new Date(), 'yyyy-MM');
+  
+  return await db.query.transactions.findMany({
+    where: (t, { eq, and }) => and(
+      eq(t.creditCardId, creditCardId),
+      eq(t.type, 'credit_card_expense'),
+      eq(t.competencyMonth, currentMonth)
+    ),
+    with: {
+      category: true,
+      subcategory: true,
+    },
+    orderBy: (t, { desc }) => [desc(t.date)],
+  });
+}
+
+export async function getCreditCardInvoiceMonths(creditCardId: number) {
+  const txs = await db.query.transactions.findMany({
+    where: (t, { eq, and }) => and(
+      eq(t.creditCardId, creditCardId),
+      eq(t.type, 'credit_card_expense')
+    ),
+    columns: { competencyMonth: true },
+    orderBy: (t, { desc }) => [desc(t.competencyMonth)]
+  });
+  
+  return [...new Set(txs.map(t => t.competencyMonth))];
 }

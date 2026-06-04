@@ -123,8 +123,8 @@ async function getOrCreateCategory(catName: string, subName: string | undefined,
 
 // PROCESS EXPENSES
 async function processExpenses(rows: any[], dbState: DbState, closingDay: number, filename: string) {
-  const transactionsToInsert = [];
-  const errorsDetail = [];
+  const transactionsToInsert: any[] = [];
+  const errorsDetail: any[] = [];
   
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -195,8 +195,8 @@ async function processExpenses(rows: any[], dbState: DbState, closingDay: number
 
 // PROCESS INCOMES
 async function processIncomes(rows: any[], dbState: DbState, closingDay: number, filename: string) {
-  const transactionsToInsert = [];
-  const errorsDetail = [];
+  const transactionsToInsert: any[] = [];
+  const errorsDetail: any[] = [];
   
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -258,7 +258,7 @@ async function processIncomes(rows: any[], dbState: DbState, closingDay: number,
 // PROCESS TRANSFERS
 async function processTransfers(rows: any[], dbState: DbState, closingDay: number, filename: string) {
   let successRows = 0;
-  const errorsDetail = [];
+  const errorsDetail: any[] = [];
   
   // Vamos buscar a categoria padrão de transferências, ou criá-la se não existir.
   const { categoryId: transferCategoryId, subcategoryId: transferSubcategoryId } = 

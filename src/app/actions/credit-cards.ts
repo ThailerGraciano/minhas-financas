@@ -73,7 +73,11 @@ export async function getInvoiceSummary(creditCardId: string | number, competenc
   };
 }
 
-export async function payFullInvoice(creditCardId: string | number, competencyMonth: string, accountId: string | number) {
+export async function payFullInvoice(
+  creditCardId: string | number,
+  competencyMonth: string,
+  accountId: string | number
+): Promise<{ success: boolean; error?: string }> {
   const parsedCardId = Number(creditCardId);
   const parsedAccountId = Number(accountId);
 

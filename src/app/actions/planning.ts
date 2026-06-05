@@ -20,26 +20,30 @@ export async function getProjectedCashFlow(accountId?: string) {
   const todayDate = format(baseDate, 'yyyy-MM-dd');
   
   const conditions = [
-    eq(transactions.status, 'pending'),
-    gte(transactions.date, todayDate)
+    eq(transactions.status, 'pending')
   ];
   
   if (accountId) {
     conditions.push(eq(transactions.accountId, Number(accountId)));
   }
 
-  const pendingTxs = await db.query.transactions.findMany({
+  const allPendingTxs = await db.query.transactions.findMany({
     where: and(...conditions),
     with: {
       category: true,
       account: true,
+      creditCard: true,
     },
     orderBy: [asc(transactions.date)],
   });
 
-  // 3. Group by date map
-  const grouped = new Map<string, typeof pendingTxs>();
-  for (const tx of pendingTxs) {
+  // Split into overdue (before today) and projected (today and future)
+  const overdueTransactions = allPendingTxs.filter(tx => tx.date < todayDate);
+  const futurePendingTxs = allPendingTxs.filter(tx => tx.date >= todayDate);
+
+  // 3. Group by date map (only for future/today transactions)
+  const grouped = new Map<string, typeof futurePendingTxs>();
+  for (const tx of futurePendingTxs) {
     if (!grouped.has(tx.date)) {
       grouped.set(tx.date, []);
     }
@@ -76,5 +80,8 @@ export async function getProjectedCashFlow(accountId?: string) {
     });
   }
 
-  return projection;
+  return {
+    projection,
+    overdueTransactions,
+  };
 }

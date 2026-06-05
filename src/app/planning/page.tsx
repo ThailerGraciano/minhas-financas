@@ -4,10 +4,8 @@ import { PlanningFilter } from './planning-filter';
 import { PlanningChart } from './planning-chart';
 import { DayByDayForecast } from './day-by-day-forecast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { TrendingUp, WalletCards } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { UpcomingTransactionsManager } from './upcoming-transactions-manager';
+import { TrendingUp } from 'lucide-react';
 
 export default async function PlanningPage(props: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -16,18 +14,10 @@ export default async function PlanningPage(props: {
   const accountId = searchParams?.accountId as string | undefined;
 
   const accounts = await getAccounts();
-  const projection = await getProjectedCashFlow(accountId);
+  const { projection, overdueTransactions } = await getProjectedCashFlow(accountId);
 
   // Extract all transactions from projection to show in Payment Manager
   const allUpcomingTransactions = projection.flatMap(p => p.transactions_of_the_day);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-  };
-
-  const formatDay = (dateStr: string) => {
-    return format(parseISO(dateStr), "dd/MM", { locale: ptBR });
-  };
 
   return (
     <div className="container mx-auto p-4 md:p-8 space-y-6 max-w-6xl">
@@ -61,54 +51,10 @@ export default async function PlanningPage(props: {
         <DayByDayForecast projection={projection} />
 
         {/* Payment Manager */}
-        <Card className="flex flex-col h-[600px]">
-          <CardHeader>
-            <CardTitle className="text-lg font-medium flex items-center gap-2">
-              <WalletCards className="w-5 h-5 text-muted-foreground" />
-              Próximos Lançamentos (Gerenciador)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto p-0">
-            {allUpcomingTransactions.length === 0 ? (
-              <div className="text-center p-12 text-muted-foreground border-t border-dashed">
-                Nenhum lançamento previsto para os próximos 30 dias.
-              </div>
-            ) : (
-              <Table>
-                <TableHeader className="sticky top-0 bg-background z-10">
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {allUpcomingTransactions.map((tx) => {
-                    const isIncome = tx.type === 'income';
-                    return (
-                      <TableRow key={tx.id}>
-                        <TableCell className="font-medium whitespace-nowrap">
-                          {formatDay(tx.date)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium line-clamp-1" title={tx.description}>{tx.description}</span>
-                            <span className="text-xs text-muted-foreground truncate">
-                              {tx.account?.name || 'Geral'} • {tx.category?.name}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className={`text-right font-bold whitespace-nowrap ${isIncome ? 'text-green-600' : 'text-red-500'}`}>
-                          {isIncome ? '+' : '-'}{formatCurrency(Number(tx.amount))}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        <UpcomingTransactionsManager
+          upcomingTransactions={allUpcomingTransactions}
+          overdueTransactions={overdueTransactions}
+        />
       </div>
     </div>
   );

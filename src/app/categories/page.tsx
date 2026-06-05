@@ -1,6 +1,6 @@
 import { getCategories } from '@/app/actions/categories';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AddCategoryDialog, AddSubcategoryForm } from './client-components';
+import { AddCategoryDialog, AddSubcategoryForm, CategoryActions } from './client-components';
 import { CategoryIcon } from '@/components/category-icon';
 
 type CategoriesData = Awaited<ReturnType<typeof getCategories>>;
@@ -35,11 +35,12 @@ export default async function CategoriesPage() {
           ) : (
             expenseCategories.map((cat: Category) => (
               <Card key={cat.id}>
-                <CardHeader className="pb-2">
+                <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <CategoryIcon name={cat.icon} className="h-5 w-5 text-red-500" />
                     {cat.name}
                   </CardTitle>
+                  <CategoryActions category={cat} />
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
@@ -73,11 +74,12 @@ export default async function CategoriesPage() {
           ) : (
             incomeCategories.map((cat: Category) => (
               <Card key={cat.id}>
-                <CardHeader className="pb-2">
+                <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <CategoryIcon name={cat.icon} className="h-5 w-5 text-green-500" />
                     {cat.name}
                   </CardTitle>
+                  <CategoryActions category={cat} />
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">

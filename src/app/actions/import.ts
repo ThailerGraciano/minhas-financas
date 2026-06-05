@@ -148,18 +148,25 @@ async function processExpenses(rows: any[], dbState: DbState, closingDay: number
       if (!dataVencimento) throw new Error(`Data de Vencimento inválida ou não encontrada.`);
       
       const competencyMonth = getCompetencyMonth(dataVencimento, closingDay);
-      const status = efetivacaoStr ? 'paid' : 'pending';
+      const dataEfetivacao = parseDate(efetivacaoStr);
+      const status = dataEfetivacao ? 'paid' : 'pending';
+      const paidAt = dataEfetivacao || null;
       const amount = parseAmount(valorStr);
 
       let accountId = null;
       let creditCardId = null;
       
-      // Regra 1: Lê CARTÃO, se existir ignora CONTA
+      // Resolve CARTÃO (se preenchido)
       if (cartaoName) {
         creditCardId = await getOrCreateCard(cartaoName, closingDay, dbState);
-      } else if (contaName) {
+      }
+
+      // Resolve CONTA (sempre que preenchido, mesmo com cartão)
+      if (contaName) {
         accountId = await getOrCreateAccount(contaName, dbState);
-      } else {
+      }
+
+      if (!creditCardId && !accountId) {
         throw new Error('Conta ou Cartão não informado.');
       }
 
@@ -177,6 +184,7 @@ async function processExpenses(rows: any[], dbState: DbState, closingDay: number
         date: format(dataVencimento, 'yyyy-MM-dd'),
         competencyMonth,
         status,
+        paidAt,
         isFixed: false,
         observations: `Importado do arquivo ${filename} - Linha ${rowIndex}`,
       });
@@ -219,7 +227,9 @@ async function processIncomes(rows: any[], dbState: DbState, closingDay: number,
       if (!dataVencimento) throw new Error(`Data de Vencimento inválida ou não encontrada.`);
       
       const competencyMonth = getCompetencyMonth(dataVencimento, closingDay);
-      const status = efetivacaoStr ? 'paid' : 'pending';
+      const dataEfetivacao = parseDate(efetivacaoStr);
+      const status = dataEfetivacao ? 'paid' : 'pending';
+      const paidAt = dataEfetivacao || null;
       const amount = parseAmount(valorStr);
 
       if (!contaName) throw new Error('Conta não informada.');
@@ -239,6 +249,7 @@ async function processIncomes(rows: any[], dbState: DbState, closingDay: number,
         date: format(dataVencimento, 'yyyy-MM-dd'),
         competencyMonth,
         status,
+        paidAt,
         isFixed: false,
         observations: `Importado do arquivo ${filename} - Linha ${rowIndex}`,
       });
@@ -285,7 +296,9 @@ async function processTransfers(rows: any[], dbState: DbState, closingDay: numbe
         if (!dataVencimento) throw new Error(`Data de Vencimento inválida ou não encontrada.`);
         
         const competencyMonth = getCompetencyMonth(dataVencimento, closingDay);
-        const status = efetivacaoStr ? 'paid' : 'pending';
+        const dataEfetivacao = parseDate(efetivacaoStr);
+        const status = dataEfetivacao ? 'paid' : 'pending';
+        const paidAt = dataEfetivacao || null;
         const amount = parseAmount(valorStr);
 
         if (!origemName || !destinoName) throw new Error('Contas de origem e destino são obrigatórias.');
@@ -307,6 +320,7 @@ async function processTransfers(rows: any[], dbState: DbState, closingDay: numbe
           date: format(dataVencimento, 'yyyy-MM-dd'),
           competencyMonth,
           status,
+          paidAt,
           isFixed: false,
           observations: observationsText,
         }).returning({ id: transactions.id });
@@ -323,6 +337,7 @@ async function processTransfers(rows: any[], dbState: DbState, closingDay: numbe
           date: format(dataVencimento, 'yyyy-MM-dd'),
           competencyMonth,
           status,
+          paidAt,
           isFixed: false,
           parentTransactionId: outTx.id,
           observations: observationsText,

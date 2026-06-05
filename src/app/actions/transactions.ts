@@ -108,6 +108,23 @@ export async function markTransactionAsPaid(id: string | number) {
   }
 }
 
+export async function toggleTransactionStatus(id: string | number, currentStatus: string) {
+  try {
+    const newStatus = currentStatus === 'paid' ? 'pending' : 'paid';
+    await db.update(transactions)
+      .set({ status: newStatus })
+      .where(eq(transactions.id, Number(id)));
+    
+    revalidatePath('/transactions');
+    revalidatePath('/');
+    revalidatePath('/credit-cards');
+    return { success: true, newStatus };
+  } catch (error) {
+    console.error('Error toggling transaction status:', error);
+    return { success: false, error: 'Failed to toggle transaction status' };
+  }
+}
+
 export async function getCreditCardInvoices(creditCardId: number, month?: string) {
   const currentMonth = month || format(new Date(), 'yyyy-MM');
   
@@ -136,4 +153,35 @@ export async function getCreditCardInvoiceMonths(creditCardId: number) {
   });
   
   return [...new Set(txs.map(t => t.competencyMonth))];
+}
+
+export async function deleteTransaction(id: number) {
+  try {
+    await db.delete(transactions).where(eq(transactions.id, id));
+    revalidatePath('/transactions');
+    revalidatePath('/');
+    revalidatePath('/planning');
+    revalidatePath('/credit-cards');
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting transaction:', error);
+    return { success: false, error: 'Failed to delete transaction' };
+  }
+}
+
+export async function updateTransaction(id: number, data: Partial<NewTransaction>) {
+  try {
+    await db.update(transactions)
+      .set(data)
+      .where(eq(transactions.id, id));
+    
+    revalidatePath('/transactions');
+    revalidatePath('/');
+    revalidatePath('/planning');
+    revalidatePath('/credit-cards');
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating transaction:', error);
+    return { success: false, error: 'Failed to update transaction' };
+  }
 }

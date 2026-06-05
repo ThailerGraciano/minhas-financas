@@ -20,6 +20,7 @@ export function AccountFormDialog({ accountToEdit, trigger }: { accountToEdit?: 
   const [open, setOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState('');
+  const [balance, setBalance] = useState<number>(accountToEdit ? Number(accountToEdit.currentBalance) : 0);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -86,7 +87,7 @@ export function AccountFormDialog({ accountToEdit, trigger }: { accountToEdit?: 
             </div>
             <div className="grid gap-2">
               <Label htmlFor="currentBalance">{accountToEdit ? 'Saldo Atual' : 'Saldo Atual Inicial'}</Label>
-              <CurrencyInput id="currentBalance" name="currentBalance" required value={accountToEdit ? Number(accountToEdit.currentBalance) : undefined} />
+              <CurrencyInput id="currentBalance" name="currentBalance" required value={balance} onValueChange={setBalance} />
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>

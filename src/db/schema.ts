@@ -51,6 +51,7 @@ export const transactions = pgTable('transactions', {
   installmentTotal: integer('installment_total'),
   parentTransactionId: integer('parent_transaction_id').references((): AnyPgColumn => transactions.id),
   observations: varchar('observations', { length: 500 }),
+  paidAt: timestamp('paid_at'),
 });
 
 export const importLogs = pgTable('import_logs', {

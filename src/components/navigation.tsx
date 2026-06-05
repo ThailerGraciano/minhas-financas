@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Settings, CreditCard, PieChart, Landmark, Receipt } from 'lucide-react';
+import { Home, Settings, CreditCard, PieChart, Landmark, Receipt, TrendingUp, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ModeToggle } from '@/components/mode-toggle';
 
@@ -11,6 +11,8 @@ const navItems = [
   { name: 'Contas', href: '/accounts', icon: Landmark },
   { name: 'Cartões', href: '/credit-cards', icon: CreditCard },
   { name: 'Transações', href: '/transactions', icon: Receipt },
+  { name: 'Planejamento', href: '/planning', icon: TrendingUp },
+  { name: 'Importar', href: '/import', icon: Download },
   { name: 'Categorias', href: '/categories', icon: PieChart },
   { name: 'Ajustes', href: '/settings', icon: Settings },
 ];

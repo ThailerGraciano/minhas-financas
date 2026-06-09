@@ -9,7 +9,7 @@ export const settings = pgTable('settings', {
 export const accounts = pgTable('accounts', {
   id: serial('id').primaryKey(),
   name: varchar('name', { length: 255 }).notNull(),
-  type: varchar('type', { length: 50 }).notNull(), // checking, savings, wallet
+  type: varchar('type', { length: 50 }).notNull(), // checking, savings, wallet, stash
   currentBalance: numeric('current_balance', { precision: 12, scale: 2 }).default('0').notNull(),
 });
 
@@ -34,6 +34,19 @@ export const creditCards = pgTable('credit_cards', {
   dueDay: integer('due_day').notNull(),
 });
 
+export const fixedTransactions = pgTable('fixed_transactions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  type: varchar('type', { length: 50 }).notNull(), // income, expense, credit_card_expense
+  accountId: integer('account_id').references(() => accounts.id),
+  creditCardId: integer('credit_card_id').references(() => creditCards.id),
+  categoryId: integer('category_id').references(() => categories.id).notNull(),
+  subcategoryId: integer('subcategory_id').references(() => subcategories.id),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
+  description: varchar('description', { length: 255 }).notNull(),
+  startDate: date('start_date').notNull(),
+  active: boolean('active').default(true).notNull(),
+});
+
 export const transactions = pgTable('transactions', {
   id: serial('id').primaryKey(),
   type: varchar('type', { length: 50 }).notNull(), // income, expense, transfer, credit_card_expense
@@ -46,7 +59,8 @@ export const transactions = pgTable('transactions', {
   date: date('date').notNull(),
   competencyMonth: varchar('competency_month', { length: 7 }).notNull(), // YYYY-MM
   status: varchar('status', { length: 50 }).notNull(), // pending, paid
-  isFixed: boolean('is_fixed').default(false).notNull(),
+  isFixed: boolean('is_fixed').default(false).notNull(), // deprecated
+  fixedTransactionId: uuid('fixed_transaction_id').references(() => fixedTransactions.id),
   installmentCurrent: integer('installment_current'),
   installmentTotal: integer('installment_total'),
   parentTransactionId: integer('parent_transaction_id').references((): AnyPgColumn => transactions.id),
@@ -86,6 +100,30 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
     fields: [transactions.parentTransactionId],
     references: [transactions.id],
   }),
+  fixedTransaction: one(fixedTransactions, {
+    fields: [transactions.fixedTransactionId],
+    references: [fixedTransactions.id],
+  }),
+}));
+
+export const fixedTransactionsRelations = relations(fixedTransactions, ({ one, many }) => ({
+  account: one(accounts, {
+    fields: [fixedTransactions.accountId],
+    references: [accounts.id],
+  }),
+  creditCard: one(creditCards, {
+    fields: [fixedTransactions.creditCardId],
+    references: [creditCards.id],
+  }),
+  category: one(categories, {
+    fields: [fixedTransactions.categoryId],
+    references: [categories.id],
+  }),
+  subcategory: one(subcategories, {
+    fields: [fixedTransactions.subcategoryId],
+    references: [subcategories.id],
+  }),
+  transactions: many(transactions),
 }));
 
 export const categoriesRelations = relations(categories, ({ many }) => ({

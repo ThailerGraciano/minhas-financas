@@ -159,7 +159,6 @@ export async function payFullInvoice(
         date: format(new Date(), 'yyyy-MM-dd'),
         competencyMonth: competencyMonth,
         status: 'paid',
-        isFixed: false,
       });
 
       // 5. Deduct from account balance

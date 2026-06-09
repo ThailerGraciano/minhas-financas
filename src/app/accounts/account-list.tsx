@@ -1,7 +1,7 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Wallet, PiggyBank, Landmark, Pencil } from 'lucide-react';
+import { Wallet, PiggyBank, Landmark, Pencil, Archive } from 'lucide-react';
 import { AccountFormDialog } from './account-form-dialog';
 import { Button } from '@/components/ui/button';
 
@@ -25,6 +25,7 @@ export function AccountList({ accounts }: { accounts: Account[] }) {
     switch (type) {
       case 'savings': return <PiggyBank className="w-5 h-5 text-blue-500" />;
       case 'wallet': return <Wallet className="w-5 h-5 text-green-500" />;
+      case 'stash': return <Archive className="w-5 h-5 text-amber-500" />;
       default: return <Landmark className="w-5 h-5 text-purple-500" />;
     }
   };
@@ -54,7 +55,7 @@ export function AccountList({ accounts }: { accounts: Account[] }) {
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(account.currentBalance)}</div>
             <p className="text-xs text-muted-foreground mt-1 capitalize">
-              {account.type === 'checking' ? 'Conta Corrente' : account.type === 'savings' ? 'Poupança' : 'Carteira'}
+              {account.type === 'checking' ? 'Conta Corrente' : account.type === 'savings' ? 'Poupança' : account.type === 'stash' ? 'Caixinha' : 'Carteira'}
             </p>
           </CardContent>
         </Card>

@@ -6,6 +6,7 @@ import { CategoryIcon } from "@/components/category-icon";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { CurrencyInput } from "@/components/ui/currency-input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -139,10 +140,16 @@ export function TransactionFormDialog() {
     } else if (tab === "income") {
       baseData.type = "income";
       baseData.accountId = Number(form.get("accountIdIncome"));
+      
+      baseData.isFixed = expenseType === "fixed";
+
+      if (expenseType === "installment") {
+        baseData.installmentTotal = Number(form.get("installmentTotal"));
+      }
     } else if (tab === "transfer") {
       baseData.type = "transfer";
       baseData.accountId = Number(form.get("accountIdTransferOrigin"));
-      // Transferências reais precisam de lógica dupla, mas manteremos simples por enquanto
+      baseData.destinationAccountId = Number(form.get("accountIdTransferDest"));
     }
 
     const res = await createTransaction(baseData as NewTransaction);
@@ -194,7 +201,7 @@ export function TransactionFormDialog() {
           </DialogDescription>
         </DialogHeader>
 
-        {formData ? (
+        {open && formData ? (
           <Tabs
             value={tab}
             onValueChange={(val) => {
@@ -222,9 +229,9 @@ export function TransactionFormDialog() {
                   <Label htmlFor="amount">Valor</Label>
                   <CurrencyInput id="amount" name="amount" required />
                 </div>
-                <div className="grid gap-2">
+                 <div className="grid gap-2">
                   <Label htmlFor="date">Data</Label>
-                  <Input id="date" name="date" type="date" defaultValue={format(new Date(), "yyyy-MM-dd")} required />
+                  <DatePicker id="date" name="date" defaultValue={format(new Date(), "yyyy-MM-dd")} required />
                 </div>
               </div>
 
@@ -304,7 +311,7 @@ export function TransactionFormDialog() {
                   </div>
                 </div>
 
-                {expenseType === "installment" && (
+                {tab === "expense" && expenseType === "installment" && (
                   <div className="grid gap-2">
                     <Label htmlFor="installmentTotal">Quantidade de Parcelas</Label>
                     <Input
@@ -405,6 +412,53 @@ export function TransactionFormDialog() {
                     ))}
                   </select>
                 </div>
+
+                <div className="grid gap-2">
+                  <Label>Tipo de Receita</Label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={expenseType === "single"}
+                        onChange={() => setExpenseType("single")}
+                        className="accent-primary"
+                      />{" "}
+                      Única
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={expenseType === "fixed"}
+                        onChange={() => setExpenseType("fixed")}
+                        className="accent-primary"
+                      />{" "}
+                      Fixa
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={expenseType === "installment"}
+                        onChange={() => setExpenseType("installment")}
+                        className="accent-primary"
+                      />{" "}
+                      Parcelada
+                    </label>
+                  </div>
+                </div>
+
+                {tab === "income" && expenseType === "installment" && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="installmentTotal">Quantidade de Parcelas</Label>
+                    <Input
+                      id="installmentTotal"
+                      name="installmentTotal"
+                      type="number"
+                      min="2"
+                      defaultValue="2"
+                      required
+                    />
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="transfer" className="space-y-4">
@@ -451,12 +505,12 @@ export function TransactionFormDialog() {
               </div>
             </form>
           </Tabs>
-        ) : (
+        ) : open ? (
           <div className="py-8 flex flex-col items-center justify-center text-muted-foreground">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
             Carregando formulário...
           </div>
-        )}
+        ) : null}
       </DialogContent>
     </Dialog>
   );

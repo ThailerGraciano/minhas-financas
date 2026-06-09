@@ -45,3 +45,40 @@ export async function getDashboardData(month?: string) {
     accounts: allAccounts,
   };
 }
+
+export async function getBalancesByType() {
+  const allAccounts = await db.select().from(accounts);
+  
+  const grouped = allAccounts.reduce((acc, curr) => {
+    const type = curr.type;
+    const balance = Number(curr.currentBalance);
+    if (!acc[type]) {
+      acc[type] = 0;
+    }
+    acc[type] += balance;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const labels: Record<string, string> = {
+    checking: 'Conta Corrente',
+    savings: 'Poupança',
+    wallet: 'Carteira',
+    stash: 'Caixinhas',
+  };
+
+  const balancesByType = Object.entries(grouped).map(([type, total]) => ({
+    type,
+    label: labels[type] || 'Outros',
+    total,
+  }));
+
+  // Ordena por maior saldo primeiro
+  balancesByType.sort((a, b) => b.total - a.total);
+
+  const totalBalance = balancesByType.reduce((acc, curr) => acc + curr.total, 0);
+
+  return {
+    balancesByType,
+    totalBalance,
+  };
+}

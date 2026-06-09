@@ -185,7 +185,6 @@ async function processExpenses(rows: any[], dbState: DbState, closingDay: number
         competencyMonth,
         status,
         paidAt,
-        isFixed: false,
         observations: `Importado do arquivo ${filename} - Linha ${rowIndex}`,
       });
     } catch (err: any) {
@@ -250,7 +249,6 @@ async function processIncomes(rows: any[], dbState: DbState, closingDay: number,
         competencyMonth,
         status,
         paidAt,
-        isFixed: false,
         observations: `Importado do arquivo ${filename} - Linha ${rowIndex}`,
       });
     } catch (err: any) {
@@ -321,7 +319,6 @@ async function processTransfers(rows: any[], dbState: DbState, closingDay: numbe
           competencyMonth,
           status,
           paidAt,
-          isFixed: false,
           observations: observationsText,
         }).returning({ id: transactions.id });
 
@@ -338,7 +335,6 @@ async function processTransfers(rows: any[], dbState: DbState, closingDay: numbe
           competencyMonth,
           status,
           paidAt,
-          isFixed: false,
           parentTransactionId: outTx.id,
           observations: observationsText,
         });

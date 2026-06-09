@@ -83,6 +83,7 @@ export function AccountFormDialog({ accountToEdit, trigger }: { accountToEdit?: 
                 <option value="checking">Conta Corrente</option>
                 <option value="savings">Poupança</option>
                 <option value="wallet">Carteira (Dinheiro)</option>
+                <option value="stash">Caixinha</option>
               </select>
             </div>
             <div className="grid gap-2">

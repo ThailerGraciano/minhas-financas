@@ -1,19 +1,21 @@
-import { getDashboardData } from '@/app/actions/dashboard';
+import { getDashboardData, getBalancesByType } from '@/app/actions/dashboard';
 import { getSettings } from '@/app/actions/settings';
 import { CompetencyFilter } from '@/components/competency-filter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { ArrowUpCircle, ArrowDownCircle, Wallet, CreditCard as CreditCardIcon } from 'lucide-react';
 import { Suspense } from 'react';
+import { AccountBalancesSummary } from '@/components/account-balances-summary';
 
 export default async function DashboardPage(props: { searchParams?: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const searchParams = await props.searchParams;
   const monthParam = searchParams?.month as string | undefined;
   const currentMonth = monthParam || format(new Date(), 'yyyy-MM');
 
-  const [data, settingsData] = await Promise.all([
+  const [data, settingsData, balancesData] = await Promise.all([
     getDashboardData(currentMonth),
     getSettings(),
+    getBalancesByType(),
   ]);
 
   const formatCurrency = (value: number) => {
@@ -29,19 +31,10 @@ export default async function DashboardPage(props: { searchParams?: Promise<{ [k
         </Suspense>
       </div>
 
+      <AccountBalancesSummary balances={balancesData.balancesByType} totalBalance={balancesData.totalBalance} />
+
       {/* Resumo do Mês */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="bg-primary/5 border-primary/20">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saldo Consolidado</CardTitle>
-            <Wallet className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{formatCurrency(data.totalBalance)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Soma de todas as contas</p>
-          </CardContent>
-        </Card>
-        
+      <div className="grid gap-4 md:grid-cols-2 mt-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Receitas do Mês</CardTitle>

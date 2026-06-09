@@ -6,6 +6,7 @@ import { CategoryIcon } from "@/components/category-icon";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { CurrencyInput } from "@/components/ui/currency-input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -68,6 +69,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
     const description = form.get("description") as string;
     const amount = form.get("amount") as string;
     const date = form.get("date") as string;
+
     const competencyMonth = date.substring(0, 7);
 
     const updateData = {
@@ -102,7 +104,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
           </DialogDescription>
         </DialogHeader>
 
-        {formData ? (
+        {open && formData ? (
           <form onSubmit={handleSubmit} className="mt-4 space-y-4">
             <div className="grid gap-2">
               <Label htmlFor="description">Descrição</Label>
@@ -116,7 +118,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="date">Data</Label>
-                <Input id="date" name="date" type="date" defaultValue={transaction.date.substring(0, 10)} required />
+                <DatePicker id="date" name="date" defaultValue={transaction.date.substring(0, 10)} required />
               </div>
             </div>
 
@@ -177,12 +179,12 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
               </Button>
             </div>
           </form>
-        ) : (
+        ) : open ? (
           <div className="py-8 flex flex-col items-center justify-center text-muted-foreground">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
             Carregando formulário...
           </div>
-        )}
+        ) : null}
       </DialogContent>
     </Dialog>
   );

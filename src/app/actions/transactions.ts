@@ -1,19 +1,8 @@
 'use server';
 
 import { db } from '@/db';
-import { transactions, accounts, fixedTransactions } from '@/db/schema';
+import { transactions, fixedTransactions } from '@/db/schema';
 import { eq, or, and, gte, lte } from 'drizzle-orm';
-
-async function adjustAccountBalance(txExecutor: any, accountId: number, amount: number, operation: 'add' | 'subtract') {
-  const [account] = await txExecutor.select().from(accounts).where(eq(accounts.id, accountId));
-  if (account) {
-    const current = Number(account.currentBalance);
-    const newBalance = operation === 'add' ? current + amount : current - amount;
-    await txExecutor.update(accounts)
-      .set({ currentBalance: newBalance.toFixed(2) })
-      .where(eq(accounts.id, accountId));
-  }
-}
 import { addMonths, format, parseISO, endOfMonth } from 'date-fns';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
@@ -35,7 +24,7 @@ const subcategoryRequiredTypes = ['income', 'expense', 'credit_card_expense'];
 
 export async function getTransactions(month?: string) {
   const currentMonth = month || format(new Date(), 'yyyy-MM');
-  
+
   // Consulta A: Transações normais do mês
   const realTransactions = await db.query.transactions.findMany({
     where: eq(transactions.competencyMonth, currentMonth),
@@ -74,9 +63,9 @@ export async function getTransactions(month?: string) {
     .map(ft => {
       const dayStr = ft.startDate.split('-')[2];
       const targetDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), parseInt(dayStr));
-      const finalDate = targetDate.getMonth() !== monthDate.getMonth() 
-          ? endOfMonth(monthDate) 
-          : targetDate;
+      const finalDate = targetDate.getMonth() !== monthDate.getMonth()
+        ? endOfMonth(monthDate)
+        : targetDate;
       const dateStr = format(finalDate, 'yyyy-MM-dd');
 
       const tempId = -Math.floor(Math.random() * 1000000) - 1;
@@ -107,7 +96,7 @@ export async function getTransactions(month?: string) {
     });
 
   const allTransactions = [...realTransactions, ...virtualTransactions];
-  
+
   // Ordena por data (descendente)
   allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -142,23 +131,12 @@ export async function createTransaction(data: NewTransaction & { destinationAcco
         }).returning();
 
         // 2. Insert destination transaction (Entrada)
-        const [destTx] = await tx.insert(transactions).values({
+        await tx.insert(transactions).values({
           ...txData,
           accountId: destinationAccountId,
           description: `${txData.description} (Entrada)`,
           parentTransactionId: originTx.id,
-        }).returning();
-
-        // 3. Update balances if created as paid
-        if (data.status === 'paid') {
-          const amount = Number(data.amount);
-          if (data.accountId) {
-            await adjustAccountBalance(tx, data.accountId, amount, 'subtract');
-          }
-          if (destinationAccountId) {
-            await adjustAccountBalance(tx, destinationAccountId, amount, 'add');
-          }
-        }
+        });
 
         return { success: true, parentId: originTx.id };
       });
@@ -188,7 +166,7 @@ export async function createTransaction(data: NewTransaction & { destinationAcco
 
         for (let i = 0; i < 12; i++) {
           const nextDate = addMonths(baseDate, i);
-          
+
           installmentsToInsert.push({
             ...txData,
             date: format(nextDate, 'yyyy-MM-dd'),
@@ -200,14 +178,6 @@ export async function createTransaction(data: NewTransaction & { destinationAcco
 
         await tx.insert(transactions).values(installmentsToInsert);
 
-        if (txData.status === 'paid') {
-          const amount = Number(txData.amount);
-          if (txData.type === 'income' && txData.accountId) {
-            await adjustAccountBalance(tx, txData.accountId, amount, 'add');
-          } else if (txData.type === 'expense' && txData.accountId) {
-            await adjustAccountBalance(tx, txData.accountId, amount, 'subtract');
-          }
-        }
         return { success: true };
       });
 
@@ -241,31 +211,12 @@ export async function createTransaction(data: NewTransaction & { destinationAcco
         await db.insert(transactions).values(installmentsToInsert);
       }
 
-      // Revert/Update balance if paid (although UI default is pending, this is good for consistency)
-      if (txData.status === 'paid') {
-        const amount = Number(txData.amount);
-        if (txData.type === 'income' && txData.accountId) {
-          await adjustAccountBalance(db, txData.accountId, amount, 'add');
-        } else if (txData.type === 'expense' && txData.accountId) {
-          await adjustAccountBalance(db, txData.accountId, amount, 'subtract');
-        }
-      }
-
       revalidatePath('/transactions');
       revalidatePath('/');
       revalidatePath('/planning');
       return { success: true, parentId: parentTx.id };
     } else {
       await db.insert(transactions).values(txData);
-
-      if (txData.status === 'paid') {
-        const amount = Number(txData.amount);
-        if (txData.type === 'income' && txData.accountId) {
-          await adjustAccountBalance(db, txData.accountId, amount, 'add');
-        } else if (txData.type === 'expense' && txData.accountId) {
-          await adjustAccountBalance(db, txData.accountId, amount, 'subtract');
-        }
-      }
 
       revalidatePath('/transactions');
       revalidatePath('/');
@@ -290,8 +241,6 @@ async function changeTransactionStatus(id: number, newStatus: 'paid' | 'pending'
       return { success: true }; // No change
     }
 
-    const amount = Number(transactionItem.amount);
-
     if (transactionItem.type === 'transfer') {
       // Find the pair
       const otherTx = transactionItem.parentTransactionId
@@ -303,56 +252,16 @@ async function changeTransactionStatus(id: number, newStatus: 'paid' | 'pending'
       const destTx = transactionItem.parentTransactionId ? transactionItem : otherTx;
 
       if (originTx && destTx) {
-        // Update both
+        // The trigger handles balance changes; we only need to update the status.
         await tx.update(transactions).set({ status: newStatus }).where(eq(transactions.id, originTx.id));
         await tx.update(transactions).set({ status: newStatus }).where(eq(transactions.id, destTx.id));
-
-        if (newStatus === 'paid') {
-          // Origin: subtract
-          if (originTx.accountId) {
-            await adjustAccountBalance(tx, originTx.accountId, amount, 'subtract');
-          }
-          // Destination: add
-          if (destTx.accountId) {
-            await adjustAccountBalance(tx, destTx.accountId, amount, 'add');
-          }
-        } else {
-          // Origin: add back
-          if (originTx.accountId) {
-            await adjustAccountBalance(tx, originTx.accountId, amount, 'add');
-          }
-          // Destination: subtract back
-          if (destTx.accountId) {
-            await adjustAccountBalance(tx, destTx.accountId, amount, 'subtract');
-          }
-        }
       } else {
-        // If the other end wasn't found (for some reason), update only this one
         await tx.update(transactions).set({ status: newStatus }).where(eq(transactions.id, id));
-        if (newStatus === 'paid') {
-          // Treat as origin if no parentTransactionId
-          const operation = transactionItem.parentTransactionId ? 'add' : 'subtract';
-          if (transactionItem.accountId) {
-            await adjustAccountBalance(tx, transactionItem.accountId, amount, operation);
-          }
-        } else {
-          const operation = transactionItem.parentTransactionId ? 'subtract' : 'add';
-          if (transactionItem.accountId) {
-            await adjustAccountBalance(tx, transactionItem.accountId, amount, operation);
-          }
-        }
       }
     } else {
-      // Normal transaction (income or expense)
+      // Normal transaction (income, expense, credit_card_expense).
+      // The trigger handles the balance update automatically on UPDATE.
       await tx.update(transactions).set({ status: newStatus }).where(eq(transactions.id, id));
-
-      if (transactionItem.type === 'income' && transactionItem.accountId) {
-        const operation = newStatus === 'paid' ? 'add' : 'subtract';
-        await adjustAccountBalance(tx, transactionItem.accountId, amount, operation);
-      } else if (transactionItem.type === 'expense' && transactionItem.accountId) {
-        const operation = newStatus === 'paid' ? 'subtract' : 'add';
-        await adjustAccountBalance(tx, transactionItem.accountId, amount, operation);
-      }
     }
 
     return { success: true };
@@ -377,7 +286,7 @@ export async function toggleTransactionStatus(id: string | number, currentStatus
   try {
     const newStatus = currentStatus === 'paid' ? 'pending' : 'paid';
     const result = await changeTransactionStatus(Number(id), newStatus);
-    
+
     revalidatePath('/transactions');
     revalidatePath('/');
     revalidatePath('/planning');
@@ -389,40 +298,39 @@ export async function toggleTransactionStatus(id: string | number, currentStatus
   }
 }
 
-export async function payVirtualTransaction(txData: any) {
+export async function payVirtualTransaction(txData: {
+  type: string;
+  accountId: number | null;
+  creditCardId: number | null;
+  categoryId: number;
+  subcategoryId: number | null;
+  amount: string;
+  description: string;
+  date: string;
+  competencyMonth: string;
+  fixedTransactionId: string | null;
+}) {
   try {
-    const result = await db.transaction(async (tx) => {
-      const [newTx] = await tx.insert(transactions).values({
-        type: txData.type,
-        accountId: txData.accountId,
-        creditCardId: txData.creditCardId,
-        categoryId: txData.categoryId,
-        subcategoryId: txData.subcategoryId,
-        amount: txData.amount,
-        description: txData.description,
-        date: txData.date,
-        competencyMonth: txData.competencyMonth,
-        status: 'paid',
-        paidAt: new Date(),
-        fixedTransactionId: txData.fixedTransactionId,
-      }).returning();
-
-      // Adjust balances
-      const amount = Number(txData.amount);
-      if (txData.type === 'income' && txData.accountId) {
-        await adjustAccountBalance(tx, txData.accountId, amount, 'add');
-      } else if (txData.type === 'expense' && txData.accountId) {
-        await adjustAccountBalance(tx, txData.accountId, amount, 'subtract');
-      }
-
-      return { success: true, newTx };
+    await db.insert(transactions).values({
+      type: txData.type,
+      accountId: txData.accountId,
+      creditCardId: txData.creditCardId,
+      categoryId: txData.categoryId,
+      subcategoryId: txData.subcategoryId,
+      amount: txData.amount,
+      description: txData.description,
+      date: txData.date,
+      competencyMonth: txData.competencyMonth,
+      status: 'paid',
+      paidAt: new Date(),
+      fixedTransactionId: txData.fixedTransactionId,
     });
 
     revalidatePath('/transactions');
     revalidatePath('/');
     revalidatePath('/planning');
     revalidatePath('/credit-cards');
-    return result;
+    return { success: true };
   } catch (error) {
     console.error('Error paying virtual transaction:', error);
     return { success: false, error: 'Failed to pay virtual transaction' };
@@ -431,7 +339,7 @@ export async function payVirtualTransaction(txData: any) {
 
 export async function getCreditCardInvoices(creditCardId: number, month?: string) {
   const currentMonth = month || format(new Date(), 'yyyy-MM');
-  
+
   return await db.query.transactions.findMany({
     where: (t, { eq, and }) => and(
       eq(t.creditCardId, creditCardId),
@@ -455,7 +363,7 @@ export async function getCreditCardInvoiceMonths(creditCardId: number) {
     columns: { competencyMonth: true },
     orderBy: (t, { desc }) => [desc(t.competencyMonth)]
   });
-  
+
   return [...new Set(txs.map(t => t.competencyMonth))];
 }
 
@@ -485,61 +393,27 @@ export async function deleteTransaction(id: number, mode: 'single' | 'future' = 
             )
           );
 
-        // Revert balance changes for all paid transactions in the deletion list
-        for (const txToDelete of txsToDelete) {
-          if (txToDelete.status === 'paid') {
-            const amount = Number(txToDelete.amount);
-            if (txToDelete.type === 'income' && txToDelete.accountId) {
-              await adjustAccountBalance(tx, txToDelete.accountId, amount, 'subtract');
-            } else if (txToDelete.type === 'expense' && txToDelete.accountId) {
-              await adjustAccountBalance(tx, txToDelete.accountId, amount, 'add');
-            }
-          }
-        }
-
-        // Delete all matched transactions
+        // Delete all matched transactions.
+        // The trigger handles balance reversion automatically for each DELETE.
         const idsToDelete = txsToDelete.map(t => t.id);
         for (const targetId of idsToDelete) {
           await tx.delete(transactions).where(eq(transactions.id, targetId));
         }
       } else {
         // mode === 'single'
-        const amount = Number(transactionItem.amount);
-
         if (transactionItem.type === 'transfer') {
           // Find the pair
           const otherTx = transactionItem.parentTransactionId
             ? await tx.query.transactions.findFirst({ where: eq(transactions.id, transactionItem.parentTransactionId) })
             : await tx.query.transactions.findFirst({ where: eq(transactions.parentTransactionId, transactionItem.id) });
 
-          // Revert balance changes if paid
-          if (transactionItem.status === 'paid') {
-            const originTx = transactionItem.parentTransactionId ? otherTx : transactionItem;
-            const destTx = transactionItem.parentTransactionId ? transactionItem : otherTx;
-
-            if (originTx && originTx.accountId) {
-              await adjustAccountBalance(tx, originTx.accountId, amount, 'add');
-            }
-            if (destTx && destTx.accountId) {
-              await adjustAccountBalance(tx, destTx.accountId, amount, 'subtract');
-            }
-          }
-
-          // Delete both
+          // Delete both. The trigger handles balance reversion for each DELETE.
           await tx.delete(transactions).where(eq(transactions.id, transactionItem.id));
           if (otherTx) {
             await tx.delete(transactions).where(eq(transactions.id, otherTx.id));
           }
         } else {
-          // Normal transaction
-          if (transactionItem.status === 'paid') {
-            if (transactionItem.type === 'income' && transactionItem.accountId) {
-              await adjustAccountBalance(tx, transactionItem.accountId, amount, 'subtract');
-            } else if (transactionItem.type === 'expense' && transactionItem.accountId) {
-              await adjustAccountBalance(tx, transactionItem.accountId, amount, 'add');
-            }
-          }
-
+          // Normal transaction. The trigger handles balance reversion automatically.
           await tx.delete(transactions).where(eq(transactions.id, id));
         }
       }
@@ -566,40 +440,15 @@ export async function updateTransaction(id: number, data: Partial<NewTransaction
         throw new Error('Transação não encontrada');
       }
 
-      // Revert old balance impact if it was paid
-      if (oldTx.status === 'paid') {
-        const oldAmount = Number(oldTx.amount);
-        if (oldTx.type === 'transfer') {
-          const otherTx = oldTx.parentTransactionId
-            ? await tx.query.transactions.findFirst({ where: eq(transactions.id, oldTx.parentTransactionId) })
-            : await tx.query.transactions.findFirst({ where: eq(transactions.parentTransactionId, oldTx.id) });
-          
-          const originTx = oldTx.parentTransactionId ? otherTx : oldTx;
-          const destTx = oldTx.parentTransactionId ? oldTx : otherTx;
-
-          if (originTx && originTx.accountId) {
-            await adjustAccountBalance(tx, originTx.accountId, oldAmount, 'add');
-          }
-          if (destTx && destTx.accountId) {
-            await adjustAccountBalance(tx, destTx.accountId, oldAmount, 'subtract');
-          }
-        } else if (oldTx.type === 'income' && oldTx.accountId) {
-          await adjustAccountBalance(tx, oldTx.accountId, oldAmount, 'subtract');
-        } else if (oldTx.type === 'expense' && oldTx.accountId) {
-          await adjustAccountBalance(tx, oldTx.accountId, oldAmount, 'add');
-        }
-      }
-
-      // If it is a transfer, we want to update the pair
       if (oldTx.type === 'transfer') {
         const otherTx = oldTx.parentTransactionId
           ? await tx.query.transactions.findFirst({ where: eq(transactions.id, oldTx.parentTransactionId) })
           : await tx.query.transactions.findFirst({ where: eq(transactions.parentTransactionId, oldTx.id) });
 
-        // Update this transaction
+        // Update this transaction. The trigger handles the balance delta automatically.
         await tx.update(transactions).set(data).where(eq(transactions.id, id));
 
-        // Update the other transaction with matching fields
+        // Update the paired transfer transaction with matching fields
         if (otherTx) {
           const otherUpdateData: Partial<NewTransaction> = {};
           if (data.amount !== undefined) otherUpdateData.amount = data.amount;
@@ -616,42 +465,9 @@ export async function updateTransaction(id: number, data: Partial<NewTransaction
             await tx.update(transactions).set(otherUpdateData).where(eq(transactions.id, otherTx.id));
           }
         }
-
-        // Apply new balance impact if it is now paid
-        const newStatus = data.status !== undefined ? data.status : oldTx.status;
-        if (newStatus === 'paid') {
-          const newAmount = Number(data.amount !== undefined ? data.amount : oldTx.amount);
-          const originTx = oldTx.parentTransactionId ? otherTx : oldTx;
-          const destTx = oldTx.parentTransactionId ? oldTx : otherTx;
-
-          // Note: if the accountId is being updated, handle that! But transfers origin/dest accounts are not edited easily.
-          const originAccountId = originTx ? (originTx.id === id ? (data.accountId !== undefined ? data.accountId : oldTx.accountId) : originTx.accountId) : null;
-          const destAccountId = destTx ? (destTx.id === id ? (data.accountId !== undefined ? data.accountId : oldTx.accountId) : destTx.accountId) : null;
-
-          if (originAccountId) {
-            await adjustAccountBalance(tx, originAccountId, newAmount, 'subtract');
-          }
-          if (destAccountId) {
-            await adjustAccountBalance(tx, destAccountId, newAmount, 'add');
-          }
-        }
       } else {
-        // Normal transaction update
+        // Normal transaction update. The trigger handles the balance delta automatically.
         await tx.update(transactions).set(data).where(eq(transactions.id, id));
-
-        // Apply new balance impact if it is now paid
-        const newStatus = data.status !== undefined ? data.status : oldTx.status;
-        if (newStatus === 'paid') {
-          const newAmount = Number(data.amount !== undefined ? data.amount : oldTx.amount);
-          const newAccountId = data.accountId !== undefined ? data.accountId : oldTx.accountId;
-          const newType = data.type !== undefined ? data.type : oldTx.type;
-
-          if (newType === 'income' && newAccountId) {
-            await adjustAccountBalance(tx, newAccountId, newAmount, 'add');
-          } else if (newType === 'expense' && newAccountId) {
-            await adjustAccountBalance(tx, newAccountId, newAmount, 'subtract');
-          }
-        }
       }
 
       return { success: true };

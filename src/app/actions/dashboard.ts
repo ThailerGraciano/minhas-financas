@@ -1,19 +1,19 @@
 'use server';
 
 import { db } from '@/db';
-import { accounts, creditCards, transactions } from '@/db/schema';
-import { eq } from 'drizzle-orm';
-import { format } from 'date-fns';
+import { accounts, creditCards, transactions, fixedTransactions } from '@/db/schema';
+import { and, eq, gte, inArray, isNotNull, lte } from 'drizzle-orm';
+import { addDays, addMonths, endOfMonth, format, subMonths } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export async function getDashboardData(month?: string) {
   const currentMonth = month || format(new Date(), 'yyyy-MM');
 
-  // Saldos
   const allAccounts = await db.select().from(accounts);
   const totalBalance = allAccounts.reduce((acc, curr) => acc + Number(curr.currentBalance), 0);
 
-  // Transações do mês
-  const monthTransactions = await db.select()
+  const monthTransactions = await db
+    .select()
     .from(transactions)
     .where(eq(transactions.competencyMonth, currentMonth));
 
@@ -25,15 +25,13 @@ export async function getDashboardData(month?: string) {
     if (t.type === 'expense' || t.type === 'credit_card_expense') totalExpense += Number(t.amount);
   });
 
-  // Faturas Abertas
   const allCards = await db.select().from(creditCards);
   const cardInvoices = allCards.map(card => {
-    const cardExpenses = monthTransactions.filter(t => t.creditCardId === card.id && t.type === 'credit_card_expense');
+    const cardExpenses = monthTransactions.filter(
+      t => t.creditCardId === card.id && t.type === 'credit_card_expense',
+    );
     const invoiceTotal = cardExpenses.reduce((acc, curr) => acc + Number(curr.amount), 0);
-    return {
-      card,
-      invoiceTotal,
-    };
+    return { card, invoiceTotal };
   });
 
   return {
@@ -48,13 +46,11 @@ export async function getDashboardData(month?: string) {
 
 export async function getBalancesByType() {
   const allAccounts = await db.select().from(accounts);
-  
+
   const grouped = allAccounts.reduce((acc, curr) => {
     const type = curr.type;
     const balance = Number(curr.currentBalance);
-    if (!acc[type]) {
-      acc[type] = 0;
-    }
+    if (!acc[type]) acc[type] = 0;
     acc[type] += balance;
     return acc;
   }, {} as Record<string, number>);
@@ -72,13 +68,165 @@ export async function getBalancesByType() {
     total,
   }));
 
-  // Ordena por maior saldo primeiro
   balancesByType.sort((a, b) => b.total - a.total);
 
   const totalBalance = balancesByType.reduce((acc, curr) => acc + curr.total, 0);
 
-  return {
-    balancesByType,
-    totalBalance,
-  };
+  return { balancesByType, totalBalance };
+}
+
+// ---------------------------------------------------------------------------
+
+export type BalanceEvolutionPoint = {
+  /** Label do mês para o eixo X, ex: "Jan" */
+  month: string;
+  /** Saldo total no último dia do mês — preenchido apenas para meses passados + atual */
+  balancePast: number | null;
+  /** Saldo projetado — preenchido apenas para o mês atual + futuros */
+  balanceFuture: number | null;
+  /** Indica se este ponto pertence ao futuro (projeção) */
+  isFuture: boolean;
+};
+
+/** Computa o delta de saldo (positivo = crédito, negativo = débito). */
+function calcDelta(rows: { type: string; amount: string }[]): number {
+  return rows.reduce((acc, r) => {
+    const amt = Number(r.amount);
+    if (r.type === 'income') return acc + amt;
+    if (r.type === 'expense' || r.type === 'credit_card_expense') return acc - amt;
+    return acc; // 'transfer' se cancela nos dois lados
+  }, 0);
+}
+
+/**
+ * Constrói a série de dados para o gráfico de evolução de saldo.
+ *
+ * Faz apenas 4–5 queries bulk no banco e calcula tudo em JavaScript,
+ * evitando o esgotamento do connection pool que ocorria com 100+ queries paralelas.
+ *
+ * - PASSADO: reconstrói o saldo somando todas as transações pagas até cada data.
+ * - FUTURO:  parte do current_balance e acumula pendentes + fixas virtuais.
+ * - O mês atual aparece em AMBAS as séries para conectar as duas linhas no Recharts.
+ */
+export async function getBalanceEvolutionData(): Promise<BalanceEvolutionPoint[]> {
+  // ── Query 1: contas ────────────────────────────────────────────────────────
+  const allAccounts = await db
+    .select({ id: accounts.id, currentBalance: accounts.currentBalance })
+    .from(accounts);
+
+  if (allAccounts.length === 0) return [];
+
+  const accountIds = allAccounts.map(a => a.id);
+  const totalCurrentBalance = allAccounts.reduce((sum, a) => sum + Number(a.currentBalance), 0);
+
+  // Datas de referência
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const tomorrow    = addDays(today, 1);
+  const tomorrowStr = format(tomorrow, 'yyyy-MM-dd');
+
+  const months = [
+    ...Array.from({ length: 6 }, (_, i) => subMonths(currentMonthStart, 6 - i)),
+    currentMonthStart,
+    ...Array.from({ length: 6 }, (_, i) => addMonths(currentMonthStart, i + 1)),
+  ];
+
+  const lastFutureDateStr = format(endOfMonth(months[months.length - 1]), 'yyyy-MM-dd');
+
+  // ── Query 2: todas as transações PAGAS (para reconstrução histórica) ───────
+  const paidTxs = await db
+    .select({ type: transactions.type, amount: transactions.amount, date: transactions.date })
+    .from(transactions)
+    .where(and(
+      inArray(transactions.accountId, accountIds),
+      eq(transactions.status, 'paid'),
+    ));
+
+  // ── Query 3: transações PENDENTES na janela futura ─────────────────────────
+  const pendingTxs = await db
+    .select({ type: transactions.type, amount: transactions.amount, date: transactions.date })
+    .from(transactions)
+    .where(and(
+      inArray(transactions.accountId, accountIds),
+      eq(transactions.status, 'pending'),
+      gte(transactions.date, tomorrowStr),
+      lte(transactions.date, lastFutureDateStr),
+    ));
+
+  // ── Query 4: fixed_transactions ativas ────────────────────────────────────
+  const activeFixed = await db
+    .select({
+      id:        fixedTransactions.id,
+      type:      fixedTransactions.type,
+      amount:    fixedTransactions.amount,
+      startDate: fixedTransactions.startDate,
+    })
+    .from(fixedTransactions)
+    .where(and(
+      eq(fixedTransactions.active, true),
+      inArray(fixedTransactions.accountId, accountIds),
+    ));
+
+  // ── Query 5: IDs de fixas já materializadas na janela futura ──────────────
+  const materializedFixedIds = new Set<string>();
+  if (activeFixed.length > 0) {
+    const matRows = await db
+      .select({ fixedTransactionId: transactions.fixedTransactionId })
+      .from(transactions)
+      .where(and(
+        inArray(transactions.accountId, accountIds),
+        gte(transactions.date, tomorrowStr),
+        lte(transactions.date, lastFutureDateStr),
+        isNotNull(transactions.fixedTransactionId),
+      ));
+    for (const r of matRows) {
+      if (r.fixedTransactionId) materializedFixedIds.add(r.fixedTransactionId);
+    }
+  }
+
+  // ── Cálculo em JS — sem nenhuma query adicional ───────────────────────────
+  const points: BalanceEvolutionPoint[] = months.map((monthStart) => {
+    const lastDay    = endOfMonth(monthStart);
+    const lastDayStr = format(lastDay, 'yyyy-MM-dd');
+    const isFuture       = monthStart > currentMonthStart;
+    const isCurrentMonth = monthStart.getTime() === currentMonthStart.getTime();
+
+    const monthLabel = format(monthStart, 'MMM', { locale: ptBR });
+    const label = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1);
+
+    // PASSADO — soma todas as pagas com date <= último dia do mês
+    const balancePast = !isFuture
+      ? calcDelta(paidTxs.filter(t => t.date <= lastDayStr))
+      : null;
+
+    // FUTURO — current_balance + pendentes + fixas virtuais até o último dia
+    let balanceFuture: number | null = null;
+    if (isFuture || isCurrentMonth) {
+      const futurePending = pendingTxs.filter(t => t.date <= lastDayStr);
+
+      // Gera ocorrências virtuais de cada fixa não materializada até lastDay
+      const virtualRows: { type: string; amount: string }[] = [];
+      for (const ft of activeFixed) {
+        if (materializedFixedIds.has(ft.id)) continue;
+
+        const ftDay  = new Date(ft.startDate).getDate();
+        const cursor = new Date(tomorrow);
+        cursor.setDate(ftDay);
+        // Se o dia da fixa neste mês já passou em relação a amanhã, avança um mês
+        if (cursor < tomorrow) cursor.setMonth(cursor.getMonth() + 1);
+
+        while (cursor <= lastDay) {
+          virtualRows.push({ type: ft.type, amount: ft.amount });
+          cursor.setMonth(cursor.getMonth() + 1);
+        }
+      }
+
+      balanceFuture = totalCurrentBalance + calcDelta([...futurePending, ...virtualRows]);
+    }
+
+    return { month: label, balancePast, balanceFuture, isFuture };
+  });
+
+  return points;
 }

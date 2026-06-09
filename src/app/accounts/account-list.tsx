@@ -1,9 +1,16 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Wallet, PiggyBank, Landmark, Pencil, Archive } from 'lucide-react';
+import { Wallet, PiggyBank, Landmark, Archive, MoreVertical, Pencil, SlidersHorizontal } from 'lucide-react';
 import { AccountFormDialog } from './account-form-dialog';
+import { AdjustBalanceDialog } from './adjust-balance-dialog';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 type Account = {
   id: number;
@@ -34,6 +41,15 @@ export function AccountList({ accounts }: { accounts: Account[] }) {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value));
   };
 
+  const getTypeName = (type: string) => {
+    switch (type) {
+      case 'checking': return 'Conta Corrente';
+      case 'savings': return 'Poupança';
+      case 'stash': return 'Caixinha';
+      default: return 'Carteira';
+    }
+  };
+
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
       {accounts.map((account) => (
@@ -43,19 +59,55 @@ export function AccountList({ accounts }: { accounts: Account[] }) {
               {getTypeIcon(account.type)}
               <CardTitle className="text-sm font-medium">{account.name}</CardTitle>
             </div>
-            <AccountFormDialog 
-              accountToEdit={account} 
-              trigger={
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                  <Pencil className="h-4 w-4" />
+
+            {/* Actions dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  aria-label={`Ações para ${account.name}`}
+                >
+                  <MoreVertical className="h-4 w-4" />
                 </Button>
-              } 
-            />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {/* Edit account — uses AccountFormDialog with a DropdownMenuItem as trigger */}
+                <AccountFormDialog
+                  accountToEdit={account}
+                  trigger={
+                    <DropdownMenuItem
+                      onSelect={(e) => e.preventDefault()}
+                      className="cursor-pointer"
+                    >
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Editar Conta
+                    </DropdownMenuItem>
+                  }
+                />
+
+                {/* Adjust balance */}
+                <AdjustBalanceDialog
+                  account={account}
+                  trigger={
+                    <DropdownMenuItem
+                      onSelect={(e) => e.preventDefault()}
+                      className="cursor-pointer"
+                    >
+                      <SlidersHorizontal className="mr-2 h-4 w-4" />
+                      Reajustar Saldo
+                    </DropdownMenuItem>
+                  }
+                />
+              </DropdownMenuContent>
+            </DropdownMenu>
           </CardHeader>
+
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(account.currentBalance)}</div>
-            <p className="text-xs text-muted-foreground mt-1 capitalize">
-              {account.type === 'checking' ? 'Conta Corrente' : account.type === 'savings' ? 'Poupança' : account.type === 'stash' ? 'Caixinha' : 'Carteira'}
+            <p className="text-xs text-muted-foreground mt-1">
+              {getTypeName(account.type)}
             </p>
           </CardContent>
         </Card>

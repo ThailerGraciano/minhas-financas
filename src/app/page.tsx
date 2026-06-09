@@ -1,21 +1,23 @@
-import { getDashboardData, getBalancesByType } from '@/app/actions/dashboard';
+import { getDashboardData, getBalancesByType, getBalanceEvolutionData } from '@/app/actions/dashboard';
 import { getSettings } from '@/app/actions/settings';
 import { CompetencyFilter } from '@/components/competency-filter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
-import { ArrowUpCircle, ArrowDownCircle, Wallet, CreditCard as CreditCardIcon } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, CreditCard as CreditCardIcon, TrendingUp } from 'lucide-react';
 import { Suspense } from 'react';
 import { AccountBalancesSummary } from '@/components/account-balances-summary';
+import { BalanceEvolutionChart, COLOR_PAST, COLOR_FUTURE } from '@/components/balance-evolution-chart';
 
 export default async function DashboardPage(props: { searchParams?: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const searchParams = await props.searchParams;
   const monthParam = searchParams?.month as string | undefined;
   const currentMonth = monthParam || format(new Date(), 'yyyy-MM');
 
-  const [data, settingsData, balancesData] = await Promise.all([
+  const [data, settingsData, balancesData, evolutionData] = await Promise.all([
     getDashboardData(currentMonth),
     getSettings(),
     getBalancesByType(),
+    getBalanceEvolutionData(),
   ]);
 
   const formatCurrency = (value: number) => {
@@ -33,8 +35,36 @@ export default async function DashboardPage(props: { searchParams?: Promise<{ [k
 
       <AccountBalancesSummary balances={balancesData.balancesByType} totalBalance={balancesData.totalBalance} />
 
+      {/* Gráfico de Evolução de Saldo */}
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
+          <TrendingUp className="h-5 w-5 text-primary" />
+          <div>
+            <CardTitle>Evolução de Saldo</CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Últimos 6 meses e projeção para os próximos 6
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-2">
+          <BalanceEvolutionChart data={evolutionData} />
+          <div className="flex items-center gap-6 mt-3 px-2">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="inline-block w-6 h-0.5 rounded" style={{ background: COLOR_PAST }} />
+              Saldo real
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <svg width="24" height="4" aria-hidden="true">
+                <line x1="0" y1="2" x2="24" y2="2" stroke={COLOR_FUTURE} strokeWidth="2" strokeDasharray="6 4" />
+              </svg>
+              Projeção
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Resumo do Mês */}
-      <div className="grid gap-4 md:grid-cols-2 mt-6">
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Receitas do Mês</CardTitle>

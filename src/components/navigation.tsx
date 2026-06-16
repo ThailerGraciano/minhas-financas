@@ -14,7 +14,6 @@ const navItems = [
   { name: 'Planejamento', href: '/planning', icon: TrendingUp },
   { name: 'Importar', href: '/import', icon: Download },
   { name: 'Categorias', href: '/categories', icon: PieChart },
-  { name: 'Ajustes', href: '/settings', icon: Settings },
 ];
 
 export function Navigation() {
@@ -22,47 +21,64 @@ export function Navigation() {
 
   return (
     <>
-      {/* Mobile Top Header */}
-      <header className="md:hidden flex h-14 items-center justify-between border-b bg-background px-4 sticky top-0 z-40">
-        <span className="text-lg font-bold tracking-tight text-primary">Minhas Finanças</span>
-        <ModeToggle />
-      </header>
-
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-64 flex-col fixed inset-y-0 left-0 border-r bg-background">
-        <div className="p-6">
-          <h1 className="text-2xl font-bold tracking-tight text-primary">Minhas Finanças</h1>
+      {/* Top Header - Desktop & Tablet */}
+      <header className="hidden md:flex h-20 items-center justify-between px-8 w-full sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        
+        {/* Logo */}
+        <div className="flex items-center gap-2 w-48">
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold">
+            MF
+          </div>
+          <span className="text-xl font-bold tracking-tight">Finanças</span>
         </div>
-        <nav className="flex-1 px-4 space-y-2">
+
+        {/* Horizontal Nav - Pill shaped */}
+        <nav className="flex-1 flex justify-center items-center gap-1">
           {navItems.map((item) => {
-            const Icon = item.icon;
             const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  "flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-all duration-300",
                   isActive 
-                    ? "bg-primary text-primary-foreground" 
-                    : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                    ? "bg-foreground text-background shadow-md scale-105" 
+                    : "text-muted-foreground hover:bg-card hover:text-foreground"
                 )}
               >
-                <Icon className="h-5 w-5" />
                 {item.name}
               </Link>
             );
           })}
         </nav>
-        <div className="p-4 border-t mt-auto flex items-center justify-between">
-          <span className="text-sm font-medium text-muted-foreground">Tema</span>
+
+        {/* Right Section: Profile & Settings */}
+        <div className="flex items-center justify-end gap-4 w-48">
+          <Link 
+            href="/settings"
+            className="w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Settings className="w-5 h-5" />
+          </Link>
           <ModeToggle />
         </div>
-      </aside>
+      </header>
+
+      {/* Mobile Top Header */}
+      <header className="md:hidden flex h-14 items-center justify-between bg-background px-4 sticky top-0 z-40">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
+            MF
+          </div>
+          <span className="text-lg font-bold tracking-tight">Finanças</span>
+        </div>
+        <ModeToggle />
+      </header>
 
       {/* Mobile Bottom Nav - Show only top 5 items for mobile to fit nicely */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t bg-background pb-safe">
-        <div className="flex justify-around items-center h-16">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t bg-card pb-safe">
+        <div className="flex justify-around items-center h-16 px-2">
           {navItems.slice(0, 5).map((item) => {
             const Icon = item.icon;
             const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
@@ -71,13 +87,15 @@ export function Navigation() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center justify-center w-full h-full space-y-1 text-[10px] font-medium transition-colors",
+                  "flex flex-col items-center justify-center w-full h-full space-y-1 text-[10px] font-medium transition-all",
                   isActive 
-                    ? "text-primary" 
+                    ? "text-primary scale-110" 
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <Icon className="h-5 w-5" />
+                <div className={cn("p-1.5 rounded-full transition-colors", isActive ? "bg-primary/10" : "")}>
+                  <Icon className="h-5 w-5" />
+                </div>
                 <span>{item.name}</span>
               </Link>
             );

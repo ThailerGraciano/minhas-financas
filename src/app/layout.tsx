@@ -26,9 +26,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row">
+          <div className="min-h-screen bg-background text-foreground flex flex-col">
             <Navigation />
-            <main className="flex-1 md:ml-64 pb-16 md:pb-0 min-h-screen relative">
+            <main className="flex-1 pb-20 md:pb-8 pt-4 px-4 md:px-8 relative container mx-auto max-w-7xl">
               {children}
               <TransactionFormDialog />
             </main>

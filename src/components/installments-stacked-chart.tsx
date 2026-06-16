@@ -75,7 +75,7 @@ export function InstallmentsStackedChart({
           width={80}
         />
         <ChartTooltip 
-          content={<ChartTooltipContent hideLabel={false} valueFormatter={(val) => `R$ ${Number(val).toFixed(2)}`} />} 
+          content={<ChartTooltipContent hideLabel={false} formatter={(val) => `R$ ${Number(val).toFixed(2)}`} />} 
         />
         <ChartLegend content={<ChartLegendContent />} />
         {keys.map((key) => {

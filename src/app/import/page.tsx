@@ -15,8 +15,9 @@ type ImportResult = {
   result?: {
     totalRows: number;
     successRows: number;
+    skippedRows: number;
     errorRows: number;
-    errorsDetail: any[];
+    errorsDetail: { row: number; data: Record<string, string>; error: string }[];
   };
 };
 
@@ -54,8 +55,9 @@ export default function ImportPage() {
         setIsImporting(false);
       };
       reader.readAsText(file);
-    } catch (error: any) {
-      setImportResult({ success: false, error: error.message || "Erro desconhecido." });
+    } catch (error) {
+      const e = error as Error;
+      setImportResult({ success: false, error: e.message || "Erro desconhecido." });
       setIsImporting(false);
     }
   };
@@ -72,7 +74,7 @@ export default function ImportPage() {
       <Tabs 
         value={activeTab} 
         onValueChange={(val) => {
-          setActiveTab(val as any);
+          setActiveTab(val as "expense" | "income" | "transfer");
           setFile(null);
           setImportResult(null);
         }}
@@ -167,7 +169,7 @@ export default function ImportPage() {
           <CardContent>
             {importResult.success && importResult.result ? (
               <div className="space-y-6">
-                <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="grid grid-cols-4 gap-4 text-center">
                   <div className="bg-muted/50 rounded-xl p-4 border border-border">
                     <div className="text-3xl font-bold">{importResult.result.totalRows}</div>
                     <div className="text-xs text-muted-foreground mt-1">Total de Linhas</div>
@@ -177,6 +179,12 @@ export default function ImportPage() {
                       {importResult.result.successRows}
                     </div>
                     <div className="text-xs text-green-600/80 dark:text-green-400/80 mt-1">Sucesso</div>
+                  </div>
+                  <div className="bg-yellow-500/10 rounded-xl p-4 border border-yellow-500/20">
+                    <div className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">
+                      {importResult.result.skippedRows}
+                    </div>
+                    <div className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-1">Ignoradas (já existiam)</div>
                   </div>
                   <div className="bg-destructive/10 rounded-xl p-4 border border-destructive/20">
                     <div className="text-3xl font-bold text-destructive">

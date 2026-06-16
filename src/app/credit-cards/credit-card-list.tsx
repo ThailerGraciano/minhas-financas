@@ -1,6 +1,5 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { CreditCard, Edit, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CreditCardFormDialog } from './credit-card-form-dialog';
@@ -37,32 +36,33 @@ export function CreditCardList({ cards, selectedMonth }: { cards: CreditCardType
   const capitalizedMonth = monthLabel ? monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1) : '';
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mt-4">
+    <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mt-4">
       {cards.map((card) => (
-        <Card key={card.id} className="transition-all hover:shadow-md flex flex-col">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{card.name}</CardTitle>
-            <CreditCard className="w-5 h-5 text-orange-500" />
-          </CardHeader>
-          <CardContent className="flex-1">
-            <div className="text-2xl font-bold">{formatCurrency(card.creditLimit)}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Limite Total
-            </p>
+        <div key={card.id} className="bg-card rounded-[2rem] border-transparent shadow-sm transition-all hover:shadow-md flex flex-col p-5 md:p-6 min-w-0">
+          <div className="flex flex-row items-center justify-between pb-4">
+            <h3 className="text-lg font-bold truncate mr-2">{card.name}</h3>
+            <div className="bg-orange-500/10 p-2.5 rounded-full shrink-0">
+              <CreditCard className="w-5 h-5 text-orange-500" />
+            </div>
+          </div>
+          <div className="flex-1 min-w-0">
+            {/* Fatura como destaque principal */}
+            {card.invoice_total !== undefined ? (
+              <>
+                <div className="text-3xl md:text-4xl font-bold">{formatCurrency(card.invoice_total.toString())}</div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {capitalizedMonth ? `Fatura de ${capitalizedMonth}` : 'Fatura Atual'}
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="text-3xl md:text-4xl font-bold">{formatCurrency(card.creditLimit)}</div>
+                <p className="text-sm text-muted-foreground mt-1">Limite Total</p>
+              </>
+            )}
 
             {card.invoice_total !== undefined && (
-              <div className="mt-4 p-3 bg-muted/30 rounded-lg space-y-3">
-                {capitalizedMonth && (
-                  <div className="font-semibold text-sm border-b pb-2 mb-2">
-                    Fatura de {capitalizedMonth}
-                  </div>
-                )}
-                
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total da Fatura:</span>
-                  <span className="font-semibold">{formatCurrency(card.invoice_total.toString())}</span>
-                </div>
-                
+              <div className="mt-4 space-y-3">
                 <Progress 
                   value={Math.min((card.invoice_total / Number(card.creditLimit)) * 100, 100)} 
                   className="h-2"
@@ -79,32 +79,33 @@ export function CreditCardList({ cards, selectedMonth }: { cards: CreditCardType
               </div>
             )}
 
-            <div className="flex gap-4 mt-4 pt-4 border-t text-sm">
-              <div>
-                <span className="text-muted-foreground">Fecha dia: </span>
-                <span className="font-medium">{card.closingDay}</span>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-6 pt-4 border-t border-muted/50 text-sm">
+              <div className="text-muted-foreground">
+                Limite: <span className="font-medium text-foreground">{formatCurrency(card.creditLimit)}</span>
               </div>
-              <div>
-                <span className="text-muted-foreground">Vence dia: </span>
-                <span className="font-medium">{card.dueDay}</span>
+              <div className="text-muted-foreground">
+                Fecha dia: <span className="font-medium text-foreground">{card.closingDay}</span>
+              </div>
+              <div className="text-muted-foreground">
+                Vence dia: <span className="font-medium text-foreground">{card.dueDay}</span>
               </div>
             </div>
-          </CardContent>
-          <CardFooter className="flex gap-2 pt-0">
+          </div>
+          <div className="flex gap-3 pt-6">
             <CreditCardFormDialog initialData={card}>
-              <Button variant="outline" className="w-full flex-1" size="sm">
+              <Button variant="outline" className="w-full flex-1 rounded-full bg-transparent border-border" size="sm">
                 <Edit className="w-4 h-4 mr-2" />
                 Editar
               </Button>
             </CreditCardFormDialog>
-            <Button variant="default" className="w-full flex-1" size="sm" asChild>
+            <Button variant="default" className="w-full flex-1 rounded-full shadow-md" size="sm" asChild>
               <Link href={`/credit-cards/${card.id}${selectedMonth ? `?month=${selectedMonth}` : ''}`}>
                 <FileText className="w-4 h-4 mr-2" />
                 Faturas
               </Link>
             </Button>
-          </CardFooter>
-        </Card>
+          </div>
+        </div>
       ))}
     </div>
   );

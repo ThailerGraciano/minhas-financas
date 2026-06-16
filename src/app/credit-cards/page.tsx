@@ -3,6 +3,7 @@ import { getSettings } from '@/app/actions/settings';
 import { CreditCardFormDialog } from './credit-card-form-dialog';
 import { CreditCardsClientPage } from './credit-cards-client-page';
 import { format } from 'date-fns';
+import { Suspense } from 'react';
 
 export const metadata = {
   title: 'Cartões | Minhas Finanças',
@@ -23,7 +24,9 @@ export default async function CreditCardsPage() {
         <CreditCardFormDialog />
       </div>
       
-      <CreditCardsClientPage closingDay={settingsData.closingDay} initialCards={initialCards} />
+      <Suspense fallback={null}>
+        <CreditCardsClientPage closingDay={settingsData.closingDay} initialCards={initialCards} />
+      </Suspense>
     </div>
   );
 }

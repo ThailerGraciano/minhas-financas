@@ -15,6 +15,13 @@
       "when": 1749432000000,
       "tag": "0001_balance_trigger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781628242984,
+      "tag": "0002_oval_argent",
+      "breakpoints": true
     }
   ]
 }

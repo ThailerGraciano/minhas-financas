@@ -6,6 +6,13 @@ import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import Papa from 'papaparse';
 import { parse, isValid, addMonths, format, getDate } from 'date-fns';
+import crypto from 'crypto';
+
+// Helper to generate import hash
+function generateImportHash(description: string, amount: string, date: string, accountOrCardName: string, extra: string = ''): string {
+  const hashStr = `${description.trim().toLowerCase()}|${amount}|${date}|${accountOrCardName.trim().toLowerCase()}${extra ? '|' + extra : ''}`;
+  return crypto.createHash('sha256').update(hashStr).digest('hex');
+}
 
 type ImportType = 'expense' | 'income' | 'transfer';
 
@@ -186,18 +193,27 @@ async function processExpenses(rows: any[], dbState: DbState, closingDay: number
         status,
         paidAt,
         observations: `Importado do arquivo ${filename} - Linha ${rowIndex}`,
+        importHash: generateImportHash(descricao || 'Despesa Importada', amount, dataVencimento.toISOString(), cartaoName || contaName || ''),
       });
     } catch (err: any) {
       errorsDetail.push({ row: rowIndex, data: row, error: err.message });
     }
   }
 
+  let skippedRows = 0;
+  let successRows = 0;
+
   if (transactionsToInsert.length > 0) {
     await db.transaction(async (tx) => {
-      await tx.insert(transactions).values(transactionsToInsert as any[]);
+      const result = await tx.insert(transactions)
+        .values(transactionsToInsert as any[])
+        .onConflictDoNothing({ target: transactions.importHash })
+        .returning({ id: transactions.id });
+      successRows = result.length;
+      skippedRows = transactionsToInsert.length - result.length;
     });
   }
-  return { successRows: transactionsToInsert.length, errorsDetail };
+  return { successRows, skippedRows, errorsDetail };
 }
 
 // PROCESS INCOMES
@@ -250,23 +266,33 @@ async function processIncomes(rows: any[], dbState: DbState, closingDay: number,
         status,
         paidAt,
         observations: `Importado do arquivo ${filename} - Linha ${rowIndex}`,
+        importHash: generateImportHash(descricao || 'Receita Importada', amount, dataVencimento.toISOString(), contaName || ''),
       });
     } catch (err: any) {
       errorsDetail.push({ row: rowIndex, data: row, error: err.message });
     }
   }
 
+  let skippedRows = 0;
+  let successRows = 0;
+
   if (transactionsToInsert.length > 0) {
     await db.transaction(async (tx) => {
-      await tx.insert(transactions).values(transactionsToInsert as any[]);
+      const result = await tx.insert(transactions)
+        .values(transactionsToInsert as any[])
+        .onConflictDoNothing({ target: transactions.importHash })
+        .returning({ id: transactions.id });
+      successRows = result.length;
+      skippedRows = transactionsToInsert.length - result.length;
     });
   }
-  return { successRows: transactionsToInsert.length, errorsDetail };
+  return { successRows, skippedRows, errorsDetail };
 }
 
 // PROCESS TRANSFERS
 async function processTransfers(rows: any[], dbState: DbState, closingDay: number, filename: string) {
   let successRows = 0;
+  let skippedRows = 0;
   const errorsDetail: any[] = [];
   
   // Vamos buscar a categoria padrão de transferências, ou criá-la se não existir.
@@ -306,8 +332,11 @@ async function processTransfers(rows: any[], dbState: DbState, closingDay: numbe
 
         const observationsText = `Importado do arquivo ${filename} - Linha ${rowIndex}`;
 
+        const hashOut = generateImportHash(descricao || 'Transferência (Saída)', amount, dataVencimento.toISOString(), origemName || '', 'out');
+        const hashIn = generateImportHash(descricao || 'Transferência (Entrada)', amount, dataVencimento.toISOString(), destinoName || '', 'in');
+
         // Insere a saída (origin)
-        const [outTx] = await tx.insert(transactions).values({
+        const outTxResult = await tx.insert(transactions).values({
           type: 'transfer',
           accountId: originAccountId,
           creditCardId: null,
@@ -320,7 +349,15 @@ async function processTransfers(rows: any[], dbState: DbState, closingDay: numbe
           status,
           paidAt,
           observations: observationsText,
-        }).returning({ id: transactions.id });
+          importHash: hashOut,
+        }).onConflictDoNothing({ target: transactions.importHash }).returning({ id: transactions.id });
+
+        if (outTxResult.length === 0) {
+          skippedRows++;
+          continue;
+        }
+        
+        const outTx = outTxResult[0];
 
         // Insere a entrada (destination) vinculada à saída (parent_transaction_id = transfer_pair_id)
         await tx.insert(transactions).values({
@@ -337,6 +374,7 @@ async function processTransfers(rows: any[], dbState: DbState, closingDay: numbe
           paidAt,
           parentTransactionId: outTx.id,
           observations: observationsText,
+          importHash: hashIn,
         });
 
         successRows++; // Conta como 1 par importado com sucesso
@@ -346,7 +384,7 @@ async function processTransfers(rows: any[], dbState: DbState, closingDay: numbe
     }
   });
 
-  return { successRows, errorsDetail };
+  return { successRows, skippedRows, errorsDetail };
 }
 
 export async function importCSV(csvString: string, type: ImportType, filename: string) {
@@ -378,7 +416,7 @@ export async function importCSV(csvString: string, type: ImportType, filename: s
 
     const dbState: DbState = { accountsMap, cardsMap, categoriesMap, subcategoriesMap };
 
-    let result = { successRows: 0, errorsDetail: [] as any[] };
+    let result = { successRows: 0, skippedRows: 0, errorsDetail: [] as any[] };
 
     switch (type) {
       case 'expense':
@@ -395,12 +433,14 @@ export async function importCSV(csvString: string, type: ImportType, filename: s
     }
 
     const successRows = result.successRows;
+    const skippedRows = result.skippedRows;
     const errorRows = result.errorsDetail.length;
 
     await db.insert(importLogs).values({
       filename,
       totalRows,
       successRows,
+      skippedRows,
       errorRows,
       errorsDetail: result.errorsDetail.length > 0 ? result.errorsDetail : null,
     });
@@ -413,6 +453,7 @@ export async function importCSV(csvString: string, type: ImportType, filename: s
       result: {
         totalRows,
         successRows,
+        skippedRows,
         errorRows,
         errorsDetail: result.errorsDetail
       } 

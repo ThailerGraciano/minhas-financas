@@ -69,6 +69,7 @@ export function UpcomingTransactionsManager({
               Nenhum lançamento previsto ou em atraso.
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
@@ -82,13 +83,15 @@ export function UpcomingTransactionsManager({
                 {hasOverdue && (
                   <TableRow
                     onClick={() => setIsDialogOpen(true)}
-                    className="cursor-pointer bg-red-500/5 hover:bg-red-500/10 dark:bg-red-950/10 dark:hover:bg-red-950/20 border-l-4 border-l-red-500 transition-colors"
+                    className="cursor-pointer bg-red-500/5 hover:bg-red-500/10 dark:bg-red-900/10 dark:hover:bg-red-900/20 transition-colors group"
                   >
-                    <TableCell className="font-semibold text-red-500 whitespace-nowrap flex items-center gap-1.5 py-4">
-                      <AlertTriangle className="w-4 h-4 text-red-500 animate-pulse" />
-                      Vencidas
+                    <TableCell className="py-5">
+                      <div className="bg-red-500/10 text-red-500 px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 font-bold text-xs">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        Vencidas
+                      </div>
                     </TableCell>
-                    <TableCell className="py-4">
+                    <TableCell className="py-5">
                       <div className="flex flex-col">
                         <span className="font-semibold text-red-500 dark:text-red-400">
                           {overdueTransactions.length} {overdueTransactions.length === 1 ? 'lançamento em atraso' : 'lançamentos em atraso'}
@@ -108,11 +111,11 @@ export function UpcomingTransactionsManager({
                 {upcomingTransactions.map((tx) => {
                   const isIncome = tx.type === 'income';
                   return (
-                    <TableRow key={tx.id}>
-                      <TableCell className="font-medium whitespace-nowrap">
+                    <TableRow key={tx.id} className="hover:bg-muted/30">
+                      <TableCell className="font-medium whitespace-nowrap py-4">
                         {formatDay(tx.date)}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-4">
                         <div className="flex flex-col">
                           <span className="font-medium line-clamp-1" title={tx.description}>
                             {tx.description}
@@ -122,7 +125,7 @@ export function UpcomingTransactionsManager({
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className={`text-right font-bold whitespace-nowrap ${isIncome ? 'text-green-600' : 'text-red-500'}`}>
+                      <TableCell className={`text-right font-bold whitespace-nowrap py-4 ${isIncome ? 'text-green-600' : 'text-red-500'}`}>
                         {isIncome ? '+' : '-'}{formatCurrency(Number(tx.amount))}
                       </TableCell>
                     </TableRow>
@@ -130,6 +133,7 @@ export function UpcomingTransactionsManager({
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -163,7 +167,7 @@ export function UpcomingTransactionsManager({
             </div>
           </div>
 
-          <div className="max-h-[350px] overflow-y-auto border rounded-lg">
+          <div className="max-h-[350px] overflow-y-auto overflow-x-auto border rounded-lg">
             <Table>
               <TableHeader className="bg-muted/50 sticky top-0">
                 <TableRow>

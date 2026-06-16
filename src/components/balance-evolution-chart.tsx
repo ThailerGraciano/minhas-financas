@@ -23,8 +23,8 @@ interface BalanceEvolutionChartProps {
 // Cores hardcoded para garantir visibilidade independente do tema monocromático.
 // O tema deste projeto usa --chart-* em escala de cinza (chroma=0), então
 // usamos oklch com chroma real para as duas linhas se distinguirem.
-const COLOR_PAST   = 'oklch(0.85 0 0)';        // quase branco – saldo real
-const COLOR_FUTURE = 'oklch(0.7 0.18 250)';    // azul-violeta – projeção
+const COLOR_PAST   = 'oklch(0.88 0.14 153)';        // verde neon (primary)
+const COLOR_FUTURE = 'oklch(0.60 0.08 153)';    // verde mais escuro
 
 const chartConfig = {
   balancePast: {
@@ -76,7 +76,7 @@ export function BalanceEvolutionChart({ data }: BalanceEvolutionChartProps) {
         data={data}
         margin={{ top: 12, right: 16, left: 8, bottom: 0 }}
       >
-        <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-muted" />
+        <CartesianGrid vertical={false} stroke="transparent" />
 
         <XAxis
           dataKey="month"
@@ -124,9 +124,9 @@ export function BalanceEvolutionChart({ data }: BalanceEvolutionChartProps) {
           dataKey="balancePast"
           name="balancePast"
           stroke={COLOR_PAST}
-          strokeWidth={2.5}
+          strokeWidth={4}
           dot={false}
-          activeDot={{ r: 5, fill: COLOR_PAST }}
+          activeDot={{ r: 6, fill: COLOR_PAST, stroke: 'var(--background)', strokeWidth: 2 }}
           connectNulls
         />
 
@@ -135,11 +135,11 @@ export function BalanceEvolutionChart({ data }: BalanceEvolutionChartProps) {
           type="monotone"
           dataKey="balanceFuture"
           name="balanceFuture"
-          stroke={COLOR_FUTURE}
-          strokeWidth={2.5}
-          strokeDasharray="6 4"
+          stroke={COLOR_PAST}
+          strokeWidth={4}
+          strokeDasharray="6 6"
           dot={false}
-          activeDot={{ r: 5, fill: COLOR_FUTURE }}
+          activeDot={{ r: 6, fill: COLOR_FUTURE, stroke: 'var(--background)', strokeWidth: 2 }}
           connectNulls
         />
       </LineChart>

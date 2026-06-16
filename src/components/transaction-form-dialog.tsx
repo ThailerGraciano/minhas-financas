@@ -83,17 +83,17 @@ export function TransactionFormDialog() {
     return options;
   }, [selectedCreditCardId, formData?.creditCards]);
 
-  // Auto-selecionar a fatura padrão quando o cartão muda
-  useEffect(() => {
-    if (!selectedCreditCardId || !formData?.creditCards) {
+  const handleCreditCardChange = (value: string) => {
+    setSelectedCreditCardId(value);
+    if (!value || !formData?.creditCards) {
       setSelectedInvoiceMonth("");
       return;
     }
-    const card = formData.creditCards.find((c: CreditCard) => c.id === Number(selectedCreditCardId));
+    const card = formData.creditCards.find((c: CreditCard) => c.id === Number(value));
     if (card) {
       setSelectedInvoiceMonth(getDefaultInvoiceMonth(card.closingDay));
     }
-  }, [selectedCreditCardId, formData?.creditCards]);
+  };
 
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -181,14 +181,20 @@ export function TransactionFormDialog() {
     return cat?.subcategories || [];
   }, [formData, selectedCategoryId]);
 
-  // Auto-selecionar a primeira subcategoria ao mudar de categoria
-  useEffect(() => {
-    if (activeSubcategories.length > 0) {
-      setSelectedSubcategoryId(String(activeSubcategories[0].id));
+  const handleCategoryChange = (val: string) => {
+    setSelectedCategoryId(val);
+    if (!formData?.categories) {
+      setSelectedSubcategoryId("");
+      return;
+    }
+    const cat = formData.categories.find((c: Category) => c.id === Number(val));
+    const subcats = cat?.subcategories || [];
+    if (subcats.length > 0) {
+      setSelectedSubcategoryId(String(subcats[0].id));
     } else {
       setSelectedSubcategoryId("");
     }
-  }, [activeSubcategories]);
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -223,29 +229,29 @@ export function TransactionFormDialog() {
               <TabsTrigger value="transfer">Transferência</TabsTrigger>
             </TabsList>
 
-            <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-              <div className="grid gap-2">
-                <Label htmlFor="description">Descrição</Label>
-                <Input id="description" name="description" required placeholder="Ex: Mercado, Salário..." />
+            <form onSubmit={handleSubmit} className="mt-6 space-y-6">
+              <div className="grid gap-3">
+                <Label htmlFor="description" className="text-muted-foreground ml-1">Descrição</Label>
+                <Input id="description" name="description" required placeholder="Ex: Mercado, Salário..." className="text-lg" />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="amount">Valor</Label>
+              <div className="grid grid-cols-2 gap-5">
+                <div className="grid gap-3">
+                  <Label htmlFor="amount" className="text-muted-foreground ml-1">Valor</Label>
                   <CurrencyInput id="amount" name="amount" required />
                 </div>
-                 <div className="grid gap-2">
-                  <Label htmlFor="date">Data</Label>
+                <div className="grid gap-3">
+                  <Label htmlFor="date" className="text-muted-foreground ml-1">Data</Label>
                   <DatePicker id="date" name="date" defaultValue={format(new Date(), "yyyy-MM-dd")} required />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="categoryId">Categoria</Label>
+              <div className="grid grid-cols-2 gap-5">
+                <div className="grid gap-3">
+                  <Label htmlFor="categoryId" className="text-muted-foreground ml-1">Categoria</Label>
                   <input type="hidden" name="categoryId" value={selectedCategoryId} required />
-                  <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
-                    <SelectTrigger className="w-full h-10 bg-background text-sm flex items-center justify-between">
+                  <Select value={selectedCategoryId} onValueChange={handleCategoryChange}>
+                    <SelectTrigger className="w-full h-12 rounded-xl border-transparent bg-muted/40 px-4 text-base hover:bg-muted/60 transition-all outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -260,13 +266,13 @@ export function TransactionFormDialog() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="subcategoryId">Subcategoria</Label>
+                <div className="grid gap-3">
+                  <Label htmlFor="subcategoryId" className="text-muted-foreground ml-1">Subcategoria</Label>
                   <select
                     name="subcategoryId"
                     value={selectedSubcategoryId}
                     onChange={(e) => setSelectedSubcategoryId(e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
+                    className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10 disabled:opacity-50"
                     disabled={!selectedCategoryId || activeSubcategories.length === 0}
                     required={tab !== "transfer"}
                   >
@@ -282,10 +288,10 @@ export function TransactionFormDialog() {
                 </div>
               </div>
 
-              <TabsContent value="expense" className="space-y-4">
-                <div className="grid gap-2">
-                  <Label>Tipo de Despesa</Label>
-                  <div className="flex gap-4">
+              <TabsContent value="expense" className="space-y-6">
+                <div className="grid gap-3">
+                  <Label className="text-muted-foreground ml-1">Tipo de Despesa</Label>
+                  <div className="flex gap-6 p-4 rounded-xl bg-muted/20 border border-border/50">
                     <label className="flex items-center gap-2 text-sm cursor-pointer">
                       <input
                         type="radio"
@@ -317,9 +323,9 @@ export function TransactionFormDialog() {
                 </div>
 
                 {tab === "expense" && expenseType === "installment" && (
-                  <div className="space-y-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="installmentTotal">Quantidade de Parcelas</Label>
+                  <div className="space-y-5">
+                    <div className="grid gap-3">
+                      <Label htmlFor="installmentTotal" className="text-muted-foreground ml-1">Quantidade de Parcelas</Label>
                       <Input
                         id="installmentTotal"
                         name="installmentTotal"
@@ -344,12 +350,12 @@ export function TransactionFormDialog() {
                   </div>
                 )}
 
-                <div className="grid gap-2">
-                  <Label>Método de Pagamento</Label>
+                <div className="grid gap-3">
+                  <Label className="text-muted-foreground ml-1">Método de Pagamento</Label>
                   <select
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
                   >
                     <option value="account">Conta</option>
                     <option value="credit_card">Cartão de Crédito</option>
@@ -357,11 +363,11 @@ export function TransactionFormDialog() {
                 </div>
 
                 {paymentMethod === "account" && (
-                  <div className="grid gap-2">
-                    <Label htmlFor="accountId">Conta</Label>
+                  <div className="grid gap-3">
+                    <Label htmlFor="accountId" className="text-muted-foreground ml-1">Conta</Label>
                     <select
                       name="accountId"
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
                       required
                     >
                       {formData.accounts.map((a: Account) => (
@@ -375,13 +381,13 @@ export function TransactionFormDialog() {
 
                 {paymentMethod === "credit_card" && (
                   <>
-                    <div className="grid gap-2">
-                      <Label htmlFor="creditCardId">Cartão de Crédito</Label>
+                    <div className="grid gap-3">
+                      <Label htmlFor="creditCardId" className="text-muted-foreground ml-1">Cartão de Crédito</Label>
                       <select
                         name="creditCardId"
                         value={selectedCreditCardId}
-                        onChange={(e) => setSelectedCreditCardId(e.target.value)}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        onChange={(e) => handleCreditCardChange(e.target.value)}
+                        className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
                         required
                       >
                         <option value="">Selecione...</option>
@@ -394,13 +400,13 @@ export function TransactionFormDialog() {
                     </div>
 
                     {selectedCreditCardId && invoiceOptions.length > 0 && (
-                      <div className="grid gap-2">
-                        <Label htmlFor="invoiceMonth">Fatura</Label>
+                      <div className="grid gap-3">
+                        <Label htmlFor="invoiceMonth" className="text-muted-foreground ml-1">Fatura</Label>
                         <select
                           name="invoiceMonth"
                           value={selectedInvoiceMonth}
                           onChange={(e) => setSelectedInvoiceMonth(e.target.value)}
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
                           required
                         >
                           {invoiceOptions.map((opt) => (
@@ -415,13 +421,13 @@ export function TransactionFormDialog() {
                 )}
               </TabsContent>
 
-              <TabsContent value="income" className="space-y-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="accountIdIncome">Depositar na Conta</Label>
+              <TabsContent value="income" className="space-y-6">
+                <div className="grid gap-3">
+                  <Label htmlFor="accountIdIncome" className="text-muted-foreground ml-1">Depositar na Conta</Label>
                   <select
                     name="accountIdIncome"
                     id="accountIdIncome"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
                     required
                   >
                     {formData.accounts.map((a: Account) => (
@@ -432,9 +438,9 @@ export function TransactionFormDialog() {
                   </select>
                 </div>
 
-                <div className="grid gap-2">
-                  <Label>Tipo de Receita</Label>
-                  <div className="flex gap-4">
+                <div className="grid gap-3">
+                  <Label className="text-muted-foreground ml-1">Tipo de Receita</Label>
+                  <div className="flex gap-6 p-4 rounded-xl bg-muted/20 border border-border/50">
                     <label className="flex items-center gap-2 text-sm cursor-pointer">
                       <input
                         type="radio"
@@ -466,9 +472,9 @@ export function TransactionFormDialog() {
                 </div>
 
                 {tab === "income" && expenseType === "installment" && (
-                  <div className="space-y-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="installmentTotal">Quantidade de Parcelas</Label>
+                  <div className="space-y-5">
+                    <div className="grid gap-3">
+                      <Label htmlFor="installmentTotal" className="text-muted-foreground ml-1">Quantidade de Parcelas</Label>
                       <Input
                         id="installmentTotal"
                         name="installmentTotal"
@@ -494,13 +500,13 @@ export function TransactionFormDialog() {
                 )}
               </TabsContent>
 
-              <TabsContent value="transfer" className="space-y-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="accountIdTransferOrigin">Conta de Origem</Label>
+              <TabsContent value="transfer" className="space-y-6">
+                <div className="grid gap-3">
+                  <Label htmlFor="accountIdTransferOrigin" className="text-muted-foreground ml-1">Conta de Origem</Label>
                   <select
                     name="accountIdTransferOrigin"
                     id="accountIdTransferOrigin"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
                     required
                   >
                     {formData.accounts.map((a: Account) => (
@@ -510,12 +516,12 @@ export function TransactionFormDialog() {
                     ))}
                   </select>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="accountIdTransferDest">Conta de Destino</Label>
+                <div className="grid gap-3">
+                  <Label htmlFor="accountIdTransferDest" className="text-muted-foreground ml-1">Conta de Destino</Label>
                   <select
                     name="accountIdTransferDest"
                     id="accountIdTransferDest"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
                     required
                   >
                     {formData.accounts.map((a: Account) => (
@@ -531,8 +537,8 @@ export function TransactionFormDialog() {
                 <p className="text-sm text-destructive text-center">{formError}</p>
               )}
 
-              <div className="pt-4 flex justify-end">
-                <Button type="submit" disabled={isPending} className="w-full sm:w-auto">
+              <div className="pt-6 flex justify-end">
+                <Button type="submit" disabled={isPending} className="w-full sm:w-auto mt-2">
                   {isPending ? "Salvando..." : "Salvar Transação"}
                 </Button>
               </div>

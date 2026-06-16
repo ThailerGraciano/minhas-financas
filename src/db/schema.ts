@@ -66,6 +66,7 @@ export const transactions = pgTable('transactions', {
   parentTransactionId: integer('parent_transaction_id').references((): AnyPgColumn => transactions.id),
   observations: varchar('observations', { length: 500 }),
   paidAt: timestamp('paid_at'),
+  importHash: varchar('import_hash', { length: 255 }).unique(),
 });
 
 export const importLogs = pgTable('import_logs', {
@@ -75,6 +76,7 @@ export const importLogs = pgTable('import_logs', {
   successRows: integer('success_rows').notNull(),
   errorRows: integer('error_rows').notNull(),
   errorsDetail: jsonb('errors_detail'),
+  skippedRows: integer('skipped_rows').notNull().default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

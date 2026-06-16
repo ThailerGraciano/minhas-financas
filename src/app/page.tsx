@@ -39,21 +39,21 @@ export default async function DashboardPage(props: { searchParams?: Promise<{ [k
       <AccountBalancesSummary balances={balancesData.balancesByType} totalBalance={balancesData.totalBalance} />
 
       {/* Gráfico de Evolução de Saldo */}
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
+      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm">
+        <div className="flex flex-row items-center gap-2 mb-4">
           <TrendingUp className="h-5 w-5 text-primary" />
           <div>
-            <CardTitle>Evolução de Saldo</CardTitle>
+            <h2 className="text-xl font-bold">Evolução de Saldo</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
               Últimos 6 meses e projeção para os próximos 6
             </p>
           </div>
-        </CardHeader>
-        <CardContent className="pt-2">
+        </div>
+        <div>
           <BalanceEvolutionChart data={evolutionData} />
           <div className="flex items-center gap-6 mt-3 px-2">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="inline-block w-6 h-0.5 rounded" style={{ background: COLOR_PAST }} />
+              <span className="inline-block w-6 h-1 rounded" style={{ background: COLOR_PAST }} />
               Saldo real
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -63,88 +63,82 @@ export default async function DashboardPage(props: { searchParams?: Promise<{ [k
               Projeção
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Gráfico de Parcelas */}
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
+      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm">
+        <div className="flex flex-row items-center gap-2 mb-4">
           <Layers className="h-5 w-5 text-primary" />
           <div>
-            <CardTitle>Projeção de Parcelamentos</CardTitle>
+            <h2 className="text-xl font-bold">Projeção de Parcelamentos</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
               Acúmulo de faturas com compras parceladas
             </p>
           </div>
-        </CardHeader>
-        <CardContent className="pt-2">
+        </div>
+        <div>
           <InstallmentsStackedChart data={installmentsData.data} keys={installmentsData.keys} />
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Resumo do Mês */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receitas do Mês</CardTitle>
-            <ArrowUpCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{formatCurrency(data.totalIncome)}</div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm flex flex-col space-y-4">
+          <div className="flex items-center gap-2">
+            <ArrowUpCircle className="h-5 w-5 text-green-500" />
+            <span className="text-sm font-medium text-muted-foreground">Receitas do Mês</span>
+          </div>
+          <div className="text-4xl font-bold text-green-500">{formatCurrency(data.totalIncome)}</div>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Despesas do Mês</CardTitle>
-            <ArrowDownCircle className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{formatCurrency(data.totalExpense)}</div>
-          </CardContent>
-        </Card>
+        <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm flex flex-col space-y-4">
+          <div className="flex items-center gap-2">
+            <ArrowDownCircle className="h-5 w-5 text-red-500" />
+            <span className="text-sm font-medium text-muted-foreground">Despesas do Mês</span>
+          </div>
+          <div className="text-4xl font-bold text-red-500">{formatCurrency(data.totalExpense)}</div>
+        </div>
       </div>
 
       {/* Contas e Faturas */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>Saldos por Conta</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm">
+          <h2 className="text-xl font-bold mb-4">Saldos por Conta</h2>
+          <div className="space-y-4">
             {data.accounts.map(acc => (
-              <div key={acc.id} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
+              <div key={acc.id} className="flex justify-between items-center border-b border-muted/50 pb-3 last:border-0 last:pb-0">
                 <span className="font-medium">{acc.name}</span>
-                <span className={Number(acc.currentBalance) < 0 ? "text-red-500" : ""}>
+                <span className={`font-bold ${Number(acc.currentBalance) < 0 ? "text-red-500" : ""}`}>
                   {formatCurrency(Number(acc.currentBalance))}
                 </span>
               </div>
             ))}
             {data.accounts.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma conta cadastrada.</p>
+              <p className="text-sm text-muted-foreground py-4">Nenhuma conta cadastrada.</p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card className="col-span-1">
-          <CardHeader>
-            <CardTitle>Faturas Abertas</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm">
+          <h2 className="text-xl font-bold mb-4">Faturas Abertas</h2>
+          <div className="space-y-4">
             {data.cardInvoices.map(invoice => (
-              <div key={invoice.card.id} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
-                <div className="flex items-center gap-2">
-                  <CreditCardIcon className="h-4 w-4 text-orange-500" />
+              <div key={invoice.card.id} className="flex justify-between items-center border-b border-muted/50 pb-3 last:border-0 last:pb-0">
+                <div className="flex items-center gap-3">
+                  <div className="bg-orange-500/10 p-2 rounded-full">
+                    <CreditCardIcon className="h-5 w-5 text-orange-500" />
+                  </div>
                   <span className="font-medium">{invoice.card.name}</span>
                 </div>
-                <span className="text-red-500 font-medium">{formatCurrency(invoice.invoiceTotal)}</span>
+                <span className="text-red-500 font-bold">{formatCurrency(invoice.invoiceTotal)}</span>
               </div>
             ))}
             {data.cardInvoices.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma fatura com gastos neste mês.</p>
+              <p className="text-sm text-muted-foreground py-4">Nenhuma fatura com gastos neste mês.</p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

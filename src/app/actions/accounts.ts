@@ -3,7 +3,7 @@
 import { db } from '@/db';
 import { accounts, categories, transactions, fixedTransactions } from '@/db/schema';
 import { and, eq, gte, lte } from 'drizzle-orm';
-import { format } from 'date-fns';
+import { format, parse, endOfMonth, isValid } from 'date-fns';
 import { revalidatePath } from 'next/cache';
 
 export async function getAccounts() {
@@ -250,4 +250,40 @@ export async function getHistoricalBalance(
 
   const futureDelta = calcDelta([...pendingReal, ...virtualRows]);
   return currentBalance + futureDelta;
+}
+
+/**
+ * Calcula o saldo consolidado de todas as contas no final de um mês de competência.
+ *
+ * @param competencyMonth Mês de competência (formato 'YYYY-MM' ou 'MM/YYYY').
+ * @returns Lista de contas com seus saldos projetados/históricos (calculated_balance).
+ */
+export async function getAccountsBalancesByCompetency(competencyMonth: string) {
+  let dateObj = parse(competencyMonth, 'yyyy-MM', new Date());
+  if (!isValid(dateObj)) {
+    // Tenta formato brasileiro
+    dateObj = parse(competencyMonth, 'MM/yyyy', new Date());
+  }
+  if (!isValid(dateObj)) {
+    throw new Error('Mês de competência inválido. Utilize YYYY-MM ou MM/YYYY.');
+  }
+
+  // O alvo é o último dia desse mês
+  const targetDate = endOfMonth(dateObj);
+
+  const allAccounts = await getAccounts();
+
+  const results = await Promise.all(
+    allAccounts.map(async (acc) => {
+      const balance = await getHistoricalBalance(acc.id, targetDate);
+      return {
+        id: acc.id,
+        name: acc.name,
+        type: acc.type,
+        calculated_balance: balance ?? 0,
+      };
+    })
+  );
+
+  return results;
 }

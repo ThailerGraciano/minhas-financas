@@ -24,35 +24,26 @@ export function AccountBalancesSummary({ balances, totalBalance }: { balances: B
   return (
     <div className="space-y-4">
       {/* Saldo Total Geral */}
-      <Card className="bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/20 overflow-hidden relative shadow-sm">
-        <div className="absolute right-0 top-0 opacity-5 pointer-events-none">
-          <Landmark className="w-32 h-32 -mt-4 -mr-4" />
-        </div>
-        <CardContent className="p-6 md:p-8">
-          <div className="flex flex-col space-y-1">
-            <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Saldo Total Geral</span>
-            <span className="text-4xl md:text-5xl font-extrabold text-foreground tracking-tight">
-              {formatCurrency(totalBalance)}
-            </span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="py-6 px-2 flex flex-col space-y-2">
+        <span className="text-sm font-medium text-muted-foreground">Saldo Total Geral</span>
+        <span className="text-5xl md:text-6xl font-bold text-foreground tracking-tight">
+          {formatCurrency(totalBalance)}
+        </span>
+      </div>
 
       {/* Grid de mini-cards */}
       {balances.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
           {balances.map((b) => (
-            <Card key={b.type} className="hover:shadow-sm transition-all bg-card/50 backdrop-blur-sm border-muted">
-              <CardContent className="p-4 flex flex-col justify-center items-center text-center space-y-3">
-                <div className="p-3 bg-muted/50 rounded-full">
-                  {getIcon(b.type)}
-                </div>
-                <div className="flex flex-col w-full">
-                  <span className="text-xs font-medium text-muted-foreground truncate">{b.label}</span>
-                  <span className="text-lg font-bold text-foreground truncate">{formatCurrency(b.total)}</span>
-                </div>
-              </CardContent>
-            </Card>
+            <div key={b.type} className="bg-card rounded-[2rem] border-transparent shadow-sm flex flex-col justify-center p-4 md:p-6 space-y-3 md:space-y-4 min-w-0">
+              <div className="w-10 h-10 bg-background rounded-full flex items-center justify-center">
+                {getIcon(b.type)}
+              </div>
+              <div className="flex flex-col space-y-1">
+                <span className="text-sm font-medium text-muted-foreground truncate">{b.label}</span>
+                <span className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground truncate">{formatCurrency(b.total)}</span>
+              </div>
+            </div>
           ))}
         </div>
       )}

@@ -1,4 +1,4 @@
-import { getDashboardData, getBalancesByType, getBalanceEvolutionData } from '@/app/actions/dashboard';
+import { getDashboardData, getBalancesByType, getBalanceEvolutionData, getInstallmentsChartData } from '@/app/actions/dashboard';
 import { getSettings } from '@/app/actions/settings';
 import { CompetencyFilter } from '@/components/competency-filter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,17 +7,20 @@ import { ArrowUpCircle, ArrowDownCircle, CreditCard as CreditCardIcon, TrendingU
 import { Suspense } from 'react';
 import { AccountBalancesSummary } from '@/components/account-balances-summary';
 import { BalanceEvolutionChart, COLOR_PAST, COLOR_FUTURE } from '@/components/balance-evolution-chart';
+import { InstallmentsStackedChart } from '@/components/installments-stacked-chart';
+import { Layers } from 'lucide-react';
 
 export default async function DashboardPage(props: { searchParams?: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const searchParams = await props.searchParams;
   const monthParam = searchParams?.month as string | undefined;
   const currentMonth = monthParam || format(new Date(), 'yyyy-MM');
 
-  const [data, settingsData, balancesData, evolutionData] = await Promise.all([
+  const [data, settingsData, balancesData, evolutionData, installmentsData] = await Promise.all([
     getDashboardData(currentMonth),
     getSettings(),
     getBalancesByType(),
     getBalanceEvolutionData(),
+    getInstallmentsChartData(),
   ]);
 
   const formatCurrency = (value: number) => {
@@ -60,6 +63,22 @@ export default async function DashboardPage(props: { searchParams?: Promise<{ [k
               Projeção
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Gráfico de Parcelas */}
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
+          <Layers className="h-5 w-5 text-primary" />
+          <div>
+            <CardTitle>Projeção de Parcelamentos</CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Acúmulo de faturas com compras parceladas
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-2">
+          <InstallmentsStackedChart data={installmentsData.data} keys={installmentsData.keys} />
         </CardContent>
       </Card>
 

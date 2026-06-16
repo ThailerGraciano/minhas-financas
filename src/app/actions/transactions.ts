@@ -17,6 +17,7 @@ const transactionSchema = z.object({
   categoryId: z.number().int().positive('Categoria é obrigatória'),
   type: z.string().min(1),
   status: z.string().min(1),
+  isTotalAmount: z.boolean().optional().default(false),
 }).passthrough();
 
 // Regra: receitas e despesas DEVEM ter subcategoria
@@ -103,7 +104,7 @@ export async function getTransactions(month?: string) {
   return allTransactions;
 }
 
-export async function createTransaction(data: NewTransaction & { destinationAccountId?: number; isFixed?: boolean }): Promise<{ success: boolean; parentId?: number; error?: string }> {
+export async function createTransaction(data: NewTransaction & { destinationAccountId?: number; isFixed?: boolean; isTotalAmount?: boolean }): Promise<{ success: boolean; parentId?: number; error?: string }> {
   // Validação Zod
   const parsed = transactionSchema.safeParse(data);
   if (!parsed.success) {
@@ -120,7 +121,7 @@ export async function createTransaction(data: NewTransaction & { destinationAcco
   }
 
   try {
-    const { isFixed, destinationAccountId, ...txData } = data;
+    const { isFixed, destinationAccountId, isTotalAmount, ...txData } = data;
 
     if (txData.type === 'transfer' && destinationAccountId) {
       const result = await db.transaction(async (tx) => {
@@ -188,8 +189,22 @@ export async function createTransaction(data: NewTransaction & { destinationAcco
     }
 
     if (txData.installmentTotal && txData.installmentTotal > 1) {
+      let baseParcelAmount = txData.amount;
+      let lastParcelAmount = txData.amount;
+
+      if (isTotalAmount) {
+        const total = Number(txData.amount);
+        const installmentValue = Math.round((total / txData.installmentTotal) * 100) / 100;
+        baseParcelAmount = installmentValue.toFixed(2);
+        
+        const sumWithoutLast = installmentValue * (txData.installmentTotal - 1);
+        const lastValue = Math.round((total - sumWithoutLast) * 100) / 100;
+        lastParcelAmount = lastValue.toFixed(2);
+      }
+
       const [parentTx] = await db.insert(transactions).values({
         ...txData,
+        amount: baseParcelAmount,
         installmentCurrent: 1,
       }).returning();
 
@@ -198,8 +213,11 @@ export async function createTransaction(data: NewTransaction & { destinationAcco
 
       for (let i = 2; i <= txData.installmentTotal; i++) {
         const nextDate = addMonths(baseDate, i - 1);
+        const isLast = i === txData.installmentTotal;
+
         installmentsToInsert.push({
           ...txData,
+          amount: isLast ? lastParcelAmount : baseParcelAmount,
           date: format(nextDate, 'yyyy-MM-dd'),
           competencyMonth: format(nextDate, 'yyyy-MM'),
           installmentCurrent: i,

@@ -10,6 +10,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { transactions } from "@/db/schema";
 import { addMonths, format } from "date-fns";
@@ -38,6 +39,7 @@ export function TransactionFormDialog() {
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("");
   const [selectedCreditCardId, setSelectedCreditCardId] = useState("");
   const [selectedInvoiceMonth, setSelectedInvoiceMonth] = useState("");
+  const [isTotalAmount, setIsTotalAmount] = useState(false);
 
   const router = useRouter();
 
@@ -136,6 +138,7 @@ export function TransactionFormDialog() {
 
       if (expenseType === "installment") {
         baseData.installmentTotal = Number(form.get("installmentTotal"));
+        baseData.isTotalAmount = isTotalAmount;
       }
     } else if (tab === "income") {
       baseData.type = "income";
@@ -145,6 +148,7 @@ export function TransactionFormDialog() {
 
       if (expenseType === "installment") {
         baseData.installmentTotal = Number(form.get("installmentTotal"));
+        baseData.isTotalAmount = isTotalAmount;
       }
     } else if (tab === "transfer") {
       baseData.type = "transfer";
@@ -209,6 +213,7 @@ export function TransactionFormDialog() {
               setSelectedCategoryId("");
               setSelectedSubcategoryId("");
               setFormError("");
+              setIsTotalAmount(false);
             }}
             className="w-full"
           >
@@ -312,16 +317,30 @@ export function TransactionFormDialog() {
                 </div>
 
                 {tab === "expense" && expenseType === "installment" && (
-                  <div className="grid gap-2">
-                    <Label htmlFor="installmentTotal">Quantidade de Parcelas</Label>
-                    <Input
-                      id="installmentTotal"
-                      name="installmentTotal"
-                      type="number"
-                      min="2"
-                      defaultValue="2"
-                      required
-                    />
+                  <div className="space-y-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="installmentTotal">Quantidade de Parcelas</Label>
+                      <Input
+                        id="installmentTotal"
+                        name="installmentTotal"
+                        type="number"
+                        min="2"
+                        defaultValue="2"
+                        required
+                      />
+                    </div>
+                    <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <Label className="text-base cursor-pointer" onClick={() => setIsTotalAmount(!isTotalAmount)}>O valor digitado é o total da compra?</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Se marcado, o valor será dividido pelo número de parcelas. Se desmarcado, o valor será o de cada parcela individual.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={isTotalAmount}
+                        onCheckedChange={setIsTotalAmount}
+                      />
+                    </div>
                   </div>
                 )}
 
@@ -447,16 +466,30 @@ export function TransactionFormDialog() {
                 </div>
 
                 {tab === "income" && expenseType === "installment" && (
-                  <div className="grid gap-2">
-                    <Label htmlFor="installmentTotal">Quantidade de Parcelas</Label>
-                    <Input
-                      id="installmentTotal"
-                      name="installmentTotal"
-                      type="number"
-                      min="2"
-                      defaultValue="2"
-                      required
-                    />
+                  <div className="space-y-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="installmentTotal">Quantidade de Parcelas</Label>
+                      <Input
+                        id="installmentTotal"
+                        name="installmentTotal"
+                        type="number"
+                        min="2"
+                        defaultValue="2"
+                        required
+                      />
+                    </div>
+                    <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <Label className="text-base cursor-pointer" onClick={() => setIsTotalAmount(!isTotalAmount)}>O valor digitado é o total da compra?</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Se marcado, o valor será dividido pelo número de parcelas. Se desmarcado, o valor será o de cada parcela individual.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={isTotalAmount}
+                        onCheckedChange={setIsTotalAmount}
+                      />
+                    </div>
                   </div>
                 )}
               </TabsContent>

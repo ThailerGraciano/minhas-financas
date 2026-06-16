@@ -1,13 +1,17 @@
-import { getCreditCards } from '@/app/actions/credit-cards';
+import { getCreditCardsWithSummary } from '@/app/actions/credit-cards';
+import { getSettings } from '@/app/actions/settings';
 import { CreditCardFormDialog } from './credit-card-form-dialog';
-import { CreditCardList } from './credit-card-list';
+import { CreditCardsClientPage } from './credit-cards-client-page';
+import { format } from 'date-fns';
 
 export const metadata = {
   title: 'Cartões | Minhas Finanças',
 };
 
 export default async function CreditCardsPage() {
-  const cards = await getCreditCards();
+  const settingsData = await getSettings();
+  const currentMonth = format(new Date(), 'yyyy-MM');
+  const initialCards = await getCreditCardsWithSummary(currentMonth);
   
   return (
     <div className="container mx-auto p-4 md:p-8">
@@ -19,7 +23,7 @@ export default async function CreditCardsPage() {
         <CreditCardFormDialog />
       </div>
       
-      <CreditCardList cards={cards} />
+      <CreditCardsClientPage closingDay={settingsData.closingDay} initialCards={initialCards} />
     </div>
   );
 }

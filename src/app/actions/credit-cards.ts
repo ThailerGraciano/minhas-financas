@@ -183,3 +183,45 @@ export async function payFullInvoice(
     return { success: false, error: error instanceof Error ? error.message : 'Falha ao pagar fatura' };
   }
 }
+
+export async function getCreditCardsWithSummary(competencyMonth: string) {
+  const cards = await db.select().from(creditCards);
+
+  const cardsWithSummary = await Promise.all(
+    cards.map(async (card) => {
+      // Busca transações do cartão na competência informada
+      const cardTxs = await db.select()
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.creditCardId, card.id),
+            eq(transactions.competencyMonth, competencyMonth),
+            eq(transactions.type, 'credit_card_expense')
+          )
+        );
+
+      let invoice_total = 0;
+      let invoice_paid = 0;
+      let invoice_pending = 0;
+
+      for (const t of cardTxs) {
+        const amount = Number(t.amount);
+        invoice_total += amount;
+        if (t.status === 'paid') {
+          invoice_paid += amount;
+        } else if (t.status === 'pending') {
+          invoice_pending += amount;
+        }
+      }
+
+      return {
+        ...card,
+        invoice_total,
+        invoice_paid,
+        invoice_pending,
+      };
+    })
+  );
+
+  return cardsWithSummary;
+}

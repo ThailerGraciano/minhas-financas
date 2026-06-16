@@ -2,7 +2,7 @@
 
 import { db } from '@/db';
 import { accounts, creditCards, transactions, fixedTransactions } from '@/db/schema';
-import { and, eq, gte, inArray, isNotNull, lte } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, lte, gt } from 'drizzle-orm';
 import { addDays, addMonths, endOfMonth, format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -229,4 +229,63 @@ export async function getBalanceEvolutionData(): Promise<BalanceEvolutionPoint[]
   });
 
   return points;
+}
+
+export async function getInstallmentsChartData() {
+  const currentMonth = format(new Date(), 'yyyy-MM');
+
+  const installments = await db
+    .select({
+      description: transactions.description,
+      amount: transactions.amount,
+      competencyMonth: transactions.competencyMonth,
+    })
+    .from(transactions)
+    .where(
+      and(
+        isNotNull(transactions.installmentTotal),
+        gt(transactions.installmentTotal, 1),
+        gte(transactions.competencyMonth, currentMonth)
+      )
+    );
+
+  const monthSet = new Set<string>();
+  installments.forEach(t => monthSet.add(t.competencyMonth));
+  
+  // Limitar projeção para no máximo 12 meses para não quebrar o layout
+  const sortedMonths = Array.from(monthSet).sort().slice(0, 12);
+
+  const dataByMonth: Record<string, any> = {};
+  const keysSet = new Set<string>();
+
+  sortedMonths.forEach(month => {
+    dataByMonth[month] = {};
+  });
+
+  installments.forEach(t => {
+    if (!dataByMonth[t.competencyMonth]) return; // Ignora se estiver fora do range de 12 meses
+    const key = t.description;
+    keysSet.add(key);
+
+    const amount = Number(t.amount);
+    if (!dataByMonth[t.competencyMonth][key]) {
+      dataByMonth[t.competencyMonth][key] = 0;
+    }
+    dataByMonth[t.competencyMonth][key] += amount;
+  });
+
+  const chartData = sortedMonths.map(month => {
+    const obj = dataByMonth[month];
+    const date = new Date(`${month}-01T00:00:00`);
+    const formattedMonth = format(date, 'MMM/yyyy', { locale: ptBR });
+    return {
+      month: formattedMonth.charAt(0).toUpperCase() + formattedMonth.slice(1),
+      ...obj,
+    };
+  });
+
+  return {
+    data: chartData,
+    keys: Array.from(keysSet),
+  };
 }

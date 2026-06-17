@@ -1,15 +1,17 @@
 import { db } from '../src/db';
-import { transactions, importLogs, accounts } from '../src/db/schema';
+import { transactions, fixedTransactions, importLogs, accounts } from '../src/db/schema';
+import { sql } from 'drizzle-orm';
 
 async function main() {
   console.log("Iniciando limpeza do banco de dados (Transações)...");
   try {
-    // 1. Apagar todas as transações
-    await db.delete(transactions);
-    console.log("✅ Todas as transações foram apagadas.");
+    // 1. Apagar todas as transações normais e fixas rapidamente usando TRUNCATE
+    await db.execute(sql`TRUNCATE TABLE transactions CASCADE`);
+    await db.execute(sql`TRUNCATE TABLE fixed_transactions CASCADE`);
+    console.log("✅ Todas as transações (normais e fixas) foram apagadas.");
 
     // 2. Apagar logs de importação
-    await db.delete(importLogs);
+    await db.execute(sql`TRUNCATE TABLE import_logs CASCADE`);
     console.log("✅ Logs de importação apagados.");
 
     // 3. Resetar saldo das contas bancárias

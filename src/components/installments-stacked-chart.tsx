@@ -35,7 +35,7 @@ export function InstallmentsStackedChart({
   data,
   keys,
 }: {
-  data: any[];
+  data: Record<string, string | number>[];
   keys: string[];
 }) {
   // Configura o chart dinamicamente com as chaves reais

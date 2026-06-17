@@ -6,6 +6,8 @@ import { and, eq, gte, inArray, isNotNull, lte, gt } from 'drizzle-orm';
 import { addDays, addMonths, endOfMonth, format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+import { getTransactions } from './transactions';
+
 export async function getDashboardData(month?: string) {
   const currentMonth = month || format(new Date(), 'yyyy-MM');
 
@@ -255,7 +257,7 @@ export async function getInstallmentsChartData() {
   // Limitar projeção para no máximo 12 meses para não quebrar o layout
   const sortedMonths = Array.from(monthSet).sort().slice(0, 12);
 
-  const dataByMonth: Record<string, any> = {};
+  const dataByMonth: Record<string, Record<string, number>> = {};
   const keysSet = new Set<string>();
 
   sortedMonths.forEach(month => {
@@ -287,5 +289,84 @@ export async function getInstallmentsChartData() {
   return {
     data: chartData,
     keys: Array.from(keysSet),
+  };
+}
+
+export async function getIncomeVsExpenseData(competencyMonth: string, showOnlyPaid: boolean = false) {
+  const [allTransactions, allAccounts] = await Promise.all([
+    getTransactions(competencyMonth),
+    db.select().from(accounts)
+  ]);
+
+  let totalIncome = 0;
+  let totalExpense = 0;
+
+  let totalPaidIncome = 0;
+  let totalCurrentBalance = 0;
+
+  const accountMap = new Map<number, { accountName: string; income: number; expense: number; currentBalance: number; paidIncome: number }>();
+
+  allAccounts.forEach(acc => {
+    totalCurrentBalance += Number(acc.currentBalance);
+    accountMap.set(acc.id, { 
+      accountName: acc.name, 
+      income: 0, 
+      expense: 0, 
+      currentBalance: Number(acc.currentBalance),
+      paidIncome: 0,
+    });
+  });
+
+  const filteredTransactions = showOnlyPaid 
+    ? allTransactions.filter(t => t.status === 'paid')
+    : allTransactions;
+
+  // Calculate paid income of the current month to subtract from current balance
+  allTransactions.forEach(t => {
+    if (t.type === 'income' && t.status === 'paid') {
+      if (t.accountId && accountMap.has(t.accountId)) {
+        accountMap.get(t.accountId)!.paidIncome += Number(t.amount);
+        totalPaidIncome += Number(t.amount);
+      }
+    }
+  });
+
+  filteredTransactions.forEach(t => {
+    const amount = Number(t.amount);
+    const isIncome = t.type === 'income';
+    const isExpense = t.type === 'expense' || t.type === 'credit_card_expense';
+
+    if (isIncome) totalIncome += amount;
+    if (isExpense) totalExpense += amount;
+
+    if (t.accountId && t.account) {
+      if (!accountMap.has(t.accountId)) {
+        accountMap.set(t.accountId, { accountName: t.account.name, income: 0, expense: 0, currentBalance: 0, paidIncome: 0 });
+      }
+      const acc = accountMap.get(t.accountId)!;
+      if (isIncome) acc.income += amount;
+      if (isExpense) acc.expense += amount;
+    }
+  });
+
+  const globalBaseBalance = totalCurrentBalance - totalPaidIncome;
+  const globalData = { name: 'Geral', income: totalIncome, expense: totalExpense, baseBalance: globalBaseBalance };
+  
+  const byAccountData = Array.from(accountMap.values()).map(acc => ({
+    accountName: acc.accountName,
+    income: acc.income,
+    expense: acc.expense,
+    baseBalance: acc.currentBalance - acc.paidIncome,
+  }));
+
+  const accountVsGlobalData = byAccountData.map(acc => ({
+    ...acc,
+    globalExpense: totalExpense,
+  }));
+
+  return {
+    global: globalData,
+    byAccount: byAccountData,
+    accountVsGlobal: accountVsGlobalData,
   };
 }

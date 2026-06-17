@@ -1,4 +1,4 @@
-import { getDashboardData, getBalancesByType, getBalanceEvolutionData, getInstallmentsChartData } from '@/app/actions/dashboard';
+import { getDashboardData, getBalancesByType, getBalanceEvolutionData, getInstallmentsChartData, getIncomeVsExpenseData } from '@/app/actions/dashboard';
 import { getSettings } from '@/app/actions/settings';
 import { CompetencyFilter } from '@/components/competency-filter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +8,10 @@ import { Suspense } from 'react';
 import { AccountBalancesSummary } from '@/components/account-balances-summary';
 import { BalanceEvolutionChart, COLOR_PAST, COLOR_FUTURE } from '@/components/balance-evolution-chart';
 import { InstallmentsStackedChart } from '@/components/installments-stacked-chart';
+import { GlobalIncomeExpenseChart } from '@/components/global-income-expense-chart';
+import { AccountIncomeExpenseChart } from '@/components/account-income-expense-chart';
+import { AccountVsGlobalExpenseChart } from '@/components/account-vs-global-expense-chart';
+import { PurchasingPowerChart } from '@/components/purchasing-power-chart';
 import { Layers } from 'lucide-react';
 
 export default async function DashboardPage(props: { searchParams?: Promise<{ [key: string]: string | string[] | undefined }> }) {
@@ -15,12 +19,13 @@ export default async function DashboardPage(props: { searchParams?: Promise<{ [k
   const monthParam = searchParams?.month as string | undefined;
   const currentMonth = monthParam || format(new Date(), 'yyyy-MM');
 
-  const [data, settingsData, balancesData, evolutionData, installmentsData] = await Promise.all([
+  const [data, settingsData, balancesData, evolutionData, installmentsData, incomeVsExpenseData] = await Promise.all([
     getDashboardData(currentMonth),
     getSettings(),
     getBalancesByType(),
     getBalanceEvolutionData(),
     getInstallmentsChartData(),
+    getIncomeVsExpenseData(currentMonth),
   ]);
 
   const formatCurrency = (value: number) => {
@@ -99,6 +104,18 @@ export default async function DashboardPage(props: { searchParams?: Promise<{ [k
           </div>
           <div className="text-4xl font-bold text-red-500">{formatCurrency(data.totalExpense)}</div>
         </div>
+      </div>
+
+      {/* Gráficos Comparativos */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <GlobalIncomeExpenseChart initialData={incomeVsExpenseData.global} competencyMonth={currentMonth} />
+        <AccountIncomeExpenseChart initialData={incomeVsExpenseData.byAccount} competencyMonth={currentMonth} />
+      </div>
+
+      {/* Gráficos Analíticos */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <PurchasingPowerChart initialData={incomeVsExpenseData.byAccount} competencyMonth={currentMonth} />
+        <AccountVsGlobalExpenseChart initialData={incomeVsExpenseData.accountVsGlobal} competencyMonth={currentMonth} />
       </div>
 
       {/* Contas e Faturas */}

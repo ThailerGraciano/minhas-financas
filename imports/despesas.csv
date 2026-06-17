@@ -1,0 +1,8 @@
+DESCRIÇÃO;LANÇAMENTO;VENCIMENTO;EFETIVAÇÃO;CATEGORIA;SUBCATEGORIA;CARTÃO;CONTA;VALOR;OBSERVAÇÕES
+Aluguel;01/07/2026 09:00;10/07/2026;10/07/2026;Moradia;Aluguel;;Nubank;1500.00;
+Mercado Mensal;05/07/2026 16:45;05/07/2026;05/07/2026;Mercado;Compras;;Pluxee;850.50;
+Energia Elétrica;10/07/2026 10:15;20/07/2026;19/07/2026;Moradia;Contas;;Nubank;185.90;
+Internet;12/07/2026 11:00;25/07/2026;;Moradia;Contas;NuBank;Nubank;99.90;
+Uber;15/07/2026 22:30;10/08/2026;;Transporte;Uber;NuBank;Nubank;25.40;
+Restaurante;18/07/2026 20:15;10/08/2026;;Alimentação;Restaurante;NuBank;Nubank;145.00;
+Assinatura Streaming;20/07/2026 08:00;10/08/2026;;Serviços;Assinaturas;NuBank;Nubank;45.90;

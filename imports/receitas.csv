@@ -1,6 +1,9 @@
 DESCRIÇÃO;LANÇAMENTO;VENCIMENTO;EFETIVAÇÃO;CATEGORIA;SUBCATEGORIA;CONTA;VALOR;OBSERVAÇÕES
-Salário;25/06/2026 10:00;05/07/2026;05/07/2026;Fixa mensal;Salário;Nubank;6500,00;
-Rendimento CDB;30/06/2026 23:59;01/07/2026;01/07/2026;Investimentos;Rendimentos;Nubank;45,50;
-Cashback Cartão;15/07/2026 14:20;15/07/2026;15/07/2026;Outros;Cashback;Nubank;12,00;
-Venda Notebook;10/07/2026 18:30;12/07/2026;12/07/2026;Vendas;Eletrônicos;Santander;1200,00;
-Vale Alimentação;01/07/2026 08:00;05/07/2026;05/07/2026;Benefícios;Alimentação;Pluxee;800,00;
+Salário;25/04/2026 10:00;05/05/2026;05/05/2026;Fixa mensal;Salário;Nubank;6500.00;
+Rendimento CDB;30/04/2026 23:59;01/05/2026;01/05/2026;Investimentos;Rendimentos;Nubank;42.30;
+Vale Alimentação;01/05/2026 08:00;05/05/2026;05/05/2026;Benefícios;Alimentação;Pluxee;800.00;
+Trabalho Extra;10/05/2026 15:30;12/05/2026;12/05/2026;Serviços;Freelance;Santander;450.00;
+Salário;25/05/2026 10:00;05/06/2026;05/06/2026;Fixa mensal;Salário;Nubank;6500.00;
+Rendimento CDB;31/05/2026 23:59;01/06/2026;01/06/2026;Investimentos;Rendimentos;Nubank;45.50;
+Vale Alimentação;01/06/2026 08:00;05/06/2026;05/06/2026;Benefícios;Alimentação;Pluxee;800.00;
+Reembolso;15/06/2026 14:00;16/06/2026;16/06/2026;Outros;Reembolsos;Nubank;120.00;

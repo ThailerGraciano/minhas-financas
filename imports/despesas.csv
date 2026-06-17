@@ -1,8 +1,14 @@
 DESCRIÇÃO;LANÇAMENTO;VENCIMENTO;EFETIVAÇÃO;CATEGORIA;SUBCATEGORIA;CARTÃO;CONTA;VALOR;OBSERVAÇÕES
-Aluguel;01/07/2026 09:00;10/07/2026;10/07/2026;Moradia;Aluguel;;Nubank;1500.00;
-Mercado Mensal;05/07/2026 16:45;05/07/2026;05/07/2026;Mercado;Compras;;Pluxee;850.50;
-Energia Elétrica;10/07/2026 10:15;20/07/2026;19/07/2026;Moradia;Contas;;Nubank;185.90;
-Internet;12/07/2026 11:00;25/07/2026;;Moradia;Contas;NuBank;Nubank;99.90;
-Uber;15/07/2026 22:30;10/08/2026;;Transporte;Uber;NuBank;Nubank;25.40;
-Restaurante;18/07/2026 20:15;10/08/2026;;Alimentação;Restaurante;NuBank;Nubank;145.00;
-Assinatura Streaming;20/07/2026 08:00;10/08/2026;;Serviços;Assinaturas;NuBank;Nubank;45.90;
+Aluguer;01/05/2026 09:00;05/05/2026;05/05/2026;Moradia;Aluguer;;Nubank;1500.00;
+Supermercado;04/05/2026 18:30;04/05/2026;04/05/2026;Mercado;Compras;;Pluxee;950.00;
+Gasolina Fiesta;10/05/2026 14:15;10/05/2026;10/05/2026;Transportes;Combustível;;Nubank;180.00;
+Fraldas e itens bebé;12/05/2026 10:20;12/05/2026;12/05/2026;Família;Filhos;NuBank;Nubank;120.50;
+Mensalidade Ginásio;15/05/2026 07:00;15/05/2026;15/05/2026;Saúde;Desporto;;Nubank;90.00;
+Cordas para Baixo;20/05/2026 19:45;10/06/2026;10/06/2026;Lazer;Música;NuBank;Nubank;150.00;
+Aluguer;01/06/2026 09:00;05/06/2026;05/06/2026;Moradia;Aluguer;;Nubank;1500.00;
+Supermercado;03/06/2026 19:00;03/06/2026;03/06/2026;Mercado;Compras;;Pluxee;880.00;
+Gasolina Fiesta;08/06/2026 15:30;08/06/2026;08/06/2026;Transportes;Combustível;;Nubank;195.00;
+Fraldas e itens bebé;11/06/2026 11:10;11/06/2026;11/06/2026;Família;Filhos;NuBank;Nubank;110.00;
+Mensalidade Ginásio;15/06/2026 07:00;15/06/2026;15/06/2026;Saúde;Desporto;;Nubank;90.00;
+Restaurante com a Isa;16/06/2026 21:00;10/07/2026;;Alimentação;Restaurantes;NuBank;Nubank;145.00;
+Assinatura Streaming;17/06/2026 08:00;10/07/2026;;Serviços;Assinaturas;NuBank;Nubank;45.90;

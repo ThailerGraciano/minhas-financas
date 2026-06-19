@@ -241,6 +241,8 @@ export async function getInstallmentsChartData() {
       description: transactions.description,
       amount: transactions.amount,
       competencyMonth: transactions.competencyMonth,
+      installmentCurrent: transactions.installmentCurrent,
+      installmentTotal: transactions.installmentTotal,
     })
     .from(transactions)
     .where(
@@ -257,7 +259,7 @@ export async function getInstallmentsChartData() {
   // Limitar projeção para no máximo 12 meses para não quebrar o layout
   const sortedMonths = Array.from(monthSet).sort().slice(0, 12);
 
-  const dataByMonth: Record<string, Record<string, number>> = {};
+  const dataByMonth: Record<string, Record<string, string | number>> = {};
   const keysSet = new Set<string>();
 
   sortedMonths.forEach(month => {
@@ -270,10 +272,14 @@ export async function getInstallmentsChartData() {
     keysSet.add(key);
 
     const amount = Number(t.amount);
-    if (!dataByMonth[t.competencyMonth][key]) {
+    if (typeof dataByMonth[t.competencyMonth][key] !== 'number') {
       dataByMonth[t.competencyMonth][key] = 0;
     }
-    dataByMonth[t.competencyMonth][key] += amount;
+    (dataByMonth[t.competencyMonth][key] as number) += amount;
+
+    if (t.installmentCurrent && t.installmentTotal) {
+      dataByMonth[t.competencyMonth][`${key}_installment`] = `${t.installmentCurrent}/${t.installmentTotal}`;
+    }
   });
 
   const chartData = sortedMonths.map(month => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { getTransactionFormData } from "@/app/actions/form-data";
-import { updateTransaction } from "@/app/actions/transactions";
+import { updateTransaction, getTransactionDetailsForEdit } from "@/app/actions/transactions";
 import { CategoryIcon } from "@/components/category-icon";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -32,6 +32,10 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("");
   const [amount, setAmount] = useState<number>(0);
   
+  const [selectedAccountId, setSelectedAccountId] = useState("");
+  const [selectedDestinationAccountId, setSelectedDestinationAccountId] = useState("");
+  const [fullTransaction, setFullTransaction] = useState<any>(null);
+  
   const router = useRouter();
 
   useEffect(() => {
@@ -45,6 +49,21 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
       setSelectedCategoryId(transaction.categoryId ? String(transaction.categoryId) : "");
       setSelectedSubcategoryId(transaction.subcategoryId ? String(transaction.subcategoryId) : "");
       setAmount(Number(transaction.amount));
+      setSelectedAccountId("");
+      setSelectedDestinationAccountId("");
+
+      getTransactionDetailsForEdit(transaction.id).then((details: any) => {
+        if (details) {
+          setFullTransaction(details);
+          setSelectedAccountId(
+            details.accountId ? String(details.accountId) : 
+            details.creditCardId ? `cc-${details.creditCardId}` : ""
+          );
+          if (details.type === 'transfer' && details.destinationAccountId) {
+            setSelectedDestinationAccountId(String(details.destinationAccountId));
+          }
+        }
+      });
     }
   }, [open, transaction]);
 
@@ -72,6 +91,9 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
 
     const competencyMonth = date.substring(0, 7);
 
+    const accountId = selectedAccountId && !selectedAccountId.startsWith('cc-') ? Number(selectedAccountId) : null;
+    const creditCardId = selectedAccountId && selectedAccountId.startsWith('cc-') ? Number(selectedAccountId.replace('cc-', '')) : null;
+
     const updateData = {
       description,
       amount,
@@ -79,6 +101,9 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
       competencyMonth,
       categoryId: Number(selectedCategoryId),
       subcategoryId: selectedSubcategoryId ? Number(selectedSubcategoryId) : null,
+      accountId,
+      creditCardId,
+      destinationAccountId: selectedDestinationAccountId && transaction.type === 'transfer' ? Number(selectedDestinationAccountId) : undefined,
     };
 
     const res = await updateTransaction(transaction.id, updateData);
@@ -110,6 +135,54 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
               <Label htmlFor="description">Descrição</Label>
               <Input id="description" name="description" defaultValue={transaction.description} required />
             </div>
+
+            {transaction.type === 'transfer' ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="accountId">Conta Origem</Label>
+                  <Select value={selectedAccountId} onValueChange={setSelectedAccountId} required>
+                    <SelectTrigger className="w-full h-10 bg-background text-sm flex items-center justify-between">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formData.accounts.map((a: any) => (
+                        <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="destinationAccountId">Conta Destino</Label>
+                  <Select value={selectedDestinationAccountId} onValueChange={setSelectedDestinationAccountId} required>
+                    <SelectTrigger className="w-full h-10 bg-background text-sm flex items-center justify-between">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formData.accounts.map((a: any) => (
+                        <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                <Label htmlFor="accountId">Conta</Label>
+                <Select value={selectedAccountId} onValueChange={setSelectedAccountId} required>
+                  <SelectTrigger className="w-full h-10 bg-background text-sm flex items-center justify-between">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {formData.accounts.map((a: any) => (
+                      <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                    ))}
+                    {transaction.type === 'credit_card_expense' && formData.creditCards.map((c: any) => (
+                      <SelectItem key={`cc-${c.id}`} value={`cc-${c.id}`}>{c.name} (Cartão)</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">

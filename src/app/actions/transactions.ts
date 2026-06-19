@@ -450,13 +450,15 @@ export async function deleteTransaction(id: number, mode: 'single' | 'future' = 
   }
 }
 
-export async function updateTransaction(id: number, data: Partial<NewTransaction>): Promise<{ success: boolean; error?: string }> {
+export async function updateTransaction(id: number, inputData: Partial<NewTransaction> & { destinationAccountId?: number }): Promise<{ success: boolean; error?: string }> {
   try {
     const result = await db.transaction(async (tx) => {
       const [oldTx] = await tx.select().from(transactions).where(eq(transactions.id, id));
       if (!oldTx) {
         throw new Error('Transação não encontrada');
       }
+
+      const { destinationAccountId, ...data } = inputData;
 
       if (oldTx.type === 'transfer') {
         const otherTx = oldTx.parentTransactionId
@@ -479,6 +481,9 @@ export async function updateTransaction(id: number, data: Partial<NewTransaction
             const cleanDesc = data.description.replace(/\s*\(Saída\)|\s*\(Entrada\)/g, '');
             otherUpdateData.description = `${cleanDesc}${suffix}`;
           }
+          if (destinationAccountId !== undefined) {
+            otherUpdateData.accountId = destinationAccountId;
+          }
           if (Object.keys(otherUpdateData).length > 0) {
             await tx.update(transactions).set(otherUpdateData).where(eq(transactions.id, otherTx.id));
           }
@@ -500,4 +505,31 @@ export async function updateTransaction(id: number, data: Partial<NewTransaction
     console.error('Error updating transaction:', error);
     return { success: false, error: 'Failed to update transaction' };
   }
+}
+
+export async function getTransactionDetailsForEdit(id: number) {
+  const [tx] = await db.select().from(transactions).where(eq(transactions.id, id));
+  if (!tx) return null;
+
+  let destinationAccountId: number | null = null;
+  if (tx.type === 'transfer') {
+    const otherTx = tx.parentTransactionId
+      ? await db.query.transactions.findFirst({ where: eq(transactions.id, tx.parentTransactionId) })
+      : await db.query.transactions.findFirst({ where: eq(transactions.parentTransactionId, tx.id) });
+    
+    // Determine which is origin and which is destination based on parentTransactionId
+    // The origin has parentTransactionId = null. The destination has parentTransactionId = origin.id
+    if (tx.parentTransactionId) {
+      // current is destination
+      destinationAccountId = tx.accountId;
+      // the real origin is the otherTx
+      return { ...tx, accountId: otherTx?.accountId ?? null, destinationAccountId };
+    } else {
+      // current is origin
+      destinationAccountId = otherTx?.accountId ?? null;
+      return { ...tx, destinationAccountId };
+    }
+  }
+
+  return tx;
 }

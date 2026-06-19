@@ -14,6 +14,19 @@ function generateImportHash(description: string, amount: string, date: string, a
   return crypto.createHash('sha256').update(hashStr).digest('hex');
 }
 
+// Helper to parse installments from description
+function parseInstallments(description: string) {
+  const match = description.match(/(.*?)\s+(\d{1,3})\/(\d{1,3})\s*$/);
+  if (match) {
+    return {
+      cleanDescription: match[1].trim(),
+      installmentCurrent: parseInt(match[2], 10),
+      installmentTotal: parseInt(match[3], 10)
+    };
+  }
+  return { cleanDescription: description.trim(), installmentCurrent: null, installmentTotal: null };
+}
+
 type ImportType = 'expense' | 'income' | 'transfer';
 
 // Helper to calculate competency month
@@ -129,9 +142,9 @@ async function getOrCreateCategory(catName: string, subName: string | undefined,
 }
 
 // PROCESS EXPENSES
-async function processExpenses(rows: any[], dbState: DbState, closingDay: number, filename: string) {
-  const transactionsToInsert: any[] = [];
-  const errorsDetail: any[] = [];
+async function processExpenses(rows: Record<string, string>[], dbState: DbState, closingDay: number, filename: string) {
+  const transactionsToInsert: typeof transactions.$inferInsert[] = [];
+  const errorsDetail: { row: number; data: Record<string, string>; error: string }[] = [];
   
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -144,10 +157,14 @@ async function processExpenses(rows: any[], dbState: DbState, closingDay: number
 
       const vencimentoStr = getCol(['VENCIMENTO', 'DATA']);
       const efetivacaoStr = getCol(['EFETIVAÇÃO', 'EFETIVACAO', 'PAGAMENTO']);
-      const descricao = getCol(['DESCRIÇÃO', 'DESCRICAO', 'NOME', 'HISTÓRICO', 'HISTORICO']);
+      const descricao = getCol(['DESCRIÇÃO', 'DESCRICAO', 'NOME', 'HISTÓRICO', 'HISTORICO']) || '';
+      const { cleanDescription, installmentCurrent, installmentTotal } = parseInstallments(descricao);
       const valorStr = getCol(['VALOR', 'QUANTIA', 'SAÍDA']);
-      const cartaoName = getCol(['CARTÃO', 'CARTAO']);
-      const contaName = getCol(['CONTA', 'BANCO']);
+      let cartaoName = getCol(['CARTÃO', 'CARTAO']);
+      if (cartaoName === '-') cartaoName = '';
+      
+      let contaName = getCol(['CONTA', 'BANCO']);
+      if (contaName === '-') contaName = '';
       const categoriaName = getCol(['CATEGORIA']);
       const subcategoriaName = getCol(['SUBCATEGORIA']);
 
@@ -187,7 +204,9 @@ async function processExpenses(rows: any[], dbState: DbState, closingDay: number
         categoryId,
         subcategoryId,
         amount,
-        description: descricao || 'Despesa Importada',
+        description: cleanDescription || 'Despesa Importada',
+        installmentCurrent,
+        installmentTotal,
         date: format(dataVencimento, 'yyyy-MM-dd'),
         competencyMonth,
         status,
@@ -195,8 +214,8 @@ async function processExpenses(rows: any[], dbState: DbState, closingDay: number
         observations: `Importado do arquivo ${filename} - Linha ${rowIndex}`,
         importHash: generateImportHash(descricao || 'Despesa Importada', amount, dataVencimento.toISOString(), cartaoName || contaName || ''),
       });
-    } catch (err: any) {
-      errorsDetail.push({ row: rowIndex, data: row, error: err.message });
+    } catch (err: unknown) {
+      errorsDetail.push({ row: rowIndex, data: row, error: err instanceof Error ? err.message : String(err) });
     }
   }
 
@@ -206,7 +225,7 @@ async function processExpenses(rows: any[], dbState: DbState, closingDay: number
   if (transactionsToInsert.length > 0) {
     await db.transaction(async (tx) => {
       const result = await tx.insert(transactions)
-        .values(transactionsToInsert as any[])
+        .values(transactionsToInsert)
         .onConflictDoNothing({ target: transactions.importHash })
         .returning({ id: transactions.id });
       successRows = result.length;
@@ -217,9 +236,9 @@ async function processExpenses(rows: any[], dbState: DbState, closingDay: number
 }
 
 // PROCESS INCOMES
-async function processIncomes(rows: any[], dbState: DbState, closingDay: number, filename: string) {
-  const transactionsToInsert: any[] = [];
-  const errorsDetail: any[] = [];
+async function processIncomes(rows: Record<string, string>[], dbState: DbState, closingDay: number, filename: string) {
+  const transactionsToInsert: typeof transactions.$inferInsert[] = [];
+  const errorsDetail: { row: number; data: Record<string, string>; error: string }[] = [];
   
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -232,9 +251,11 @@ async function processIncomes(rows: any[], dbState: DbState, closingDay: number,
 
       const vencimentoStr = getCol(['VENCIMENTO', 'DATA']);
       const efetivacaoStr = getCol(['EFETIVAÇÃO', 'EFETIVACAO', 'PAGAMENTO']);
-      const descricao = getCol(['DESCRIÇÃO', 'DESCRICAO', 'NOME', 'HISTÓRICO', 'HISTORICO']);
+      const descricao = getCol(['DESCRIÇÃO', 'DESCRICAO', 'NOME', 'HISTÓRICO', 'HISTORICO']) || '';
+      const { cleanDescription, installmentCurrent, installmentTotal } = parseInstallments(descricao);
       const valorStr = getCol(['VALOR', 'QUANTIA', 'ENTRADA']);
-      const contaName = getCol(['CONTA', 'BANCO']);
+      let contaName = getCol(['CONTA', 'BANCO']);
+      if (contaName === '-') contaName = '';
       const categoriaName = getCol(['CATEGORIA']);
       const subcategoriaName = getCol(['SUBCATEGORIA']);
 
@@ -260,7 +281,9 @@ async function processIncomes(rows: any[], dbState: DbState, closingDay: number,
         categoryId,
         subcategoryId,
         amount,
-        description: descricao || 'Receita Importada',
+        description: cleanDescription || 'Receita Importada',
+        installmentCurrent,
+        installmentTotal,
         date: format(dataVencimento, 'yyyy-MM-dd'),
         competencyMonth,
         status,
@@ -268,8 +291,8 @@ async function processIncomes(rows: any[], dbState: DbState, closingDay: number,
         observations: `Importado do arquivo ${filename} - Linha ${rowIndex}`,
         importHash: generateImportHash(descricao || 'Receita Importada', amount, dataVencimento.toISOString(), contaName || ''),
       });
-    } catch (err: any) {
-      errorsDetail.push({ row: rowIndex, data: row, error: err.message });
+    } catch (err: unknown) {
+      errorsDetail.push({ row: rowIndex, data: row, error: err instanceof Error ? err.message : String(err) });
     }
   }
 
@@ -279,7 +302,7 @@ async function processIncomes(rows: any[], dbState: DbState, closingDay: number,
   if (transactionsToInsert.length > 0) {
     await db.transaction(async (tx) => {
       const result = await tx.insert(transactions)
-        .values(transactionsToInsert as any[])
+        .values(transactionsToInsert)
         .onConflictDoNothing({ target: transactions.importHash })
         .returning({ id: transactions.id });
       successRows = result.length;
@@ -290,10 +313,10 @@ async function processIncomes(rows: any[], dbState: DbState, closingDay: number,
 }
 
 // PROCESS TRANSFERS
-async function processTransfers(rows: any[], dbState: DbState, closingDay: number, filename: string) {
+async function processTransfers(rows: Record<string, string>[], dbState: DbState, closingDay: number, filename: string) {
   let successRows = 0;
   let skippedRows = 0;
-  const errorsDetail: any[] = [];
+  const errorsDetail: { row: number; data: Record<string, string>; error: string }[] = [];
   
   // Vamos buscar a categoria padrão de transferências, ou criá-la se não existir.
   const { categoryId: transferCategoryId, subcategoryId: transferSubcategoryId } = 
@@ -313,8 +336,10 @@ async function processTransfers(rows: any[], dbState: DbState, closingDay: numbe
         const efetivacaoStr = getCol(['EFETIVAÇÃO', 'EFETIVACAO', 'PAGAMENTO']);
         const descricao = getCol(['DESCRIÇÃO', 'DESCRICAO', 'NOME', 'HISTÓRICO', 'HISTORICO']);
         const valorStr = getCol(['VALOR', 'QUANTIA']);
-        const origemName = getCol(['ORIGEM', 'CONTA ORIGEM', 'SAÍDA']);
-        const destinoName = getCol(['DESTINO', 'CONTA DESTINO', 'ENTRADA']);
+        let origemName = getCol(['ORIGEM', 'CONTA ORIGEM', 'SAÍDA']);
+        if (origemName === '-') origemName = '';
+        let destinoName = getCol(['DESTINO', 'CONTA DESTINO', 'ENTRADA']);
+        if (destinoName === '-') destinoName = '';
 
         const dataVencimento = parseDate(vencimentoStr);
         if (!dataVencimento) throw new Error(`Data de Vencimento inválida ou não encontrada.`);
@@ -378,8 +403,8 @@ async function processTransfers(rows: any[], dbState: DbState, closingDay: numbe
         });
 
         successRows++; // Conta como 1 par importado com sucesso
-      } catch (err: any) {
-        errorsDetail.push({ row: rowIndex, data: row, error: err.message });
+      } catch (err: unknown) {
+        errorsDetail.push({ row: rowIndex, data: row, error: err instanceof Error ? err.message : String(err) });
       }
     }
   });
@@ -389,7 +414,7 @@ async function processTransfers(rows: any[], dbState: DbState, closingDay: numbe
 
 export async function importCSV(csvString: string, type: ImportType, filename: string) {
   try {
-    const parsedCSV = Papa.parse<any>(csvString, {
+    const parsedCSV = Papa.parse<Record<string, string>>(csvString, {
       header: true,
       skipEmptyLines: true,
     });
@@ -416,7 +441,7 @@ export async function importCSV(csvString: string, type: ImportType, filename: s
 
     const dbState: DbState = { accountsMap, cardsMap, categoriesMap, subcategoriesMap };
 
-    let result = { successRows: 0, skippedRows: 0, errorsDetail: [] as any[] };
+    let result = { successRows: 0, skippedRows: 0, errorsDetail: [] as { row: number; data: Record<string, string>; error: string }[] };
 
     switch (type) {
       case 'expense':
@@ -459,8 +484,8 @@ export async function importCSV(csvString: string, type: ImportType, filename: s
       } 
     };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error importing CSV:', error);
-    return { success: false, error: error.message || 'Falha ao processar o arquivo CSV' };
+    return { success: false, error: error instanceof Error ? error.message : 'Falha ao processar o arquivo CSV' };
   }
 }

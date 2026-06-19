@@ -38,6 +38,27 @@ export async function updateCreditCard(id: number, data: Partial<typeof creditCa
   }
 }
 
+export async function deleteCreditCard(id: number) {
+  try {
+    const linkedTxs = await db.select({ id: transactions.id })
+      .from(transactions)
+      .where(eq(transactions.creditCardId, id))
+      .limit(1);
+
+    if (linkedTxs.length > 0) {
+      return { success: false, error: 'Não é possível excluir: existem transações vinculadas a este cartão.' };
+    }
+
+    await db.delete(creditCards).where(eq(creditCards.id, id));
+    revalidatePath('/credit-cards');
+    revalidatePath('/dashboard');
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting credit card:', error);
+    return { success: false, error: 'Falha ao excluir cartão de crédito' };
+  }
+}
+
 export async function getInvoiceSummary(creditCardId: string | number, competencyMonth: string) {
   const parsedId = Number(creditCardId);
   const cardTransactions = await db.query.transactions.findMany({

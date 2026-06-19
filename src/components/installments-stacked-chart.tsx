@@ -31,6 +31,50 @@ const COLORS = [
   "#d946ef", // fuchsia-500
 ];
 
+type TooltipPayload = {
+  dataKey: string;
+  name?: string;
+  value: number;
+  color?: string;
+  fill?: string;
+  payload: Record<string, string | number>;
+};
+
+type CustomTooltipProps = {
+  active?: boolean;
+  payload?: TooltipPayload[];
+  label?: string;
+};
+
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-popover border text-popover-foreground rounded-lg shadow-md p-3 min-w-[200px]">
+        <div className="font-semibold mb-2 border-b pb-1">{label}</div>
+        <div className="flex flex-col gap-1.5">
+          {payload.map((entry: TooltipPayload, index: number) => {
+            const installmentText = entry.payload[`${entry.dataKey}_installment`];
+            return (
+              <div key={index} className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color || entry.fill }} />
+                  <span className="font-medium text-muted-foreground">
+                    {entry.dataKey} {installmentText ? ` ${installmentText}` : ''}
+                  </span>
+                </div>
+                <span className="font-bold ml-4">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(entry.value)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 export function InstallmentsStackedChart({
   data,
   keys,
@@ -75,7 +119,8 @@ export function InstallmentsStackedChart({
           width={80}
         />
         <ChartTooltip 
-          content={<ChartTooltipContent hideLabel={false} formatter={(val) => `R$ ${Number(val).toFixed(2)}`} />} 
+          cursor={{ fill: 'var(--muted)', opacity: 0.1 }}
+          content={<CustomTooltip />} 
         />
         <ChartLegend content={<ChartLegendContent />} />
         {keys.map((key) => {

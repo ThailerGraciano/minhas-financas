@@ -1,12 +1,24 @@
 'use client';
 
-import { CreditCard, Edit, FileText } from 'lucide-react';
+import { CreditCard, Edit, FileText, Trash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CreditCardFormDialog } from './credit-card-form-dialog';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Progress } from '@/components/ui/progress';
+import { useState } from 'react';
+import { deleteCreditCard } from '@/app/actions/credit-cards';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type CreditCardType = {
   id: number;
@@ -20,6 +32,23 @@ type CreditCardType = {
 };
 
 export function CreditCardList({ cards, selectedMonth }: { cards: CreditCardType[], selectedMonth?: string }) {
+  const [cardToDelete, setCardToDelete] = useState<CreditCardType | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  const handleDelete = async () => {
+    if (!cardToDelete) return;
+    setIsDeleting(true);
+    setDeleteError("");
+    const result = await deleteCreditCard(cardToDelete.id);
+    setIsDeleting(false);
+    if (result.success) {
+      setCardToDelete(null);
+    } else {
+      setDeleteError(result.error || "Erro ao excluir o cartão.");
+    }
+  };
+
   if (cards.length === 0) {
     return (
       <div className="text-center p-8 text-muted-foreground border rounded-lg border-dashed">
@@ -41,8 +70,18 @@ export function CreditCardList({ cards, selectedMonth }: { cards: CreditCardType
         <div key={card.id} className="bg-card rounded-[2rem] border-transparent shadow-sm transition-all hover:shadow-md flex flex-col p-5 md:p-6 min-w-0">
           <div className="flex flex-row items-center justify-between pb-4">
             <h3 className="text-lg font-bold truncate mr-2">{card.name}</h3>
-            <div className="bg-orange-500/10 p-2.5 rounded-full shrink-0">
-              <CreditCard className="w-5 h-5 text-orange-500" />
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full" 
+                onClick={() => { setCardToDelete(card); setDeleteError(""); }}
+              >
+                <Trash className="w-4 h-4" />
+              </Button>
+              <div className="bg-orange-500/10 p-2.5 rounded-full shrink-0">
+                <CreditCard className="w-5 h-5 text-orange-500" />
+              </div>
             </div>
           </div>
           <div className="flex-1 min-w-0">
@@ -107,6 +146,33 @@ export function CreditCardList({ cards, selectedMonth }: { cards: CreditCardType
           </div>
         </div>
       ))}
+
+      <AlertDialog open={!!cardToDelete} onOpenChange={(open) => !open && setCardToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Cartão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o cartão <strong>{cardToDelete?.name}</strong>?
+            </AlertDialogDescription>
+            {deleteError && (
+              <p className="text-sm font-medium text-destructive mt-2">{deleteError}</p>
+            )}
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleDelete();
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

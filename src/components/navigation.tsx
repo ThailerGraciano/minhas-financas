@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Settings, CreditCard, PieChart, Landmark, Receipt, TrendingUp, Download, ShoppingCart } from 'lucide-react';
+import { Home, Settings, CreditCard, PieChart, Landmark, Receipt, TrendingUp, Download, ShoppingCart, LogOut } from 'lucide-react';
+import { signOut } from 'next-auth/react';
 import { cn } from '@/lib/utils';
 import { ModeToggle } from '@/components/mode-toggle';
 
@@ -62,6 +63,13 @@ export function Navigation() {
           >
             <Settings className="w-5 h-5" />
           </Link>
+          <button
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            title="Sair da conta"
+            className="w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-red-400 hover:text-red-500 hover:bg-red-400/10 transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+          </button>
           <ModeToggle />
         </div>
       </header>
@@ -74,7 +82,15 @@ export function Navigation() {
           </div>
           <span className="text-lg font-bold tracking-tight">Finanças</span>
         </div>
-        <ModeToggle />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            className="w-8 h-8 flex items-center justify-center text-red-400 hover:text-red-500 transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+          </button>
+          <ModeToggle />
+        </div>
       </header>
 
       {/* Mobile Bottom Nav - Show only top 5 items for mobile to fit nicely */}

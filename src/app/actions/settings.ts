@@ -4,16 +4,20 @@ import { db } from '@/db';
 import { settings } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+import { auth } from '@/auth';
 
 export async function updateClosingDay(closingDay: number) {
   try {
-    // Como é um app de uso pessoal, assumimos apenas um registro de configurações com id = 1
-    const existing = await db.select().from(settings).where(eq(settings.id, 1));
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
+    const existing = await db.select().from(settings).where(eq(settings.userId, userId));
     
     if (existing.length === 0) {
-      await db.insert(settings).values({ id: 1, closingDay });
+      await db.insert(settings).values({ userId, closingDay });
     } else {
-      await db.update(settings).set({ closingDay }).where(eq(settings.id, 1));
+      await db.update(settings).set({ closingDay }).where(eq(settings.userId, userId));
     }
     
     revalidatePath('/settings');
@@ -25,6 +29,10 @@ export async function updateClosingDay(closingDay: number) {
 }
 
 export async function getSettings() {
-  const result = await db.select().from(settings).where(eq(settings.id, 1));
-  return result[0] || { closingDay: 25 };
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
+  const result = await db.select().from(settings).where(eq(settings.userId, userId));
+  return result[0] || { closingDay: 1 };
 }

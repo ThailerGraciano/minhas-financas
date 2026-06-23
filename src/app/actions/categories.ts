@@ -2,11 +2,17 @@
 
 import { db } from '@/db';
 import { categories, subcategories, transactions } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+import { auth } from '@/auth';
 
 export async function getCategories() {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
   return await db.query.categories.findMany({
+    where: eq(categories.userId, userId),
     with: { subcategories: true },
     orderBy: (categories, { asc }) => [asc(categories.name)]
   });
@@ -14,22 +20,26 @@ export async function getCategories() {
 
 export async function createCategory(name: string, type: 'income' | 'expense', icon?: string) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
     const result = await db.transaction(async (tx) => {
       const [category] = await tx
         .insert(categories)
-        .values({ name, type, icon: icon || 'Tag' })
+        .values({ userId, name, type, icon: icon || 'Tag' })
         .returning();
 
       // Toda categoria nasce com a subcategoria padrão "Geral"
       await tx
         .insert(subcategories)
-        .values({ name: 'Geral', categoryId: category.id });
+        .values({ userId, name: 'Geral', categoryId: category.id });
 
       return category;
     });
 
     revalidatePath('/categories');
-    revalidatePath('/'); // Dashboard where form is
+    revalidatePath('/'); // Dashboard onde tem formulário
     return { success: true, category: result };
   } catch (error) {
     console.error('Error creating category:', error);
@@ -39,7 +49,11 @@ export async function createCategory(name: string, type: 'income' | 'expense', i
 
 export async function createSubcategory(name: string, categoryId: string) {
   try {
-    const [subcategory] = await db.insert(subcategories).values({ name, categoryId: Number(categoryId) }).returning();
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
+    const [subcategory] = await db.insert(subcategories).values({ userId, name, categoryId: Number(categoryId) }).returning();
     revalidatePath('/categories');
     revalidatePath('/'); 
     return { success: true, subcategory };
@@ -51,7 +65,11 @@ export async function createSubcategory(name: string, categoryId: string) {
 
 export async function updateCategoryIcon(id: number, icon: string) {
   try {
-    await db.update(categories).set({ icon }).where(eq(categories.id, id));
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
+    await db.update(categories).set({ icon }).where(and(eq(categories.id, id), eq(categories.userId, userId)));
     revalidatePath('/categories');
     revalidatePath('/');
     return { success: true };
@@ -63,11 +81,15 @@ export async function updateCategoryIcon(id: number, icon: string) {
 
 export async function deleteCategory(id: number) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
     // 1. Check if category is linked to any transaction
     const linkedTransactions = await db
       .select({ id: transactions.id })
       .from(transactions)
-      .where(eq(transactions.categoryId, id))
+      .where(and(eq(transactions.categoryId, id), eq(transactions.userId, userId)))
       .limit(1);
 
     if (linkedTransactions.length > 0) {
@@ -78,12 +100,11 @@ export async function deleteCategory(id: number) {
     }
 
     // 2. If no transactions are linked, we can delete the category.
-    // Note: Category has subcategories (like the default "Geral"). We must delete the subcategories first or use a transaction to delete both.
     await db.transaction(async (tx) => {
       // First delete associated subcategories
-      await tx.delete(subcategories).where(eq(subcategories.categoryId, id));
+      await tx.delete(subcategories).where(and(eq(subcategories.categoryId, id), eq(subcategories.userId, userId)));
       // Then delete the category
-      await tx.delete(categories).where(eq(categories.id, id));
+      await tx.delete(categories).where(and(eq(categories.id, id), eq(categories.userId, userId)));
     });
 
     revalidatePath('/categories');

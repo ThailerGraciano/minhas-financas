@@ -16,8 +16,31 @@ type Account = {
   currentBalance: string;
 };
 
-export function AccountFormDialog({ accountToEdit, trigger }: { accountToEdit?: Account, trigger?: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
+export function AccountFormDialog({ 
+  accountToEdit, 
+  trigger,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+  hideTrigger
+}: { 
+  accountToEdit?: Account, 
+  trigger?: React.ReactNode,
+  open?: boolean,
+  onOpenChange?: (open: boolean) => void,
+  hideTrigger?: boolean
+}) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : uncontrolledOpen;
+  
+  const handleOpenChange = (value: boolean) => {
+    if (isControlled && controlledOnOpenChange) {
+      controlledOnOpenChange(value);
+    } else {
+      setUncontrolledOpen(value);
+    }
+  };
+
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState('');
   const [balance, setBalance] = useState<number>(accountToEdit ? Number(accountToEdit.currentBalance) : 0);
@@ -47,17 +70,19 @@ export function AccountFormDialog({ accountToEdit, trigger }: { accountToEdit?: 
     setIsPending(false);
 
     if (result.success) {
-      setOpen(false);
+      handleOpenChange(false);
     } else {
       setError(result.error || `Erro ao ${accountToEdit ? 'atualizar' : 'criar'} conta`);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || <Button className="cursor-pointer"><Plus className="w-4 h-4 mr-2 md:mr-2 pointer-events-none" /><span className="hidden md:inline pointer-events-none">Nova Conta</span><span className="md:hidden pointer-events-none">Conta</span></Button>}
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      {!hideTrigger && (
+        <DialogTrigger asChild>
+          {trigger || <Button className="cursor-pointer"><Plus className="w-4 h-4 mr-2 md:mr-2 pointer-events-none" /><span className="hidden md:inline pointer-events-none">Nova Conta</span><span className="md:hidden pointer-events-none">Conta</span></Button>}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>

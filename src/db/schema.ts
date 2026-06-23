@@ -1,13 +1,23 @@
 import { pgTable, serial, varchar, integer, boolean, numeric, date, uuid, timestamp, jsonb, AnyPgColumn, primaryKey } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
+export const users = pgTable('users', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: varchar('name', { length: 255 }).notNull(),
+  email: varchar('email', { length: 255 }).unique().notNull(),
+  passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 export const settings = pgTable('settings', {
   id: serial('id').primaryKey(),
-  closingDay: integer('closing_day').default(25).notNull(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  closingDay: integer('closing_day').default(1).notNull(),
 });
 
 export const accounts = pgTable('accounts', {
   id: serial('id').primaryKey(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
   name: varchar('name', { length: 255 }).notNull(),
   type: varchar('type', { length: 50 }).notNull(), // checking, savings, wallet, stash
   currentBalance: numeric('current_balance', { precision: 12, scale: 2 }).default('0').notNull(),
@@ -15,6 +25,7 @@ export const accounts = pgTable('accounts', {
 
 export const categories = pgTable('categories', {
   id: serial('id').primaryKey(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
   name: varchar('name', { length: 255 }).notNull(),
   type: varchar('type', { length: 50 }).notNull().default('expense'), // income, expense
   icon: varchar('icon', { length: 50 }).notNull().default('Tag'),
@@ -22,12 +33,14 @@ export const categories = pgTable('categories', {
 
 export const subcategories = pgTable('subcategories', {
   id: serial('id').primaryKey(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
   categoryId: integer('category_id').references(() => categories.id).notNull(),
   name: varchar('name', { length: 255 }).notNull(),
 });
 
 export const creditCards = pgTable('credit_cards', {
   id: serial('id').primaryKey(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
   name: varchar('name', { length: 255 }).notNull(),
   creditLimit: numeric('credit_limit', { precision: 12, scale: 2 }).notNull(),
   closingDay: integer('closing_day').notNull(),
@@ -36,6 +49,7 @@ export const creditCards = pgTable('credit_cards', {
 
 export const fixedTransactions = pgTable('fixed_transactions', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
   type: varchar('type', { length: 50 }).notNull(), // income, expense, credit_card_expense
   accountId: integer('account_id').references(() => accounts.id),
   creditCardId: integer('credit_card_id').references(() => creditCards.id),
@@ -49,6 +63,7 @@ export const fixedTransactions = pgTable('fixed_transactions', {
 
 export const transactions = pgTable('transactions', {
   id: serial('id').primaryKey(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
   type: varchar('type', { length: 50 }).notNull(), // income, expense, transfer, credit_card_expense
   accountId: integer('account_id').references(() => accounts.id),
   creditCardId: integer('credit_card_id').references(() => creditCards.id),
@@ -82,6 +97,7 @@ export const importLogs = pgTable('import_logs', {
 
 export const marketReceipts = pgTable('market_receipts', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
   storeName: varchar('store_name', { length: 255 }).notNull(),
   date: timestamp('date').notNull(),
   totalAmount: numeric('total_amount', { precision: 12, scale: 2 }).notNull(),
@@ -106,7 +122,43 @@ export const marketReceiptTransactions = pgTable('market_receipt_transactions', 
 }, (table) => [primaryKey({ columns: [table.receiptId, table.transactionId] })]);
 
 // Relations
+export const usersRelations = relations(users, ({ many }) => ({
+  settings: many(settings),
+  accounts: many(accounts),
+  categories: many(categories),
+  subcategories: many(subcategories),
+  creditCards: many(creditCards),
+  fixedTransactions: many(fixedTransactions),
+  transactions: many(transactions),
+  marketReceipts: many(marketReceipts),
+}));
+
+export const settingsRelations = relations(settings, ({ one }) => ({
+  user: one(users, {
+    fields: [settings.userId],
+    references: [users.id],
+  }),
+}));
+
+export const accountsRelations = relations(accounts, ({ one }) => ({
+  user: one(users, {
+    fields: [accounts.userId],
+    references: [users.id],
+  }),
+}));
+
+export const creditCardsRelations = relations(creditCards, ({ one }) => ({
+  user: one(users, {
+    fields: [creditCards.userId],
+    references: [users.id],
+  }),
+}));
+
 export const transactionsRelations = relations(transactions, ({ one }) => ({
+  user: one(users, {
+    fields: [transactions.userId],
+    references: [users.id],
+  }),
   account: one(accounts, {
     fields: [transactions.accountId],
     references: [accounts.id],
@@ -134,6 +186,10 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
 }));
 
 export const fixedTransactionsRelations = relations(fixedTransactions, ({ one, many }) => ({
+  user: one(users, {
+    fields: [fixedTransactions.userId],
+    references: [users.id],
+  }),
   account: one(accounts, {
     fields: [fixedTransactions.accountId],
     references: [accounts.id],
@@ -153,18 +209,30 @@ export const fixedTransactionsRelations = relations(fixedTransactions, ({ one, m
   transactions: many(transactions),
 }));
 
-export const categoriesRelations = relations(categories, ({ many }) => ({
+export const categoriesRelations = relations(categories, ({ one, many }) => ({
+  user: one(users, {
+    fields: [categories.userId],
+    references: [users.id],
+  }),
   subcategories: many(subcategories),
 }));
 
 export const subcategoriesRelations = relations(subcategories, ({ one }) => ({
+  user: one(users, {
+    fields: [subcategories.userId],
+    references: [users.id],
+  }),
   category: one(categories, {
     fields: [subcategories.categoryId],
     references: [categories.id],
   }),
 }));
 
-export const marketReceiptsRelations = relations(marketReceipts, ({ many }) => ({
+export const marketReceiptsRelations = relations(marketReceipts, ({ one, many }) => ({
+  user: one(users, {
+    fields: [marketReceipts.userId],
+    references: [users.id],
+  }),
   items: many(marketItems),
   receiptTransactions: many(marketReceiptTransactions),
 }));

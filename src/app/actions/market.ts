@@ -4,8 +4,9 @@ import { GoogleGenerativeAI, SchemaType, ResponseSchema } from '@google/generati
 import { z } from 'zod';
 import { db } from '@/db';
 import { marketReceipts, marketItems, marketReceiptTransactions, transactions } from '@/db/schema';
-import { desc, inArray, eq } from 'drizzle-orm';
+import { desc, inArray, eq, and } from 'drizzle-orm';
 import { SYSTEM_PROMPT } from '@/lib/prompts';
+import { auth } from '@/auth';
 
 const receiptItemSchema = z.object({
   description: z.string(),
@@ -73,6 +74,9 @@ export async function processMarketReceipt(input: MarketReceiptInput): Promise<{
   error: string;
 }> {
   try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
     const genAI = getGenAI();
     const model = genAI.getGenerativeModel({
       model: 'gemini-3.1-flash-lite',
@@ -86,10 +90,8 @@ export async function processMarketReceipt(input: MarketReceiptInput): Promise<{
     let result;
 
     if (input.type === 'text') {
-      // Text input (pasted receipt text)
       result = await model.generateContent(input.text);
     } else {
-      // Image file (already base64 from client)
       result = await model.generateContent([
         {
           inlineData: {
@@ -126,6 +128,10 @@ export async function processMarketReceipt(input: MarketReceiptInput): Promise<{
 }
 
 export async function getRecentMarketTransactions() {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
   const recent = await db
     .select({
       id: transactions.id,
@@ -135,7 +141,7 @@ export async function getRecentMarketTransactions() {
       type: transactions.type,
     })
     .from(transactions)
-    .where(inArray(transactions.type, ['expense', 'credit_card_expense']))
+    .where(and(inArray(transactions.type, ['expense', 'credit_card_expense']), eq(transactions.userId, userId)))
     .orderBy(desc(transactions.date), desc(transactions.id))
     .limit(30);
   
@@ -147,10 +153,15 @@ export async function saveMarketReceipt(
   selectedTransactionIds: number[]
 ) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
     const totalAmount = receiptData.items.reduce((acc, item) => acc + (Number(item.net_price) || 0), 0);
 
     await db.transaction(async (tx) => {
       const [receipt] = await tx.insert(marketReceipts).values({
+        userId,
         storeName: receiptData.storeName,
         date: new Date(receiptData.date),
         totalAmount: totalAmount.toString(),

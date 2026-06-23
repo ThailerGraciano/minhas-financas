@@ -5,19 +5,24 @@ import { accounts, creditCards, transactions, fixedTransactions } from '@/db/sch
 import { and, eq, gte, inArray, isNotNull, lte, gt } from 'drizzle-orm';
 import { addDays, addMonths, endOfMonth, format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { auth } from '@/auth';
 
 import { getTransactions } from './transactions';
 
 export async function getDashboardData(month?: string) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
   const currentMonth = month || format(new Date(), 'yyyy-MM');
 
-  const allAccounts = await db.select().from(accounts);
+  const allAccounts = await db.select().from(accounts).where(eq(accounts.userId, userId));
   const totalBalance = allAccounts.reduce((acc, curr) => acc + Number(curr.currentBalance), 0);
 
   const monthTransactions = await db
     .select()
     .from(transactions)
-    .where(eq(transactions.competencyMonth, currentMonth));
+    .where(and(eq(transactions.competencyMonth, currentMonth), eq(transactions.userId, userId)));
 
   let totalIncome = 0;
   let totalExpense = 0;
@@ -27,7 +32,7 @@ export async function getDashboardData(month?: string) {
     if (t.type === 'expense' || t.type === 'credit_card_expense') totalExpense += Number(t.amount);
   });
 
-  const allCards = await db.select().from(creditCards);
+  const allCards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
   const cardInvoices = allCards.map(card => {
     const cardExpenses = monthTransactions.filter(
       t => t.creditCardId === card.id && t.type === 'credit_card_expense',
@@ -47,7 +52,11 @@ export async function getDashboardData(month?: string) {
 }
 
 export async function getBalancesByType() {
-  const allAccounts = await db.select().from(accounts);
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
+  const allAccounts = await db.select().from(accounts).where(eq(accounts.userId, userId));
 
   const grouped = allAccounts.reduce((acc, curr) => {
     const type = curr.type;
@@ -77,51 +86,37 @@ export async function getBalancesByType() {
   return { balancesByType, totalBalance };
 }
 
-// ---------------------------------------------------------------------------
-
 export type BalanceEvolutionPoint = {
-  /** Label do mês para o eixo X, ex: "Jan" */
   month: string;
-  /** Saldo total no último dia do mês — preenchido apenas para meses passados + atual */
   balancePast: number | null;
-  /** Saldo projetado — preenchido apenas para o mês atual + futuros */
   balanceFuture: number | null;
-  /** Indica se este ponto pertence ao futuro (projeção) */
   isFuture: boolean;
 };
 
-/** Computa o delta de saldo (positivo = crédito, negativo = débito). */
 function calcDelta(rows: { type: string; amount: string }[]): number {
   return rows.reduce((acc, r) => {
     const amt = Number(r.amount);
     if (r.type === 'income') return acc + amt;
     if (r.type === 'expense' || r.type === 'credit_card_expense') return acc - amt;
-    return acc; // 'transfer' se cancela nos dois lados
+    return acc;
   }, 0);
 }
 
-/**
- * Constrói a série de dados para o gráfico de evolução de saldo.
- *
- * Faz apenas 4–5 queries bulk no banco e calcula tudo em JavaScript,
- * evitando o esgotamento do connection pool que ocorria com 100+ queries paralelas.
- *
- * - PASSADO: reconstrói o saldo somando todas as transações pagas até cada data.
- * - FUTURO:  parte do current_balance e acumula pendentes + fixas virtuais.
- * - O mês atual aparece em AMBAS as séries para conectar as duas linhas no Recharts.
- */
 export async function getBalanceEvolutionData(): Promise<BalanceEvolutionPoint[]> {
-  // ── Query 1: contas ────────────────────────────────────────────────────────
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
   const allAccounts = await db
     .select({ id: accounts.id, currentBalance: accounts.currentBalance })
-    .from(accounts);
+    .from(accounts)
+    .where(eq(accounts.userId, userId));
 
   if (allAccounts.length === 0) return [];
 
   const accountIds = allAccounts.map(a => a.id);
   const totalCurrentBalance = allAccounts.reduce((sum, a) => sum + Number(a.currentBalance), 0);
 
-  // Datas de referência
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -136,16 +131,15 @@ export async function getBalanceEvolutionData(): Promise<BalanceEvolutionPoint[]
 
   const lastFutureDateStr = format(endOfMonth(months[months.length - 1]), 'yyyy-MM-dd');
 
-  // ── Query 2: todas as transações PAGAS (para reconstrução histórica) ───────
   const paidTxs = await db
     .select({ type: transactions.type, amount: transactions.amount, date: transactions.date })
     .from(transactions)
     .where(and(
       inArray(transactions.accountId, accountIds),
       eq(transactions.status, 'paid'),
+      eq(transactions.userId, userId)
     ));
 
-  // ── Query 3: transações PENDENTES na janela futura ─────────────────────────
   const pendingTxs = await db
     .select({ type: transactions.type, amount: transactions.amount, date: transactions.date })
     .from(transactions)
@@ -154,9 +148,9 @@ export async function getBalanceEvolutionData(): Promise<BalanceEvolutionPoint[]
       eq(transactions.status, 'pending'),
       gte(transactions.date, tomorrowStr),
       lte(transactions.date, lastFutureDateStr),
+      eq(transactions.userId, userId)
     ));
 
-  // ── Query 4: fixed_transactions ativas ────────────────────────────────────
   const activeFixed = await db
     .select({
       id:        fixedTransactions.id,
@@ -168,9 +162,9 @@ export async function getBalanceEvolutionData(): Promise<BalanceEvolutionPoint[]
     .where(and(
       eq(fixedTransactions.active, true),
       inArray(fixedTransactions.accountId, accountIds),
+      eq(fixedTransactions.userId, userId)
     ));
 
-  // ── Query 5: IDs de fixas já materializadas na janela futura ──────────────
   const materializedFixedIds = new Set<string>();
   if (activeFixed.length > 0) {
     const matRows = await db
@@ -181,13 +175,13 @@ export async function getBalanceEvolutionData(): Promise<BalanceEvolutionPoint[]
         gte(transactions.date, tomorrowStr),
         lte(transactions.date, lastFutureDateStr),
         isNotNull(transactions.fixedTransactionId),
+        eq(transactions.userId, userId)
       ));
     for (const r of matRows) {
       if (r.fixedTransactionId) materializedFixedIds.add(r.fixedTransactionId);
     }
   }
 
-  // ── Cálculo em JS — sem nenhuma query adicional ───────────────────────────
   const points: BalanceEvolutionPoint[] = months.map((monthStart) => {
     const lastDay    = endOfMonth(monthStart);
     const lastDayStr = format(lastDay, 'yyyy-MM-dd');
@@ -197,17 +191,14 @@ export async function getBalanceEvolutionData(): Promise<BalanceEvolutionPoint[]
     const monthLabel = format(monthStart, 'MMM', { locale: ptBR });
     const label = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1);
 
-    // PASSADO — soma todas as pagas com date <= último dia do mês
     const balancePast = !isFuture
       ? calcDelta(paidTxs.filter(t => t.date <= lastDayStr))
       : null;
 
-    // FUTURO — current_balance + pendentes + fixas virtuais até o último dia
     let balanceFuture: number | null = null;
     if (isFuture || isCurrentMonth) {
       const futurePending = pendingTxs.filter(t => t.date <= lastDayStr);
 
-      // Gera ocorrências virtuais de cada fixa não materializada até lastDay
       const virtualRows: { type: string; amount: string }[] = [];
       for (const ft of activeFixed) {
         if (materializedFixedIds.has(ft.id)) continue;
@@ -215,7 +206,6 @@ export async function getBalanceEvolutionData(): Promise<BalanceEvolutionPoint[]
         const ftDay  = new Date(ft.startDate).getDate();
         const cursor = new Date(tomorrow);
         cursor.setDate(ftDay);
-        // Se o dia da fixa neste mês já passou em relação a amanhã, avança um mês
         if (cursor < tomorrow) cursor.setMonth(cursor.getMonth() + 1);
 
         while (cursor <= lastDay) {
@@ -234,6 +224,10 @@ export async function getBalanceEvolutionData(): Promise<BalanceEvolutionPoint[]
 }
 
 export async function getInstallmentsChartData() {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
   const currentMonth = format(new Date(), 'yyyy-MM');
 
   const installments = await db
@@ -250,14 +244,14 @@ export async function getInstallmentsChartData() {
         inArray(transactions.type, ['expense', 'credit_card_expense']),
         isNotNull(transactions.installmentTotal),
         gt(transactions.installmentTotal, 1),
-        gte(transactions.competencyMonth, currentMonth)
+        gte(transactions.competencyMonth, currentMonth),
+        eq(transactions.userId, userId)
       )
     );
 
   const monthSet = new Set<string>();
   installments.forEach(t => monthSet.add(t.competencyMonth));
   
-  // Limitar projeção para no máximo 12 meses para não quebrar o layout
   const sortedMonths = Array.from(monthSet).sort().slice(0, 12);
 
   const dataByMonth: Record<string, Record<string, string | number>> = {};
@@ -268,7 +262,7 @@ export async function getInstallmentsChartData() {
   });
 
   installments.forEach(t => {
-    if (!dataByMonth[t.competencyMonth]) return; // Ignora se estiver fora do range de 12 meses
+    if (!dataByMonth[t.competencyMonth]) return; 
     const key = t.description;
     keysSet.add(key);
 
@@ -300,9 +294,13 @@ export async function getInstallmentsChartData() {
 }
 
 export async function getIncomeVsExpenseData(competencyMonth: string, showOnlyPaid: boolean = false) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
   const [allTransactions, allAccounts] = await Promise.all([
     getTransactions(competencyMonth),
-    db.select().from(accounts)
+    db.select().from(accounts).where(eq(accounts.userId, userId))
   ]);
 
   let totalIncome = 0;
@@ -328,7 +326,6 @@ export async function getIncomeVsExpenseData(competencyMonth: string, showOnlyPa
     ? allTransactions.filter(t => t.status === 'paid')
     : allTransactions;
 
-  // Calculate paid income of the current month to subtract from current balance
   allTransactions.forEach(t => {
     if (t.type === 'income' && t.status === 'paid') {
       if (t.accountId && accountMap.has(t.accountId)) {

@@ -2,19 +2,18 @@
 
 import { db } from '@/db';
 import { transactions, importLogs, settings, categories, subcategories, accounts, creditCards } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import Papa from 'papaparse';
 import { parse, isValid, addMonths, format, getDate } from 'date-fns';
 import crypto from 'crypto';
+import { auth } from '@/auth';
 
-// Helper to generate import hash
 function generateImportHash(description: string, amount: string, date: string, accountOrCardName: string, extra: string = ''): string {
   const hashStr = `${description.trim().toLowerCase()}|${amount}|${date}|${accountOrCardName.trim().toLowerCase()}${extra ? '|' + extra : ''}`;
   return crypto.createHash('sha256').update(hashStr).digest('hex');
 }
 
-// Helper to parse installments from description
 function parseInstallments(description: string) {
   const match = description.match(/(.*?)\s+(\d{1,3})\/(\d{1,3})\s*$/);
   if (match) {
@@ -29,7 +28,6 @@ function parseInstallments(description: string) {
 
 type ImportType = 'expense' | 'income' | 'transfer';
 
-// Helper to calculate competency month
 function getCompetencyMonth(date: Date, closingDay: number): string {
   const day = getDate(date);
   if (day > closingDay) {
@@ -38,7 +36,6 @@ function getCompetencyMonth(date: Date, closingDay: number): string {
   return format(date, 'yyyy-MM');
 }
 
-// Helper to parse dates
 function parseDate(dateStr: string): Date | null {
   if (!dateStr) return null;
   let parsed = parse(dateStr, 'yyyy-MM-dd', new Date());
@@ -48,7 +45,6 @@ function parseDate(dateStr: string): Date | null {
   return null;
 }
 
-// Helper to parse amount
 function parseAmount(amountStr: string): string {
   if (!amountStr) return '0';
   let cleaned = amountStr.replace(/[R$\s]/g, '');
@@ -68,12 +64,13 @@ type DbState = {
   subcategoriesMap: Map<string, number>;
 };
 
-async function getOrCreateAccount(name: string, dbState: DbState) {
+async function getOrCreateAccount(name: string, dbState: DbState, userId: string) {
   const lowerName = name.toLowerCase();
   if (dbState.accountsMap.has(lowerName)) {
     return dbState.accountsMap.get(lowerName)!;
   }
   const [newAcc] = await db.insert(accounts).values({
+    userId,
     name: name,
     type: 'checking',
   }).returning();
@@ -81,12 +78,13 @@ async function getOrCreateAccount(name: string, dbState: DbState) {
   return newAcc.id;
 }
 
-async function getOrCreateCard(name: string, closingDay: number, dbState: DbState) {
+async function getOrCreateCard(name: string, closingDay: number, dbState: DbState, userId: string) {
   const lowerName = name.toLowerCase();
   if (dbState.cardsMap.has(lowerName)) {
     return dbState.cardsMap.get(lowerName)!;
   }
   const [newCard] = await db.insert(creditCards).values({
+    userId,
     name: name,
     creditLimit: '0',
     closingDay,
@@ -96,7 +94,7 @@ async function getOrCreateCard(name: string, closingDay: number, dbState: DbStat
   return newCard.id;
 }
 
-async function getOrCreateCategory(catName: string, subName: string | undefined, transactionType: string, dbState: DbState) {
+async function getOrCreateCategory(catName: string, subName: string | undefined, transactionType: string, dbState: DbState, userId: string) {
   let categoryId = null;
   const lowerCat = catName.toLowerCase();
   
@@ -104,6 +102,7 @@ async function getOrCreateCategory(catName: string, subName: string | undefined,
     categoryId = dbState.categoriesMap.get(lowerCat)!;
   } else {
     const [newCat] = await db.insert(categories).values({
+      userId,
       name: catName,
       type: transactionType === 'transfer' ? 'expense' : transactionType,
     }).returning();
@@ -111,6 +110,7 @@ async function getOrCreateCategory(catName: string, subName: string | undefined,
     categoryId = newCat.id;
 
     const [newSub] = await db.insert(subcategories).values({
+      userId,
       name: 'Geral',
       categoryId: newCat.id,
     }).returning();
@@ -125,6 +125,7 @@ async function getOrCreateCategory(catName: string, subName: string | undefined,
       subcategoryId = dbState.subcategoriesMap.get(key)!;
     } else {
       const [newSub] = await db.insert(subcategories).values({
+        userId,
         name: subName,
         categoryId,
       }).returning();
@@ -141,8 +142,7 @@ async function getOrCreateCategory(catName: string, subName: string | undefined,
   return { categoryId, subcategoryId };
 }
 
-// PROCESS EXPENSES
-async function processExpenses(rows: Record<string, string>[], dbState: DbState, closingDay: number, filename: string) {
+async function processExpenses(rows: Record<string, string>[], dbState: DbState, closingDay: number, filename: string, userId: string) {
   const transactionsToInsert: typeof transactions.$inferInsert[] = [];
   const errorsDetail: { row: number; data: Record<string, string>; error: string }[] = [];
   
@@ -180,14 +180,12 @@ async function processExpenses(rows: Record<string, string>[], dbState: DbState,
       let accountId = null;
       let creditCardId = null;
       
-      // Resolve CARTÃO (se preenchido)
       if (cartaoName) {
-        creditCardId = await getOrCreateCard(cartaoName, closingDay, dbState);
+        creditCardId = await getOrCreateCard(cartaoName, closingDay, dbState, userId);
       }
 
-      // Resolve CONTA (sempre que preenchido, mesmo com cartão)
       if (contaName) {
-        accountId = await getOrCreateAccount(contaName, dbState);
+        accountId = await getOrCreateAccount(contaName, dbState, userId);
       }
 
       if (!creditCardId && !accountId) {
@@ -195,9 +193,10 @@ async function processExpenses(rows: Record<string, string>[], dbState: DbState,
       }
 
       if (!categoriaName) throw new Error('Categoria não informada.');
-      const { categoryId, subcategoryId } = await getOrCreateCategory(categoriaName, subcategoriaName, 'expense', dbState);
+      const { categoryId, subcategoryId } = await getOrCreateCategory(categoriaName, subcategoriaName, 'expense', dbState, userId);
 
       transactionsToInsert.push({
+        userId,
         type: creditCardId ? 'credit_card_expense' : 'expense',
         accountId,
         creditCardId,
@@ -235,8 +234,7 @@ async function processExpenses(rows: Record<string, string>[], dbState: DbState,
   return { successRows, skippedRows, errorsDetail };
 }
 
-// PROCESS INCOMES
-async function processIncomes(rows: Record<string, string>[], dbState: DbState, closingDay: number, filename: string) {
+async function processIncomes(rows: Record<string, string>[], dbState: DbState, closingDay: number, filename: string, userId: string) {
   const transactionsToInsert: typeof transactions.$inferInsert[] = [];
   const errorsDetail: { row: number; data: Record<string, string>; error: string }[] = [];
   
@@ -269,12 +267,13 @@ async function processIncomes(rows: Record<string, string>[], dbState: DbState, 
       const amount = parseAmount(valorStr);
 
       if (!contaName) throw new Error('Conta não informada.');
-      const accountId = await getOrCreateAccount(contaName, dbState);
+      const accountId = await getOrCreateAccount(contaName, dbState, userId);
 
       if (!categoriaName) throw new Error('Categoria não informada.');
-      const { categoryId, subcategoryId } = await getOrCreateCategory(categoriaName, subcategoriaName, 'income', dbState);
+      const { categoryId, subcategoryId } = await getOrCreateCategory(categoriaName, subcategoriaName, 'income', dbState, userId);
 
       transactionsToInsert.push({
+        userId,
         type: 'income',
         accountId,
         creditCardId: null,
@@ -312,15 +311,13 @@ async function processIncomes(rows: Record<string, string>[], dbState: DbState, 
   return { successRows, skippedRows, errorsDetail };
 }
 
-// PROCESS TRANSFERS
-async function processTransfers(rows: Record<string, string>[], dbState: DbState, closingDay: number, filename: string) {
+async function processTransfers(rows: Record<string, string>[], dbState: DbState, closingDay: number, filename: string, userId: string) {
   let successRows = 0;
   let skippedRows = 0;
   const errorsDetail: { row: number; data: Record<string, string>; error: string }[] = [];
   
-  // Vamos buscar a categoria padrão de transferências, ou criá-la se não existir.
   const { categoryId: transferCategoryId, subcategoryId: transferSubcategoryId } = 
-    await getOrCreateCategory('Transferência', 'Geral', 'transfer', dbState);
+    await getOrCreateCategory('Transferência', 'Geral', 'transfer', dbState, userId);
 
   await db.transaction(async (tx) => {
     for (let i = 0; i < rows.length; i++) {
@@ -352,22 +349,22 @@ async function processTransfers(rows: Record<string, string>[], dbState: DbState
 
         if (!origemName || !destinoName) throw new Error('Contas de origem e destino são obrigatórias.');
 
-        const originAccountId = await getOrCreateAccount(origemName, dbState);
-        const destAccountId = await getOrCreateAccount(destinoName, dbState);
+        const originAccountId = await getOrCreateAccount(origemName, dbState, userId);
+        const destAccountId = await getOrCreateAccount(destinoName, dbState, userId);
 
         const observationsText = `Importado do arquivo ${filename} - Linha ${rowIndex}`;
 
         const hashOut = generateImportHash(descricao || 'Transferência (Saída)', amount, dataVencimento.toISOString(), origemName || '', 'out');
         const hashIn = generateImportHash(descricao || 'Transferência (Entrada)', amount, dataVencimento.toISOString(), destinoName || '', 'in');
 
-        // Insere a saída (origin)
         const outTxResult = await tx.insert(transactions).values({
+          userId,
           type: 'transfer',
           accountId: originAccountId,
           creditCardId: null,
           categoryId: transferCategoryId,
           subcategoryId: transferSubcategoryId,
-          amount: amount, // O app trata saída/entrada por lógica, mas o type é transfer
+          amount: amount, 
           description: descricao || 'Transferência (Saída)',
           date: format(dataVencimento, 'yyyy-MM-dd'),
           competencyMonth,
@@ -384,8 +381,8 @@ async function processTransfers(rows: Record<string, string>[], dbState: DbState
         
         const outTx = outTxResult[0];
 
-        // Insere a entrada (destination) vinculada à saída (parent_transaction_id = transfer_pair_id)
         await tx.insert(transactions).values({
+          userId,
           type: 'transfer',
           accountId: destAccountId,
           creditCardId: null,
@@ -402,7 +399,7 @@ async function processTransfers(rows: Record<string, string>[], dbState: DbState
           importHash: hashIn,
         });
 
-        successRows++; // Conta como 1 par importado com sucesso
+        successRows++; 
       } catch (err: unknown) {
         errorsDetail.push({ row: rowIndex, data: row, error: err instanceof Error ? err.message : String(err) });
       }
@@ -414,6 +411,10 @@ async function processTransfers(rows: Record<string, string>[], dbState: DbState
 
 export async function importCSV(csvString: string, type: ImportType, filename: string) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
     const parsedCSV = Papa.parse<Record<string, string>>(csvString, {
       header: true,
       skipEmptyLines: true,
@@ -426,17 +427,16 @@ export async function importCSV(csvString: string, type: ImportType, filename: s
     const rows = parsedCSV.data;
     const totalRows = rows.length;
 
-    const [appSettings] = await db.select().from(settings).limit(1);
+    const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
     const closingDay = appSettings?.closingDay || 25;
 
-    // Load initial map states
-    const existingAccounts = await db.select().from(accounts);
+    const existingAccounts = await db.select().from(accounts).where(eq(accounts.userId, userId));
     const accountsMap = new Map(existingAccounts.map(a => [a.name.toLowerCase(), a.id]));
-    const existingCards = await db.select().from(creditCards);
+    const existingCards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
     const cardsMap = new Map(existingCards.map(c => [c.name.toLowerCase(), c.id]));
-    const existingCategories = await db.select().from(categories);
+    const existingCategories = await db.select().from(categories).where(eq(categories.userId, userId));
     const categoriesMap = new Map(existingCategories.map(c => [c.name.toLowerCase(), c.id]));
-    const existingSubcategories = await db.select().from(subcategories);
+    const existingSubcategories = await db.select().from(subcategories).where(eq(subcategories.userId, userId));
     const subcategoriesMap = new Map(existingSubcategories.map(s => [`${s.categoryId}_${s.name.toLowerCase()}`, s.id]));
 
     const dbState: DbState = { accountsMap, cardsMap, categoriesMap, subcategoriesMap };
@@ -445,13 +445,13 @@ export async function importCSV(csvString: string, type: ImportType, filename: s
 
     switch (type) {
       case 'expense':
-        result = await processExpenses(rows, dbState, closingDay, filename);
+        result = await processExpenses(rows, dbState, closingDay, filename, userId);
         break;
       case 'income':
-        result = await processIncomes(rows, dbState, closingDay, filename);
+        result = await processIncomes(rows, dbState, closingDay, filename, userId);
         break;
       case 'transfer':
-        result = await processTransfers(rows, dbState, closingDay, filename);
+        result = await processTransfers(rows, dbState, closingDay, filename, userId);
         break;
       default:
         throw new Error('Tipo de importação inválido.');

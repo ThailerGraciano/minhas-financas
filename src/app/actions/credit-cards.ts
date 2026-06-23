@@ -5,14 +5,19 @@ import { creditCards, transactions, accounts, categories, subcategories } from '
 import { eq, and } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { format } from 'date-fns';
+import { auth } from '@/auth';
 
 export async function getCreditCards() {
-  return await db.select().from(creditCards);
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  return await db.select().from(creditCards).where(eq(creditCards.userId, session.user.id));
 }
 
-export async function createCreditCard(data: typeof creditCards.$inferInsert) {
+export async function createCreditCard(data: Omit<typeof creditCards.$inferInsert, 'userId'>) {
   try {
-    await db.insert(creditCards).values(data);
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    await db.insert(creditCards).values({ ...data, userId: session.user.id });
     revalidatePath('/credit-cards');
     return { success: true };
   } catch (error) {
@@ -22,13 +27,17 @@ export async function createCreditCard(data: typeof creditCards.$inferInsert) {
 }
 
 export async function getCreditCard(id: number) {
-  const [card] = await db.select().from(creditCards).where(eq(creditCards.id, id));
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const [card] = await db.select().from(creditCards).where(and(eq(creditCards.id, id), eq(creditCards.userId, session.user.id)));
   return card;
 }
 
 export async function updateCreditCard(id: number, data: Partial<typeof creditCards.$inferInsert>) {
   try {
-    await db.update(creditCards).set(data).where(eq(creditCards.id, id));
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    await db.update(creditCards).set(data).where(and(eq(creditCards.id, id), eq(creditCards.userId, session.user.id)));
     revalidatePath('/credit-cards');
     revalidatePath(`/credit-cards/${id}`);
     return { success: true };
@@ -40,16 +49,20 @@ export async function updateCreditCard(id: number, data: Partial<typeof creditCa
 
 export async function deleteCreditCard(id: number) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
     const linkedTxs = await db.select({ id: transactions.id })
       .from(transactions)
-      .where(eq(transactions.creditCardId, id))
+      .where(and(eq(transactions.creditCardId, id), eq(transactions.userId, userId)))
       .limit(1);
 
     if (linkedTxs.length > 0) {
       return { success: false, error: 'Não é possível excluir: existem transações vinculadas a este cartão.' };
     }
 
-    await db.delete(creditCards).where(eq(creditCards.id, id));
+    await db.delete(creditCards).where(and(eq(creditCards.id, id), eq(creditCards.userId, userId)));
     revalidatePath('/credit-cards');
     revalidatePath('/dashboard');
     return { success: true };
@@ -60,12 +73,16 @@ export async function deleteCreditCard(id: number) {
 }
 
 export async function getInvoiceSummary(creditCardId: string | number, competencyMonth: string) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
   const parsedId = Number(creditCardId);
   const cardTransactions = await db.query.transactions.findMany({
     where: (t, { eq, and }) => and(
       eq(t.creditCardId, parsedId),
       eq(t.competencyMonth, competencyMonth),
-      eq(t.type, 'credit_card_expense')
+      eq(t.type, 'credit_card_expense'),
+      eq(t.userId, userId)
     ),
     with: {
       category: true,
@@ -99,6 +116,9 @@ export async function payFullInvoice(
   competencyMonth: string,
   accountId: string | number
 ): Promise<{ success: boolean; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
   const parsedCardId = Number(creditCardId);
   const parsedAccountId = Number(accountId);
 
@@ -111,7 +131,8 @@ export async function payFullInvoice(
           and(
             eq(transactions.creditCardId, parsedCardId),
             eq(transactions.competencyMonth, competencyMonth),
-            eq(transactions.type, 'credit_card_expense')
+            eq(transactions.type, 'credit_card_expense'),
+            eq(transactions.userId, userId)
           )
         );
 
@@ -134,36 +155,37 @@ export async function payFullInvoice(
             eq(transactions.creditCardId, parsedCardId),
             eq(transactions.competencyMonth, competencyMonth),
             eq(transactions.type, 'credit_card_expense'),
-            eq(transactions.status, 'pending')
+            eq(transactions.status, 'pending'),
+            eq(transactions.userId, userId)
           )
         );
 
       // 3. Find or create Category for "Pagamento de Fatura"
       let category = await tx.query.categories.findFirst({
-        where: (categories, { eq }) => eq(categories.name, 'Pagamento de Fatura')
+        where: (categories, { eq, and }) => and(eq(categories.name, 'Pagamento de Fatura'), eq(categories.userId, userId))
       });
       let subcategoryId = null;
 
       if (!category) {
         const [newCategory] = await tx.insert(categories)
-          .values({ name: 'Pagamento de Fatura', type: 'expense', icon: 'CreditCard' })
+          .values({ userId, name: 'Pagamento de Fatura', type: 'expense', icon: 'CreditCard' })
           .returning();
         
         const [newSubcategory] = await tx.insert(subcategories)
-          .values({ name: 'Geral', categoryId: newCategory.id })
+          .values({ userId, name: 'Geral', categoryId: newCategory.id })
           .returning();
           
         category = newCategory;
         subcategoryId = newSubcategory.id;
       } else {
         const subcategory = await tx.query.subcategories.findFirst({
-          where: (subcategories, { eq }) => eq(subcategories.categoryId, category!.id)
+          where: (subcategories, { eq, and }) => and(eq(subcategories.categoryId, category!.id), eq(subcategories.userId, userId))
         });
         subcategoryId = subcategory?.id || null;
         
         if (!subcategoryId) {
           const [newSubcategory] = await tx.insert(subcategories)
-            .values({ name: 'Geral', categoryId: category.id })
+            .values({ userId, name: 'Geral', categoryId: category.id })
             .returning();
           subcategoryId = newSubcategory.id;
         }
@@ -171,6 +193,7 @@ export async function payFullInvoice(
 
       // 4. Create the transfer transaction for the payment (avoids double counting in expenses)
       await tx.insert(transactions).values({
+        userId,
         type: 'transfer',
         accountId: parsedAccountId,
         categoryId: category.id,
@@ -183,12 +206,12 @@ export async function payFullInvoice(
       });
 
       // 5. Deduct from account balance
-      const [account] = await tx.select().from(accounts).where(eq(accounts.id, parsedAccountId));
+      const [account] = await tx.select().from(accounts).where(and(eq(accounts.id, parsedAccountId), eq(accounts.userId, userId)));
       if (account) {
         const newBalance = Number(account.currentBalance) - pendingAmount;
         await tx.update(accounts)
           .set({ currentBalance: newBalance.toString() })
-          .where(eq(accounts.id, parsedAccountId));
+          .where(and(eq(accounts.id, parsedAccountId), eq(accounts.userId, userId)));
       }
 
       return { success: true };
@@ -206,7 +229,11 @@ export async function payFullInvoice(
 }
 
 export async function getCreditCardsWithSummary(competencyMonth: string) {
-  const cards = await db.select().from(creditCards);
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
+  const cards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
 
   const cardsWithSummary = await Promise.all(
     cards.map(async (card) => {
@@ -217,7 +244,8 @@ export async function getCreditCardsWithSummary(competencyMonth: string) {
           and(
             eq(transactions.creditCardId, card.id),
             eq(transactions.competencyMonth, competencyMonth),
-            eq(transactions.type, 'credit_card_expense')
+            eq(transactions.type, 'credit_card_expense'),
+            eq(transactions.userId, userId)
           )
         );
 

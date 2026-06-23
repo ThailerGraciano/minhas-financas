@@ -6,8 +6,10 @@ import { eq, or, and, gte, lte } from 'drizzle-orm';
 import { addMonths, format, parseISO, endOfMonth } from 'date-fns';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { auth } from '@/auth';
 
 type NewTransaction = typeof transactions.$inferInsert;
+type CreateTransactionInput = Omit<NewTransaction, 'userId'> & { destinationAccountId?: number; isFixed?: boolean; isTotalAmount?: boolean };
 
 const transactionSchema = z.object({
   description: z.string().min(1, 'Descrição é obrigatória'),
@@ -20,15 +22,17 @@ const transactionSchema = z.object({
   isTotalAmount: z.boolean().optional().default(false),
 }).passthrough();
 
-// Regra: receitas e despesas DEVEM ter subcategoria
 const subcategoryRequiredTypes = ['income', 'expense', 'credit_card_expense'];
 
 export async function getTransactions(month?: string) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
   const currentMonth = month || format(new Date(), 'yyyy-MM');
 
-  // Consulta A: Transações normais do mês
   const realTransactions = await db.query.transactions.findMany({
-    where: eq(transactions.competencyMonth, currentMonth),
+    where: and(eq(transactions.competencyMonth, currentMonth), eq(transactions.userId, userId)),
     with: {
       account: true,
       category: true,
@@ -40,11 +44,11 @@ export async function getTransactions(month?: string) {
   const monthDate = parseISO(`${currentMonth}-01`);
   const lastDayOfMonth = format(endOfMonth(monthDate), 'yyyy-MM-dd');
 
-  // Consulta B: Transações fixas ativas e já iniciadas
   const activeFixedTxs = await db.query.fixedTransactions.findMany({
     where: and(
       eq(fixedTransactions.active, true),
-      lte(fixedTransactions.startDate, lastDayOfMonth)
+      lte(fixedTransactions.startDate, lastDayOfMonth),
+      eq(fixedTransactions.userId, userId)
     ),
     with: {
       account: true,
@@ -73,6 +77,7 @@ export async function getTransactions(month?: string) {
 
       return {
         id: tempId,
+        userId: userId,
         type: ft.type,
         accountId: ft.accountId,
         creditCardId: ft.creditCardId,
@@ -98,21 +103,22 @@ export async function getTransactions(month?: string) {
 
   const allTransactions = [...realTransactions, ...virtualTransactions];
 
-  // Ordena por data (descendente)
   allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return allTransactions;
 }
 
-export async function createTransaction(data: NewTransaction & { destinationAccountId?: number; isFixed?: boolean; isTotalAmount?: boolean }): Promise<{ success: boolean; parentId?: number; error?: string }> {
-  // Validação Zod
+export async function createTransaction(data: CreateTransactionInput): Promise<{ success: boolean; parentId?: number; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
   const parsed = transactionSchema.safeParse(data);
   if (!parsed.success) {
     const firstError = parsed.error.issues[0]?.message || 'Dados inválidos';
     return { success: false, error: firstError };
   }
 
-  // Subcategoria obrigatória para receitas e despesas
   if (
     subcategoryRequiredTypes.includes(data.type) &&
     (!data.subcategoryId || data.subcategoryId <= 0)
@@ -125,15 +131,15 @@ export async function createTransaction(data: NewTransaction & { destinationAcco
 
     if (txData.type === 'transfer' && destinationAccountId) {
       const result = await db.transaction(async (tx) => {
-        // 1. Insert origin transaction (Saída)
         const [originTx] = await tx.insert(transactions).values({
           ...txData,
+          userId,
           description: `${txData.description} (Saída)`,
         }).returning();
 
-        // 2. Insert destination transaction (Entrada)
         await tx.insert(transactions).values({
           ...txData,
+          userId,
           accountId: destinationAccountId,
           description: `${txData.description} (Entrada)`,
           parentTransactionId: originTx.id,
@@ -151,6 +157,7 @@ export async function createTransaction(data: NewTransaction & { destinationAcco
     if (isFixed) {
       const result = await db.transaction(async (tx) => {
         const [fixedTx] = await tx.insert(fixedTransactions).values({
+          userId,
           type: txData.type,
           accountId: txData.accountId!,
           creditCardId: txData.creditCardId || null,
@@ -170,6 +177,7 @@ export async function createTransaction(data: NewTransaction & { destinationAcco
 
           installmentsToInsert.push({
             ...txData,
+            userId,
             date: format(nextDate, 'yyyy-MM-dd'),
             competencyMonth: format(nextDate, 'yyyy-MM'),
             status: i === 0 ? (txData.status || 'pending') : 'pending',
@@ -204,6 +212,7 @@ export async function createTransaction(data: NewTransaction & { destinationAcco
 
       const [parentTx] = await db.insert(transactions).values({
         ...txData,
+        userId,
         amount: baseParcelAmount,
         installmentCurrent: 1,
       }).returning();
@@ -217,6 +226,7 @@ export async function createTransaction(data: NewTransaction & { destinationAcco
 
         installmentsToInsert.push({
           ...txData,
+          userId,
           amount: isLast ? lastParcelAmount : baseParcelAmount,
           date: format(nextDate, 'yyyy-MM-dd'),
           competencyMonth: format(nextDate, 'yyyy-MM'),
@@ -234,7 +244,7 @@ export async function createTransaction(data: NewTransaction & { destinationAcco
       revalidatePath('/planning');
       return { success: true, parentId: parentTx.id };
     } else {
-      await db.insert(transactions).values(txData);
+      await db.insert(transactions).values({ ...txData, userId });
 
       revalidatePath('/transactions');
       revalidatePath('/');
@@ -248,37 +258,35 @@ export async function createTransaction(data: NewTransaction & { destinationAcco
 }
 
 async function changeTransactionStatus(id: number, newStatus: 'paid' | 'pending') {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
   return await db.transaction(async (tx) => {
-    // 1. Get the transaction
-    const [transactionItem] = await tx.select().from(transactions).where(eq(transactions.id, id));
+    const [transactionItem] = await tx.select().from(transactions).where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
     if (!transactionItem) {
       throw new Error('Transação não encontrada');
     }
 
     if (transactionItem.status === newStatus) {
-      return { success: true }; // No change
+      return { success: true };
     }
 
     if (transactionItem.type === 'transfer') {
-      // Find the pair
       const otherTx = transactionItem.parentTransactionId
-        ? await tx.query.transactions.findFirst({ where: eq(transactions.id, transactionItem.parentTransactionId) })
-        : await tx.query.transactions.findFirst({ where: eq(transactions.parentTransactionId, transactionItem.id) });
+        ? await tx.query.transactions.findFirst({ where: and(eq(transactions.id, transactionItem.parentTransactionId), eq(transactions.userId, userId)) })
+        : await tx.query.transactions.findFirst({ where: and(eq(transactions.parentTransactionId, transactionItem.id), eq(transactions.userId, userId)) });
 
-      // Determine origin and destination
       const originTx = transactionItem.parentTransactionId ? otherTx : transactionItem;
       const destTx = transactionItem.parentTransactionId ? transactionItem : otherTx;
 
       if (originTx && destTx) {
-        // The trigger handles balance changes; we only need to update the status.
         await tx.update(transactions).set({ status: newStatus }).where(eq(transactions.id, originTx.id));
         await tx.update(transactions).set({ status: newStatus }).where(eq(transactions.id, destTx.id));
       } else {
         await tx.update(transactions).set({ status: newStatus }).where(eq(transactions.id, id));
       }
     } else {
-      // Normal transaction (income, expense, credit_card_expense).
-      // The trigger handles the balance update automatically on UPDATE.
       await tx.update(transactions).set({ status: newStatus }).where(eq(transactions.id, id));
     }
 
@@ -329,7 +337,12 @@ export async function payVirtualTransaction(txData: {
   fixedTransactionId: string | null;
 }) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
     await db.insert(transactions).values({
+      userId,
       type: txData.type,
       accountId: txData.accountId,
       creditCardId: txData.creditCardId,
@@ -341,7 +354,7 @@ export async function payVirtualTransaction(txData: {
       competencyMonth: txData.competencyMonth,
       status: 'paid',
       paidAt: new Date(),
-      fixedTransactionId: txData.fixedTransactionId,
+      fixedTransactionId: txData.fixedTransactionId || null,
     });
 
     revalidatePath('/transactions');
@@ -356,13 +369,18 @@ export async function payVirtualTransaction(txData: {
 }
 
 export async function getCreditCardInvoices(creditCardId: number, month?: string) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
   const currentMonth = month || format(new Date(), 'yyyy-MM');
 
   return await db.query.transactions.findMany({
     where: (t, { eq, and }) => and(
       eq(t.creditCardId, creditCardId),
       eq(t.type, 'credit_card_expense'),
-      eq(t.competencyMonth, currentMonth)
+      eq(t.competencyMonth, currentMonth),
+      eq(t.userId, userId)
     ),
     with: {
       category: true,
@@ -373,10 +391,15 @@ export async function getCreditCardInvoices(creditCardId: number, month?: string
 }
 
 export async function getCreditCardInvoiceMonths(creditCardId: number) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
   const txs = await db.query.transactions.findMany({
     where: (t, { eq, and }) => and(
       eq(t.creditCardId, creditCardId),
-      eq(t.type, 'credit_card_expense')
+      eq(t.type, 'credit_card_expense'),
+      eq(t.userId, userId)
     ),
     columns: { competencyMonth: true },
     orderBy: (t, { desc }) => [desc(t.competencyMonth)]
@@ -387,17 +410,20 @@ export async function getCreditCardInvoiceMonths(creditCardId: number) {
 
 export async function deleteTransaction(id: number, mode: 'single' | 'future' = 'single') {
   try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
     const result = await db.transaction(async (tx) => {
-      const [transactionItem] = await tx.select().from(transactions).where(eq(transactions.id, id));
+      const [transactionItem] = await tx.select().from(transactions).where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
       if (!transactionItem) {
-        return { success: true }; // Already deleted
+        return { success: true };
       }
 
       if (mode === 'future') {
         const parentId = transactionItem.parentTransactionId || transactionItem.id;
         const targetDate = transactionItem.date;
 
-        // Fetch all transactions in the series that are on or after the target date
         const txsToDelete = await tx.select()
           .from(transactions)
           .where(
@@ -407,31 +433,26 @@ export async function deleteTransaction(id: number, mode: 'single' | 'future' = 
                 eq(transactions.id, parentId),
                 transactionItem.fixedTransactionId ? eq(transactions.fixedTransactionId, transactionItem.fixedTransactionId) : undefined
               ),
-              gte(transactions.date, targetDate)
+              gte(transactions.date, targetDate),
+              eq(transactions.userId, userId)
             )
           );
 
-        // Delete all matched transactions.
-        // The trigger handles balance reversion automatically for each DELETE.
         const idsToDelete = txsToDelete.map(t => t.id);
         for (const targetId of idsToDelete) {
           await tx.delete(transactions).where(eq(transactions.id, targetId));
         }
       } else {
-        // mode === 'single'
         if (transactionItem.type === 'transfer') {
-          // Find the pair
           const otherTx = transactionItem.parentTransactionId
-            ? await tx.query.transactions.findFirst({ where: eq(transactions.id, transactionItem.parentTransactionId) })
-            : await tx.query.transactions.findFirst({ where: eq(transactions.parentTransactionId, transactionItem.id) });
+            ? await tx.query.transactions.findFirst({ where: and(eq(transactions.id, transactionItem.parentTransactionId), eq(transactions.userId, userId)) })
+            : await tx.query.transactions.findFirst({ where: and(eq(transactions.parentTransactionId, transactionItem.id), eq(transactions.userId, userId)) });
 
-          // Delete both. The trigger handles balance reversion for each DELETE.
           await tx.delete(transactions).where(eq(transactions.id, transactionItem.id));
           if (otherTx) {
             await tx.delete(transactions).where(eq(transactions.id, otherTx.id));
           }
         } else {
-          // Normal transaction. The trigger handles balance reversion automatically.
           await tx.delete(transactions).where(eq(transactions.id, id));
         }
       }
@@ -450,10 +471,14 @@ export async function deleteTransaction(id: number, mode: 'single' | 'future' = 
   }
 }
 
-export async function updateTransaction(id: number, inputData: Partial<NewTransaction> & { destinationAccountId?: number }): Promise<{ success: boolean; error?: string }> {
+export async function updateTransaction(id: number, inputData: Partial<CreateTransactionInput> & { destinationAccountId?: number }): Promise<{ success: boolean; error?: string }> {
   try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
     const result = await db.transaction(async (tx) => {
-      const [oldTx] = await tx.select().from(transactions).where(eq(transactions.id, id));
+      const [oldTx] = await tx.select().from(transactions).where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
       if (!oldTx) {
         throw new Error('Transação não encontrada');
       }
@@ -462,13 +487,11 @@ export async function updateTransaction(id: number, inputData: Partial<NewTransa
 
       if (oldTx.type === 'transfer') {
         const otherTx = oldTx.parentTransactionId
-          ? await tx.query.transactions.findFirst({ where: eq(transactions.id, oldTx.parentTransactionId) })
-          : await tx.query.transactions.findFirst({ where: eq(transactions.parentTransactionId, oldTx.id) });
+          ? await tx.query.transactions.findFirst({ where: and(eq(transactions.id, oldTx.parentTransactionId), eq(transactions.userId, userId)) })
+          : await tx.query.transactions.findFirst({ where: and(eq(transactions.parentTransactionId, oldTx.id), eq(transactions.userId, userId)) });
 
-        // Update this transaction. The trigger handles the balance delta automatically.
         await tx.update(transactions).set(data).where(eq(transactions.id, id));
 
-        // Update the paired transfer transaction with matching fields
         if (otherTx) {
           const otherUpdateData: Partial<NewTransaction> = {};
           if (data.amount !== undefined) otherUpdateData.amount = data.amount;
@@ -476,7 +499,6 @@ export async function updateTransaction(id: number, inputData: Partial<NewTransa
           if (data.competencyMonth !== undefined) otherUpdateData.competencyMonth = data.competencyMonth;
           if (data.status !== undefined) otherUpdateData.status = data.status;
           if (data.description !== undefined) {
-            // Keep the (Saída) / (Entrada) suffix accordingly
             const suffix = otherTx.parentTransactionId ? ' (Entrada)' : ' (Saída)';
             const cleanDesc = data.description.replace(/\s*\(Saída\)|\s*\(Entrada\)/g, '');
             otherUpdateData.description = `${cleanDesc}${suffix}`;
@@ -489,7 +511,6 @@ export async function updateTransaction(id: number, inputData: Partial<NewTransa
           }
         }
       } else {
-        // Normal transaction update. The trigger handles the balance delta automatically.
         await tx.update(transactions).set(data).where(eq(transactions.id, id));
       }
 
@@ -508,24 +529,23 @@ export async function updateTransaction(id: number, inputData: Partial<NewTransa
 }
 
 export async function getTransactionDetailsForEdit(id: number) {
-  const [tx] = await db.select().from(transactions).where(eq(transactions.id, id));
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
+  const [tx] = await db.select().from(transactions).where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
   if (!tx) return null;
 
   let destinationAccountId: number | null = null;
   if (tx.type === 'transfer') {
     const otherTx = tx.parentTransactionId
-      ? await db.query.transactions.findFirst({ where: eq(transactions.id, tx.parentTransactionId) })
-      : await db.query.transactions.findFirst({ where: eq(transactions.parentTransactionId, tx.id) });
+      ? await db.query.transactions.findFirst({ where: and(eq(transactions.id, tx.parentTransactionId), eq(transactions.userId, userId)) })
+      : await db.query.transactions.findFirst({ where: and(eq(transactions.parentTransactionId, tx.id), eq(transactions.userId, userId)) });
     
-    // Determine which is origin and which is destination based on parentTransactionId
-    // The origin has parentTransactionId = null. The destination has parentTransactionId = origin.id
     if (tx.parentTransactionId) {
-      // current is destination
       destinationAccountId = tx.accountId;
-      // the real origin is the otherTx
       return { ...tx, accountId: otherTx?.accountId ?? null, destinationAccountId };
     } else {
-      // current is origin
       destinationAccountId = otherTx?.accountId ?? null;
       return { ...tx, destinationAccountId };
     }

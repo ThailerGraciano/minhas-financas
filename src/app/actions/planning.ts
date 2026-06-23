@@ -2,16 +2,21 @@
 
 import { db } from '@/db';
 import { transactions, accounts } from '@/db/schema';
-import { eq, gte, and, asc } from 'drizzle-orm';
+import { eq, and, asc } from 'drizzle-orm';
 import { format, addDays } from 'date-fns';
+import { auth } from '@/auth';
 
 export async function getProjectedCashFlow(accountId?: string) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
   // 1. Initial balance
   let allAccounts;
   if (accountId) {
-    allAccounts = await db.select().from(accounts).where(eq(accounts.id, Number(accountId)));
+    allAccounts = await db.select().from(accounts).where(and(eq(accounts.id, Number(accountId)), eq(accounts.userId, userId)));
   } else {
-    allAccounts = await db.select().from(accounts);
+    allAccounts = await db.select().from(accounts).where(eq(accounts.userId, userId));
   }
   let currentBalance = allAccounts.reduce((acc, curr) => acc + Number(curr.currentBalance), 0);
 
@@ -20,7 +25,8 @@ export async function getProjectedCashFlow(accountId?: string) {
   const todayDate = format(baseDate, 'yyyy-MM-dd');
   
   const conditions = [
-    eq(transactions.status, 'pending')
+    eq(transactions.status, 'pending'),
+    eq(transactions.userId, userId)
   ];
   
   if (accountId) {

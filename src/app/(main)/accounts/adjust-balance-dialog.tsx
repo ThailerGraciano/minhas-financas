@@ -25,17 +25,34 @@ type Account = {
 interface AdjustBalanceDialogProps {
   account: Account;
   trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }
 
-export function AdjustBalanceDialog({ account, trigger }: AdjustBalanceDialogProps) {
-  const [open, setOpen] = useState(false);
+export function AdjustBalanceDialog({
+  account,
+  trigger,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+  hideTrigger
+}: AdjustBalanceDialogProps) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : uncontrolledOpen;
+
   const [realBalance, setRealBalance] = useState<number>(Number(account.currentBalance));
   const [error, setError] = useState('');
   const [isPending, startTransition] = useTransition();
 
   // Reset state when dialog opens
   const handleOpenChange = (value: boolean) => {
-    setOpen(value);
+    if (isControlled && controlledOnOpenChange) {
+      controlledOnOpenChange(value);
+    } else {
+      setUncontrolledOpen(value);
+    }
+
     if (value) {
       setRealBalance(Number(account.currentBalance));
       setError('');
@@ -49,7 +66,7 @@ export function AdjustBalanceDialog({ account, trigger }: AdjustBalanceDialogPro
     startTransition(async () => {
       const result = await adjustAccountBalance(account.id, realBalance);
       if (result.success) {
-        setOpen(false);
+        handleOpenChange(false);
       } else {
         setError(result.error ?? 'Erro ao ajustar saldo.');
       }
@@ -58,14 +75,16 @@ export function AdjustBalanceDialog({ account, trigger }: AdjustBalanceDialogPro
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        {trigger ?? (
-          <Button variant="outline" size="sm">
-            <SlidersHorizontal className="h-4 w-4 mr-2" />
-            Reajustar Saldo
-          </Button>
-        )}
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild>
+          {trigger ?? (
+            <Button variant="outline" size="sm">
+              <SlidersHorizontal className="h-4 w-4 mr-2" />
+              Reajustar Saldo
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
 
       <DialogContent className="sm:max-w-[420px]">
         <form onSubmit={handleSubmit}>
@@ -108,7 +127,7 @@ export function AdjustBalanceDialog({ account, trigger }: AdjustBalanceDialogPro
             <Button
               type="button"
               variant="ghost"
-              onClick={() => setOpen(false)}
+              onClick={() => handleOpenChange(false)}
               disabled={isPending}
             >
               Cancelar

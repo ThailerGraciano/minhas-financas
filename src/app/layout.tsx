@@ -1,8 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
-import { Navigation } from '@/components/navigation';
-import { TransactionFormDialog } from '@/components/transaction-form-dialog';
 import { ThemeProvider } from '@/components/theme-provider';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -26,13 +24,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="min-h-screen bg-background text-foreground flex flex-col">
-            <Navigation />
-            <main className="flex-1 pb-20 md:pb-8 pt-4 px-4 md:px-8 relative container mx-auto max-w-7xl">
-              {children}
-              <TransactionFormDialog />
-            </main>
-          </div>
+          {children}
         </ThemeProvider>
       </body>
     </html>

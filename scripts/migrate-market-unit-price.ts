@@ -9,8 +9,12 @@ async function runMigration() {
   try {
     await sql.unsafe(`ALTER TABLE "market_items" ADD COLUMN "unit_price" numeric(12, 2) DEFAULT '0' NOT NULL;`);
     console.log('Added unit_price column');
-  } catch(e: any) {
-    console.log("unit_price error:", e.message);
+  } catch(e: unknown) {
+    if (e instanceof Error) {
+      console.log("unit_price error:", e.message);
+    } else {
+      console.log("unit_price error:", String(e));
+    }
   }
 
   console.log('Migration completed');

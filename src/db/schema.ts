@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, integer, boolean, numeric, date, uuid, timestamp, jsonb, AnyPgColumn } from 'drizzle-orm/pg-core';
+import { pgTable, serial, varchar, integer, boolean, numeric, date, uuid, timestamp, jsonb, AnyPgColumn, primaryKey } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 export const settings = pgTable('settings', {
@@ -80,6 +80,31 @@ export const importLogs = pgTable('import_logs', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const marketReceipts = pgTable('market_receipts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  storeName: varchar('store_name', { length: 255 }).notNull(),
+  date: timestamp('date').notNull(),
+  totalAmount: numeric('total_amount', { precision: 12, scale: 2 }).notNull(),
+});
+
+export const marketItems = pgTable('market_items', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  receiptId: uuid('receipt_id').references(() => marketReceipts.id).notNull(),
+  description: varchar('description', { length: 255 }).notNull(),
+  quantity: numeric('quantity', { precision: 10, scale: 3 }).notNull(),
+  unitMeasure: varchar('unit_measure', { length: 10 }).notNull(), // KG, UN, L
+  category: varchar('category', { length: 255 }),
+  unitPrice: numeric('unit_price', { precision: 12, scale: 2 }).default('0').notNull(),
+  originalPrice: numeric('original_price', { precision: 12, scale: 2 }).notNull(),
+  discountAmount: numeric('discount_amount', { precision: 12, scale: 2 }).default('0').notNull(),
+  netPrice: numeric('net_price', { precision: 12, scale: 2 }).notNull(),
+});
+
+export const marketReceiptTransactions = pgTable('market_receipt_transactions', {
+  receiptId: uuid('receipt_id').references(() => marketReceipts.id).notNull(),
+  transactionId: integer('transaction_id').references(() => transactions.id).notNull(),
+}, (table) => [primaryKey({ columns: [table.receiptId, table.transactionId] })]);
+
 // Relations
 export const transactionsRelations = relations(transactions, ({ one }) => ({
   account: one(accounts, {
@@ -136,5 +161,28 @@ export const subcategoriesRelations = relations(subcategories, ({ one }) => ({
   category: one(categories, {
     fields: [subcategories.categoryId],
     references: [categories.id],
+  }),
+}));
+
+export const marketReceiptsRelations = relations(marketReceipts, ({ many }) => ({
+  items: many(marketItems),
+  receiptTransactions: many(marketReceiptTransactions),
+}));
+
+export const marketItemsRelations = relations(marketItems, ({ one }) => ({
+  receipt: one(marketReceipts, {
+    fields: [marketItems.receiptId],
+    references: [marketReceipts.id],
+  }),
+}));
+
+export const marketReceiptTransactionsRelations = relations(marketReceiptTransactions, ({ one }) => ({
+  receipt: one(marketReceipts, {
+    fields: [marketReceiptTransactions.receiptId],
+    references: [marketReceipts.id],
+  }),
+  transaction: one(transactions, {
+    fields: [marketReceiptTransactions.transactionId],
+    references: [transactions.id],
   }),
 }));

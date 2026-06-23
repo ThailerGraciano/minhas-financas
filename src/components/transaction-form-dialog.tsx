@@ -26,7 +26,7 @@ type Account = FormData["accounts"][0];
 type CreditCard = FormData["creditCards"][0];
 type NewTransaction = typeof transactions.$inferInsert;
 
-export function TransactionFormDialog() {
+export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.ReactNode, onSuccess?: () => void } = {}) {
   const [open, setOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [formData, setFormData] = useState<FormData | null>(null);
@@ -161,6 +161,7 @@ export function TransactionFormDialog() {
     setIsPending(false);
     if (res.success) {
       setOpen(false);
+      if (onSuccess) onSuccess();
       router.refresh();
     } else {
       setFormError(res.error || "Erro ao salvar a transação.");
@@ -199,9 +200,11 @@ export function TransactionFormDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="cursor-pointer fixed bottom-20 md:bottom-8 right-4 md:right-8 rounded-full h-14 w-14 shadow-2xl p-0 bg-gradient-to-br from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 transition-all hover:scale-110 active:scale-95 z-[100] border-none flex items-center justify-center">
-          <Plus className="h-7 w-7 text-white pointer-events-none" />
-        </Button>
+        {trigger ? trigger : (
+          <Button className="cursor-pointer fixed bottom-20 md:bottom-8 right-4 md:right-8 rounded-full h-14 w-14 shadow-2xl p-0 bg-gradient-to-br from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 transition-all hover:scale-110 active:scale-95 z-[100] border-none flex items-center justify-center">
+            <Plus className="h-7 w-7 text-white pointer-events-none" />
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>

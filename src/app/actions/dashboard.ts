@@ -247,6 +247,7 @@ export async function getInstallmentsChartData() {
     .from(transactions)
     .where(
       and(
+        inArray(transactions.type, ['expense', 'credit_card_expense']),
         isNotNull(transactions.installmentTotal),
         gt(transactions.installmentTotal, 1),
         gte(transactions.competencyMonth, currentMonth)

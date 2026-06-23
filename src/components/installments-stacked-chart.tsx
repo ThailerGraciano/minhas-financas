@@ -7,7 +7,6 @@ import {
   ChartConfig,
   ChartContainer,
   ChartTooltip,
-  ChartTooltipContent,
   ChartLegend,
   ChartLegendContent,
 } from "@/components/ui/chart"
@@ -82,6 +81,8 @@ export function InstallmentsStackedChart({
   data: Record<string, string | number>[];
   keys: string[];
 }) {
+  const [hoveredKey, setHoveredKey] = React.useState<string | null>(null);
+
   // Configura o chart dinamicamente com as chaves reais
   const chartConfig = React.useMemo(() => {
     const config: ChartConfig = {};
@@ -130,6 +131,10 @@ export function InstallmentsStackedChart({
               dataKey={key}
               stackId="a"
               fill={chartConfig[key]?.color || '#000000'}
+              opacity={hoveredKey ? (hoveredKey === key ? 1 : 0.2) : 1}
+              onMouseEnter={() => setHoveredKey(key)}
+              onMouseLeave={() => setHoveredKey(null)}
+              style={{ transition: 'opacity 0.2s ease-in-out', cursor: 'pointer' }}
             />
           );
         })}

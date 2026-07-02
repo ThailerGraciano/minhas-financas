@@ -43,6 +43,7 @@ function CurrencyInput({
   // Sync if externally controlled value changes
   React.useEffect(() => {
     if (controlledValue !== undefined) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCents(Math.round(controlledValue * 100));
     }
   }, [controlledValue]);

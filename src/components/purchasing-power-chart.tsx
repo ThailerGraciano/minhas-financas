@@ -60,6 +60,7 @@ export function PurchasingPowerChart({ initialData, competencyMonth }: Purchasin
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setData(initialData);
     setShowOnlyPaid(false);
   }, [initialData]);

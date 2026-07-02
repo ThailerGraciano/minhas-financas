@@ -17,8 +17,21 @@ type FormData = NonNullable<Awaited<ReturnType<typeof getTransactionFormData>>>;
 type Category = FormData["categories"][0];
 type Subcategory = Category["subcategories"][0];
 
+interface TransactionProp {
+  id: number | string;
+  type: string;
+  description: string;
+  amount: number | string;
+  date: string;
+  categoryId?: number | string | null;
+  subcategoryId?: number | string | null;
+  accountId?: number | string | null;
+  creditCardId?: number | string | null;
+  destinationAccountId?: number | string | null;
+}
+
 interface EditTransactionDialogProps {
-  transaction: any;
+  transaction: TransactionProp | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -34,7 +47,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
   
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [selectedDestinationAccountId, setSelectedDestinationAccountId] = useState("");
-  const [fullTransaction, setFullTransaction] = useState<any>(null);
+  const [fullTransaction, setFullTransaction] = useState<TransactionProp | null>(null);
   
   const router = useRouter();
 
@@ -46,13 +59,14 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
 
   useEffect(() => {
     if (open && transaction) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedCategoryId(transaction.categoryId ? String(transaction.categoryId) : "");
       setSelectedSubcategoryId(transaction.subcategoryId ? String(transaction.subcategoryId) : "");
       setAmount(Number(transaction.amount));
       setSelectedAccountId("");
       setSelectedDestinationAccountId("");
 
-      getTransactionDetailsForEdit(transaction.id).then((details: any) => {
+      getTransactionDetailsForEdit(Number(transaction.id)).then((details: TransactionProp | null) => {
         if (details) {
           setFullTransaction(details);
           setSelectedAccountId(
@@ -81,6 +95,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!transaction) return;
     setIsPending(true);
     setFormError("");
 
@@ -106,7 +121,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
       destinationAccountId: selectedDestinationAccountId && transaction.type === 'transfer' ? Number(selectedDestinationAccountId) : undefined,
     };
 
-    const res = await updateTransaction(transaction.id, updateData);
+    const res = await updateTransaction(Number(transaction.id), updateData);
 
     setIsPending(false);
     if (res.success) {
@@ -145,7 +160,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {formData.accounts.map((a: any) => (
+                      {formData.accounts.map((a: { id: string | number; name: string }) => (
                         <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -158,7 +173,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {formData.accounts.map((a: any) => (
+                      {formData.accounts.map((a: { id: string | number; name: string }) => (
                         <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -173,10 +188,10 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {formData.accounts.map((a: any) => (
+                    {formData.accounts.map((a: { id: string | number; name: string }) => (
                       <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
                     ))}
-                    {transaction.type === 'credit_card_expense' && formData.creditCards.map((c: any) => (
+                    {transaction.type === 'credit_card_expense' && formData.creditCards.map((c: { id: string | number; name: string }) => (
                       <SelectItem key={`cc-${c.id}`} value={`cc-${c.id}`}>{c.name} (Cartão)</SelectItem>
                     ))}
                   </SelectContent>

@@ -3,6 +3,7 @@
 import { getTransactionFormData } from "@/app/actions/form-data";
 import { createTransaction } from "@/app/actions/transactions";
 import { CategoryIcon } from "@/components/category-icon";
+import { QuickCategoryDialog } from "@/components/quick-category-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -150,6 +151,7 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
         baseData.installmentTotal = Number(form.get("installmentTotal"));
         baseData.isTotalAmount = isTotalAmount;
       }
+
     } else if (tab === "transfer") {
       baseData.type = "transfer";
       baseData.accountId = Number(form.get("accountIdTransferOrigin"));
@@ -165,6 +167,26 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
       router.refresh();
     } else {
       setFormError(res.error || "Erro ao salvar a transação.");
+    }
+  };
+
+  const handleCategoryCreated = async (newCategoryId: string, newSubcategoryId: string) => {
+    // Re-fetch the form data so the new category is available in the selects
+    const data = await getTransactionFormData();
+    setFormData(data);
+    setSelectedCategoryId(newCategoryId);
+    
+    if (newSubcategoryId) {
+      setSelectedSubcategoryId(newSubcategoryId);
+    } else {
+      // Find "Geral" subcategory for this category to select it
+      const cat = data.categories.find(c => c.id === Number(newCategoryId));
+      const geralSub = cat?.subcategories.find(sc => sc.name === 'Geral');
+      if (geralSub) {
+        setSelectedSubcategoryId(String(geralSub.id));
+      } else {
+        setSelectedSubcategoryId("");
+      }
     }
   };
 
@@ -253,21 +275,24 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
                 <div className="grid gap-3">
                   <Label htmlFor="categoryId" className="text-muted-foreground ml-1">Categoria</Label>
                   <input type="hidden" name="categoryId" value={selectedCategoryId} required />
-                  <Select value={selectedCategoryId} onValueChange={handleCategoryChange}>
-                    <SelectTrigger className="w-full h-12 rounded-xl border-transparent bg-muted/40 px-4 text-base hover:bg-muted/60 transition-all outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10">
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredCategories.map((c: Category) => (
-                        <SelectItem key={c.id} value={String(c.id)}>
-                          <div className="flex items-center gap-2">
-                            <CategoryIcon name={c.icon} className="h-4 w-4 text-muted-foreground" />
-                            <span>{c.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select value={selectedCategoryId} onValueChange={handleCategoryChange}>
+                      <SelectTrigger className="w-full h-12 rounded-xl border-transparent bg-muted/40 px-4 text-base hover:bg-muted/60 transition-all outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredCategories.map((c: Category) => (
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            <div className="flex items-center gap-2">
+                              <CategoryIcon name={c.icon} className="h-4 w-4 text-muted-foreground" />
+                              <span>{c.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <QuickCategoryDialog type={tab === "income" ? "income" : "expense"} onSuccess={handleCategoryCreated} />
+                  </div>
                 </div>
                 <div className="grid gap-3">
                   <Label htmlFor="subcategoryId" className="text-muted-foreground ml-1">Subcategoria</Label>

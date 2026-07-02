@@ -2,7 +2,7 @@
 
 import { db } from '@/db';
 import { accounts, categories, transactions, fixedTransactions } from '@/db/schema';
-import { and, eq, gte, lte } from 'drizzle-orm';
+import { and, eq, gte, lte, desc } from 'drizzle-orm';
 import { format, parse, endOfMonth, isValid } from 'date-fns';
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/auth';
@@ -10,7 +10,7 @@ import { auth } from '@/auth';
 export async function getAccounts() {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
-  return await db.select().from(accounts).where(eq(accounts.userId, session.user.id));
+  return await db.select().from(accounts).where(eq(accounts.userId, session.user.id)).orderBy(desc(accounts.currentBalance));
 }
 
 export async function createAccount(data: Omit<typeof accounts.$inferInsert, 'userId'>) {

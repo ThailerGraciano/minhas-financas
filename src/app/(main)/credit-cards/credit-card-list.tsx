@@ -20,7 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-type CreditCardType = {
+export type CreditCardType = {
   id: number;
   name: string;
   creditLimit: string;

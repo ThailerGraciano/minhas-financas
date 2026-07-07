@@ -317,11 +317,16 @@ export function TransactionFormDialog({
                         ))}
                       </SelectContent>
                     </Select>
-                    <QuickCategoryDialog type={tab === "income" ? "income" : "expense"} onSuccess={handleCategoryCreated} />
+                    <QuickCategoryDialog
+                      type={tab === "income" ? "income" : "expense"}
+                      onSuccess={handleCategoryCreated}
+                    />
                   </div>
                 </div>
                 <div className="grid gap-3">
-                  <Label htmlFor="subcategoryId" className="text-muted-foreground ml-1">Subcategoria</Label>
+                  <Label htmlFor="subcategoryId" className="text-muted-foreground ml-1">
+                    Subcategoria
+                  </Label>
                   <div className="flex gap-2">
                     <select
                       name="subcategoryId"
@@ -401,9 +406,7 @@ export function TransactionFormDialog({
                           defaultValue="1"
                           required
                         />
-                        <p className="text-xs text-muted-foreground ml-1">
-                          Ex: Para a parcela 5 de 48, digite 5.
-                        </p>
+                        <p className="text-xs text-muted-foreground ml-1">Ex: Para a parcela 5 de 48, digite 5.</p>
                       </div>
                       <div className="grid gap-3">
                         <Label htmlFor="installmentTotal" className="text-muted-foreground ml-1">
@@ -578,9 +581,7 @@ export function TransactionFormDialog({
                           defaultValue="1"
                           required
                         />
-                        <p className="text-xs text-muted-foreground ml-1">
-                          Ex: Para a parcela 5 de 48, digite 5.
-                        </p>
+                        <p className="text-xs text-muted-foreground ml-1">Ex: Para a parcela 5 de 48, digite 5.</p>
                       </div>
                       <div className="grid gap-3">
                         <Label htmlFor="installmentTotal" className="text-muted-foreground ml-1">

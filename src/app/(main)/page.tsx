@@ -44,7 +44,7 @@ export default async function DashboardPage(props: { searchParams?: Promise<{ [k
       <AccountBalancesSummary balances={balancesData.balancesByType} totalBalance={balancesData.totalBalance} />
 
       {/* Gráfico de Evolução de Saldo */}
-      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm">
+      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full overflow-hidden">
         <div className="flex flex-row items-center gap-2 mb-4">
           <TrendingUp className="h-5 w-5 text-primary" />
           <div>
@@ -72,7 +72,7 @@ export default async function DashboardPage(props: { searchParams?: Promise<{ [k
       </div>
 
       {/* Gráfico de Parcelas */}
-      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm">
+      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full overflow-hidden">
         <div className="flex flex-row items-center gap-2 mb-4">
           <Layers className="h-5 w-5 text-primary" />
           <div>

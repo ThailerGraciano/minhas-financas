@@ -78,7 +78,7 @@ export function AccountVsGlobalExpenseChart({ initialData, competencyMonth }: Ac
   }
 
   return (
-    <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm">
+    <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full overflow-hidden">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">Poder de Pagamento (Receitas vs Despesa Global)</h2>
         <div className="flex items-center space-x-2">

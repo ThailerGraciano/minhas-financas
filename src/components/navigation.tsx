@@ -35,7 +35,7 @@ export function Navigation() {
         </div>
 
         {/* Horizontal Nav - Pill shaped */}
-        <nav className="flex-1 flex justify-center items-center gap-1">
+        <nav className="flex-1 flex justify-center items-center gap-1 overflow-x-auto no-scrollbar px-2">
           {navItems.map((item) => {
             const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
             return (
@@ -43,7 +43,7 @@ export function Navigation() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-all duration-300",
+                  "flex items-center gap-1.5 rounded-full px-3 lg:px-4 py-2 text-sm font-medium transition-all duration-300 whitespace-nowrap",
                   isActive 
                     ? "bg-foreground text-background shadow-md scale-105" 
                     : "text-muted-foreground hover:bg-card hover:text-foreground"

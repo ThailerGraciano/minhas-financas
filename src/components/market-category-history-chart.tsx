@@ -55,7 +55,7 @@ export function MarketCategoryHistoryChart({ data }: MarketCategoryHistoryChartP
 
   if (data.length === 0 || categories.length === 0) {
     return (
-      <Card className="rounded-[2rem] border-transparent shadow-sm flex flex-col h-full">
+      <Card className="rounded-[2rem] border-transparent shadow-sm flex flex-col h-full w-full overflow-hidden">
         <CardHeader className="pb-2">
           <CardTitle className="text-xl font-bold">Evolução por Categoria</CardTitle>
           <CardDescription>Últimos 3 meses</CardDescription>
@@ -68,7 +68,7 @@ export function MarketCategoryHistoryChart({ data }: MarketCategoryHistoryChartP
   }
 
   return (
-    <Card className="rounded-[2rem] border-transparent shadow-sm flex flex-col h-full">
+    <Card className="rounded-[2rem] border-transparent shadow-sm flex flex-col h-full w-full overflow-hidden">
       <CardHeader className="pb-2">
         <CardTitle className="text-xl font-bold">Evolução por Categoria</CardTitle>
         <CardDescription>Últimos 3 meses</CardDescription>

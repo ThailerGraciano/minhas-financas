@@ -28,7 +28,7 @@ const formatCurrency = (value: number) =>
 export function MarketTopCategoryItemsChart({ data }: MarketTopCategoryItemsChartProps) {
   if (data.length === 0) {
     return (
-      <Card className="rounded-[2rem] border-transparent shadow-sm flex flex-col h-full md:col-span-2">
+      <Card className="rounded-[2rem] border-transparent shadow-sm flex flex-col h-full md:col-span-2 w-full overflow-hidden">
         <CardHeader className="pb-2">
           <CardTitle className="text-xl font-bold">Top 3 Produtos por Categoria</CardTitle>
           <CardDescription>Os itens mais caros de cada seção</CardDescription>
@@ -44,7 +44,7 @@ export function MarketTopCategoryItemsChart({ data }: MarketTopCategoryItemsChar
   const displayData = data.slice(0, 4);
 
   return (
-    <Card className="rounded-[2rem] border-transparent shadow-sm flex flex-col h-full md:col-span-2">
+    <Card className="rounded-[2rem] border-transparent shadow-sm flex flex-col h-full md:col-span-2 w-full overflow-hidden">
       <CardHeader className="pb-4">
         <CardTitle className="text-xl font-bold">Top 3 Produtos por Categoria</CardTitle>
         <CardDescription>Os itens de maior valor em cada seção</CardDescription>

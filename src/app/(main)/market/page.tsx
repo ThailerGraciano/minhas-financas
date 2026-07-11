@@ -66,7 +66,7 @@ export default async function MarketPage(props: { searchParams?: Promise<{ [key:
 
       <div className="grid gap-6 lg:grid-cols-2">
         <MarketCategoryChart data={dashboardData.spendingByCategory} />
-        <MarketCategoryItemsChart data={dashboardData.itemsByCategory} />
+        <MarketCategoryItemsChart data={dashboardData.spendingByCategory} />
         
         <div className="lg:col-span-2">
           <MarketCategoryHistoryChart data={categoryHistory} />

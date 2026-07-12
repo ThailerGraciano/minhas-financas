@@ -43,9 +43,10 @@ type CustomTooltipProps = {
   active?: boolean;
   payload?: TooltipPayload[];
   label?: string;
+  hoveredKey?: string | null;
 };
 
-const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
+const CustomTooltip = ({ active, payload, label, hoveredKey }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-popover border text-popover-foreground rounded-lg shadow-md p-3 min-w-[200px]">
@@ -53,11 +54,17 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
         <div className="flex flex-col gap-1.5">
           {payload.map((entry: TooltipPayload, index: number) => {
             const installmentText = entry.payload[`${entry.dataKey}_installment`];
+            const isHovered = hoveredKey === entry.dataKey;
+            const isDimmed = hoveredKey && !isHovered;
+            
             return (
-              <div key={index} className="flex items-center justify-between text-sm">
+              <div 
+                key={index} 
+                className={`flex items-center justify-between text-sm transition-opacity duration-200 ${isDimmed ? 'opacity-30' : 'opacity-100'}`}
+              >
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color || entry.fill }} />
-                  <span className="font-medium text-muted-foreground">
+                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: entry.color || entry.fill }} />
+                  <span className={`font-medium ${isHovered ? 'text-foreground' : 'text-muted-foreground'}`}>
                     {entry.dataKey} {installmentText ? ` ${installmentText}` : ''}
                   </span>
                 </div>
@@ -121,7 +128,7 @@ export function InstallmentsStackedChart({
         />
         <ChartTooltip 
           cursor={{ fill: 'var(--muted)', opacity: 0.1 }}
-          content={<CustomTooltip />} 
+          content={<CustomTooltip hoveredKey={hoveredKey} />} 
         />
         <ChartLegend content={<ChartLegendContent />} />
         {keys.map((key) => {

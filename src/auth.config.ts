@@ -11,4 +11,5 @@ export const authConfig = {
       return true; // Lógica de proteção de rotas pode ser feita aqui
     },
   },
+  trustHost: true,
 } satisfies NextAuthConfig;

@@ -374,3 +374,62 @@ export async function getIncomeVsExpenseData(competencyMonth: string, showOnlyPa
     accountVsGlobal: accountVsGlobalData,
   };
 }
+
+export type TreemapNode = {
+  name: string;
+  value?: number;
+  id?: string;
+  children?: TreemapNode[];
+};
+
+export async function getExpenseTreemapData(competencyMonth: string) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
+  const rawTransactions = await db.query.transactions.findMany({
+    where: and(
+      inArray(transactions.type, ['expense', 'credit_card_expense']),
+      eq(transactions.competencyMonth, competencyMonth),
+      eq(transactions.userId, userId)
+    ),
+    with: {
+      category: true,
+      subcategory: true,
+    }
+  });
+
+  const root: TreemapNode = { name: 'Despesas', children: [] };
+  const categoryMap = new Map<string, TreemapNode>();
+  const subcategoryMap = new Map<string, TreemapNode>();
+
+  rawTransactions.forEach(t => {
+    const catName = t.category?.name || 'Sem Categoria';
+    const subName = t.subcategory?.name || 'Geral';
+    const val = Number(t.amount);
+    
+    if (!categoryMap.has(catName)) {
+      const newCat: TreemapNode = { name: catName, children: [] };
+      categoryMap.set(catName, newCat);
+      root.children!.push(newCat);
+    }
+    
+    const catNode = categoryMap.get(catName)!;
+    const subcatKey = `${catName}-${subName}`;
+    
+    if (!subcategoryMap.has(subcatKey)) {
+      const newSub: TreemapNode = { name: subName, children: [] };
+      subcategoryMap.set(subcatKey, newSub);
+      catNode.children!.push(newSub);
+    }
+    
+    const subNode = subcategoryMap.get(subcatKey)!;
+    subNode.children!.push({
+      name: t.description,
+      value: val,
+      id: String(t.id),
+    });
+  });
+
+  return root;
+}

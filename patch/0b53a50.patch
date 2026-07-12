@@ -1,0 +1,245 @@
+From 0b53a507bd7151d49c371c41b2e075f3790f0809 Mon Sep 17 00:00:00 2001
+From: Thailer Graciano <thailer.graciano@outlook.com>
+Date: Wed, 8 Jul 2026 14:52:59 -0300
+Subject: [PATCH] =?UTF-8?q?Cria=C3=A7=C3=A3o=20de=20sub=20categoria?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ src/components/quick-category-dialog.tsx   | 117 +++++++++++++++------
+ src/components/transaction-form-dialog.tsx |  44 +++++---
+ 2 files changed, 111 insertions(+), 50 deletions(-)
+
+diff --git a/src/components/quick-category-dialog.tsx b/src/components/quick-category-dialog.tsx
+index c7f846f..a790637 100644
+--- a/src/components/quick-category-dialog.tsx
++++ b/src/components/quick-category-dialog.tsx
+@@ -20,9 +20,12 @@ import { CATEGORY_ICONS_LIST } from "@/components/category-icon";
+ interface QuickCategoryDialogProps {
+   type: "income" | "expense";
+   onSuccess: (categoryId: string, subcategoryId: string) => void;
++  isSubcategoryMode?: boolean;
++  parentCategoryId?: string;
++  parentCategoryName?: string;
+ }
+ 
+-export function QuickCategoryDialog({ type, onSuccess }: QuickCategoryDialogProps) {
++export function QuickCategoryDialog({ type, onSuccess, isSubcategoryMode, parentCategoryId, parentCategoryName }: QuickCategoryDialogProps) {
+   const [open, setOpen] = useState(false);
+   const [isPending, setIsPending] = useState(false);
+   const [error, setError] = useState("");
+@@ -34,9 +37,30 @@ export function QuickCategoryDialog({ type, onSuccess }: QuickCategoryDialogProp
+     setError("");
+ 
+     const formData = new FormData(e.currentTarget);
+-    const name = formData.get("name") as string;
+     const subcategoryName = formData.get("subcategoryName") as string;
+ 
++    if (isSubcategoryMode && parentCategoryId) {
++      if (!subcategoryName || subcategoryName.trim() === "") {
++        setError("O nome da subcategoria é obrigatório");
++        setIsPending(false);
++        return;
++      }
++      
++      const subRes = await createSubcategory(subcategoryName.trim(), parentCategoryId);
++      if (!subRes.success || !subRes.subcategory) {
++        setError(subRes.error || "Erro ao criar subcategoria");
++        setIsPending(false);
++        return;
++      }
++
++      setIsPending(false);
++      setOpen(false);
++      onSuccess(parentCategoryId, String(subRes.subcategory.id));
++      return;
++    }
++
++    const name = formData.get("name") as string;
++
+     // 1. Create the category
+     const res = await createCategory(name, type, selectedIcon);
+     
+@@ -71,7 +95,7 @@ export function QuickCategoryDialog({ type, onSuccess }: QuickCategoryDialogProp
+           variant="outline"
+           size="icon"
+           className="h-12 w-12 shrink-0 rounded-xl border-dashed"
+-          title="Nova categoria"
++          title={isSubcategoryMode ? "Nova subcategoria" : "Nova categoria"}
+         >
+           <Plus className="h-5 w-5 text-muted-foreground" />
+         </Button>
+@@ -79,46 +103,68 @@ export function QuickCategoryDialog({ type, onSuccess }: QuickCategoryDialogProp
+       <DialogContent className="sm:max-w-[425px] z-[200]">
+         <form onSubmit={handleSubmit}>
+           <DialogHeader>
+-            <DialogTitle>Nova Categoria</DialogTitle>
++            <DialogTitle>{isSubcategoryMode ? "Nova Subcategoria" : "Nova Categoria"}</DialogTitle>
+             <DialogDescription>
+-              Crie rapidamente uma categoria para esta transação.
++              {isSubcategoryMode 
++                ? "Crie uma subcategoria vinculada à categoria selecionada."
++                : "Crie rapidamente uma categoria para esta transação."
++              }
+             </DialogDescription>
+           </DialogHeader>
+           <div className="grid gap-4 py-4">
+             <div className="grid gap-2">
+               <Label htmlFor="quick-category-name">Nome da Categoria</Label>
+-              <Input id="quick-category-name" name="name" required placeholder="Ex: Casa, Lazer..." />
++              <Input 
++                id="quick-category-name" 
++                name="name" 
++                required={!isSubcategoryMode} 
++                disabled={isSubcategoryMode}
++                defaultValue={isSubcategoryMode ? parentCategoryName : ""}
++                placeholder="Ex: Casa, Lazer..." 
++              />
+             </div>
+             <div className="grid gap-2">
+-              <Label htmlFor="quick-subcategory-name">Subcategoria (Opcional)</Label>
+-              <Input id="quick-subcategory-name" name="subcategoryName" placeholder="Ex: Aluguel, Cinema..." />
+-              <p className="text-xs text-muted-foreground">
+-                Se deixado em branco, a transação usará a subcategoria &quot;Geral&quot;.
+-              </p>
++              <Label htmlFor="quick-subcategory-name">
++                {isSubcategoryMode ? "Nome da Subcategoria" : "Subcategoria (Opcional)"}
++              </Label>
++              <Input 
++                id="quick-subcategory-name" 
++                name="subcategoryName" 
++                required={isSubcategoryMode}
++                placeholder="Ex: Aluguel, Cinema..." 
++              />
++              {!isSubcategoryMode && (
++                <p className="text-xs text-muted-foreground">
++                  Se deixado em branco, a transação usará a subcategoria &quot;Geral&quot;.
++                </p>
++              )}
+             </div>
+-            <div className="grid gap-2">
+-              <Label>Ícone</Label>
+-              <div className="grid grid-cols-5 gap-2 p-3 border rounded-md bg-muted/20 max-h-[160px] overflow-y-auto">
+-                {CATEGORY_ICONS_LIST.map(({ name, Icon }) => {
+-                  const isSelected = selectedIcon === name;
+-                  return (
+-                    <button
+-                      key={name}
+-                      type="button"
+-                      onClick={() => setSelectedIcon(name)}
+-                      className={`flex items-center justify-center p-2 rounded-md transition-all border ${
+-                        isSelected 
+-                          ? 'bg-primary border-primary text-primary-foreground scale-105 shadow-sm' 
+-                          : 'bg-background border-transparent hover:bg-muted text-muted-foreground hover:text-foreground'
+-                      }`}
+-                      title={name}
+-                    >
+-                      <Icon className="h-5 w-5" />
+-                    </button>
+-                  );
+-                })}
++            
++            {!isSubcategoryMode && (
++              <div className="grid gap-2">
++                <Label>Ícone</Label>
++                <div className="grid grid-cols-5 gap-2 p-3 border rounded-md bg-muted/20 max-h-[160px] overflow-y-auto">
++                  {CATEGORY_ICONS_LIST.map(({ name, Icon }) => {
++                    const isSelected = selectedIcon === name;
++                    return (
++                      <button
++                        key={name}
++                        type="button"
++                        onClick={() => setSelectedIcon(name)}
++                        className={`flex items-center justify-center p-2 rounded-md transition-all border ${
++                          isSelected 
++                            ? 'bg-primary border-primary text-primary-foreground scale-105 shadow-sm' 
++                            : 'bg-background border-transparent hover:bg-muted text-muted-foreground hover:text-foreground'
++                        }`}
++                        title={name}
++                      >
++                        <Icon className="h-5 w-5" />
++                      </button>
++                    );
++                  })}
++                </div>
+               </div>
+-            </div>
++            )}
+             {error && <p className="text-sm text-destructive">{error}</p>}
+           </div>
+           <DialogFooter>
+@@ -126,7 +172,10 @@ export function QuickCategoryDialog({ type, onSuccess }: QuickCategoryDialogProp
+               Cancelar
+             </Button>
+             <Button type="submit" disabled={isPending}>
+-              {isPending ? "Criando..." : "Criar Categoria"}
++              {isPending 
++                ? (isSubcategoryMode ? "Criando..." : "Criando...") 
++                : (isSubcategoryMode ? "Criar Subcategoria" : "Criar Categoria")
++              }
+             </Button>
+           </DialogFooter>
+         </form>
+diff --git a/src/components/transaction-form-dialog.tsx b/src/components/transaction-form-dialog.tsx
+index 51e70ba..737757e 100644
+--- a/src/components/transaction-form-dialog.tsx
++++ b/src/components/transaction-form-dialog.tsx
+@@ -240,7 +240,7 @@ export function TransactionFormDialog({
+           </Button>
+         )}
+       </DialogTrigger>
+-      <DialogContent className="sm:max-w-[500px]">
++      <DialogContent className="sm:max-w-[650px]">
+         <DialogHeader>
+           <DialogTitle>Nova Transação</DialogTitle>
+           <DialogDescription className="sr-only">
+@@ -327,21 +327,33 @@ export function TransactionFormDialog({
+                   <Label htmlFor="subcategoryId" className="text-muted-foreground ml-1">
+                     Subcategoria
+                   </Label>
+-                  <select
+-                    name="subcategoryId"
+-                    value={selectedSubcategoryId}
+-                    onChange={(e) => setSelectedSubcategoryId(e.target.value)}
+-                    className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10 disabled:opacity-50"
+-                    disabled={!selectedCategoryId || activeSubcategories.length === 0}
+-                    required={tab !== "transfer"}
+-                  >
+-                    {activeSubcategories.length === 0 && <option value="">Selecione uma categoria primeiro</option>}
+-                    {activeSubcategories.map((sc: Subcategory) => (
+-                      <option key={sc.id} value={sc.id}>
+-                        {sc.name}
+-                      </option>
+-                    ))}
+-                  </select>
++                  <div className="flex gap-2">
++                    <select
++                      name="subcategoryId"
++                      value={selectedSubcategoryId}
++                      onChange={(e) => setSelectedSubcategoryId(e.target.value)}
++                      className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10 disabled:opacity-50"
++                      disabled={!selectedCategoryId}
++                      required={tab !== "transfer"}
++                    >
++                      {activeSubcategories.length === 0 && <option value="">Nenhuma subcategoria disponível</option>}
++                      {activeSubcategories.map((sc: Subcategory) => (
++                        <option key={sc.id} value={sc.id}>
++                          {sc.name}
++                        </option>
++                      ))}
++                    </select>
++                    <QuickCategoryDialog
++                      type={tab === "income" ? "income" : "expense"}
++                      onSuccess={(catId, subCatId) => {
++                        handleCategoryCreated(catId, subCatId);
++                        setSelectedSubcategoryId(subCatId);
++                      }}
++                      isSubcategoryMode={true}
++                      parentCategoryId={selectedCategoryId}
++                      parentCategoryName={filteredCategories.find(c => String(c.id) === selectedCategoryId)?.name}
++                    />
++                  </div>
+                 </div>
+               </div>
+ 

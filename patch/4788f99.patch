@@ -1,0 +1,55 @@
+From 4788f99d1d498233768d830a156fadde6b83297a Mon Sep 17 00:00:00 2001
+From: Thailer Graciano <thailer.graciano@outlook.com>
+Date: Wed, 8 Jul 2026 10:56:14 -0300
+Subject: [PATCH] destaque no hint
+
+---
+ src/components/installments-stacked-chart.tsx | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/src/components/installments-stacked-chart.tsx b/src/components/installments-stacked-chart.tsx
+index 30726ee..ba3ae0d 100644
+--- a/src/components/installments-stacked-chart.tsx
++++ b/src/components/installments-stacked-chart.tsx
+@@ -43,9 +43,10 @@ type CustomTooltipProps = {
+   active?: boolean;
+   payload?: TooltipPayload[];
+   label?: string;
++  hoveredKey?: string | null;
+ };
+ 
+-const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
++const CustomTooltip = ({ active, payload, label, hoveredKey }: CustomTooltipProps) => {
+   if (active && payload && payload.length) {
+     return (
+       <div className="bg-popover border text-popover-foreground rounded-lg shadow-md p-3 min-w-[200px]">
+@@ -53,11 +54,17 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
+         <div className="flex flex-col gap-1.5">
+           {payload.map((entry: TooltipPayload, index: number) => {
+             const installmentText = entry.payload[`${entry.dataKey}_installment`];
++            const isHovered = hoveredKey === entry.dataKey;
++            const isDimmed = hoveredKey && !isHovered;
++            
+             return (
+-              <div key={index} className="flex items-center justify-between text-sm">
++              <div 
++                key={index} 
++                className={`flex items-center justify-between text-sm transition-opacity duration-200 ${isDimmed ? 'opacity-30' : 'opacity-100'}`}
++              >
+                 <div className="flex items-center gap-2">
+-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color || entry.fill }} />
+-                  <span className="font-medium text-muted-foreground">
++                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: entry.color || entry.fill }} />
++                  <span className={`font-medium ${isHovered ? 'text-foreground' : 'text-muted-foreground'}`}>
+                     {entry.dataKey} {installmentText ? ` ${installmentText}` : ''}
+                   </span>
+                 </div>
+@@ -121,7 +128,7 @@ export function InstallmentsStackedChart({
+         />
+         <ChartTooltip 
+           cursor={{ fill: 'var(--muted)', opacity: 0.1 }}
+-          content={<CustomTooltip />} 
++          content={<CustomTooltip hoveredKey={hoveredKey} />} 
+         />
+         <ChartLegend content={<ChartLegendContent />} />
+         {keys.map((key) => {

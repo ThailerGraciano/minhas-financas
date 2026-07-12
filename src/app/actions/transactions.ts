@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { auth } from '@/auth';
 
 type NewTransaction = typeof transactions.$inferInsert;
-type CreateTransactionInput = Omit<NewTransaction, 'userId'> & { destinationAccountId?: number; isFixed?: boolean; isTotalAmount?: boolean };
+type CreateTransactionInput = Omit<NewTransaction, 'userId'> & { destinationAccountId?: number; isFixed?: boolean; isTotalAmount?: boolean; current_installment?: number };
 
 const transactionSchema = z.object({
   description: z.string().min(1, 'Descrição é obrigatória'),
@@ -20,7 +20,17 @@ const transactionSchema = z.object({
   type: z.string().min(1),
   status: z.string().min(1),
   isTotalAmount: z.boolean().optional().default(false),
-}).passthrough();
+  installmentTotal: z.coerce.number().optional(),
+  current_installment: z.coerce.number().min(1).default(1),
+}).passthrough().superRefine((data, ctx) => {
+  if (data.installmentTotal && data.current_installment > data.installmentTotal) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'A parcela inicial não pode ser maior que o total de parcelas.',
+      path: ['current_installment'],
+    });
+  }
+});
 
 const subcategoryRequiredTypes = ['income', 'expense', 'credit_card_expense'];
 
@@ -127,7 +137,7 @@ export async function createTransaction(data: CreateTransactionInput): Promise<{
   }
 
   try {
-    const { isFixed, destinationAccountId, isTotalAmount, ...txData } = data;
+    const { isFixed, destinationAccountId, isTotalAmount, current_installment, ...txData } = data;
 
     if (txData.type === 'transfer' && destinationAccountId) {
       const result = await db.transaction(async (tx) => {
@@ -210,22 +220,26 @@ export async function createTransaction(data: CreateTransactionInput): Promise<{
         lastParcelAmount = lastValue.toFixed(2);
       }
 
+      const currentInstallment = current_installment || 1;
+
       const [parentTx] = await db.insert(transactions).values({
         ...txData,
+        description: `${txData.description} (${currentInstallment}/${txData.installmentTotal})`,
         userId,
-        amount: baseParcelAmount,
-        installmentCurrent: 1,
+        amount: currentInstallment === txData.installmentTotal ? lastParcelAmount : baseParcelAmount,
+        installmentCurrent: currentInstallment,
       }).returning();
 
       const installmentsToInsert: NewTransaction[] = [];
       const baseDate = parseISO(data.date);
 
-      for (let i = 2; i <= txData.installmentTotal; i++) {
-        const nextDate = addMonths(baseDate, i - 1);
+      for (let i = currentInstallment + 1; i <= txData.installmentTotal; i++) {
+        const nextDate = addMonths(baseDate, i - currentInstallment);
         const isLast = i === txData.installmentTotal;
 
         installmentsToInsert.push({
           ...txData,
+          description: `${txData.description} (${i}/${txData.installmentTotal})`,
           userId,
           amount: isLast ? lastParcelAmount : baseParcelAmount,
           date: format(nextDate, 'yyyy-MM-dd'),

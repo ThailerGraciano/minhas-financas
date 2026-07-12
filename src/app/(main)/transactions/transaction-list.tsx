@@ -22,13 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Pencil, Trash } from "lucide-react";
+import { Pencil, Trash } from "lucide-react";
 
 export type TransactionWithRelations = {
   id: number;
@@ -294,25 +288,22 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                   </div>
 
                   {!tx.isGroup && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger className="p-2 hover:bg-muted rounded-full transition-colors focus:outline-none">
-                        <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="rounded-2xl">
-                        <DropdownMenuItem
-                          className="cursor-pointer rounded-xl"
-                          onClick={() => setTransactionToEdit(tx)}
-                        >
-                          <Pencil className="w-4 h-4 mr-2" /> Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="cursor-pointer text-destructive focus:text-destructive rounded-xl"
-                          onClick={() => setTransactionToDelete(tx)}
-                        >
-                          <Trash className="w-4 h-4 mr-2" /> Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex items-center gap-0.5 md:gap-1">
+                      <button
+                        onClick={() => setTransactionToEdit(tx)}
+                        className="p-2 text-muted-foreground hover:bg-muted hover:text-foreground rounded-full transition-colors focus:outline-none"
+                        title="Editar"
+                      >
+                        <Pencil className="w-4 h-4 md:w-[18px] md:h-[18px]" />
+                      </button>
+                      <button
+                        onClick={() => setTransactionToDelete(tx)}
+                        className="p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-full transition-colors focus:outline-none"
+                        title="Excluir"
+                      >
+                        <Trash className="w-4 h-4 md:w-[18px] md:h-[18px]" />
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -330,7 +321,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
 
       {/* Delete Alert */}
       <AlertDialog open={!!transactionToDelete} onOpenChange={(open) => !open && setTransactionToDelete(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="sm:max-w-[500px]">
           {transactionToDelete &&
           (transactionToDelete.fixedTransactionId ||
             (transactionToDelete.installmentTotal && transactionToDelete.installmentTotal > 1)) ? (
@@ -342,7 +333,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                   esta e todas as próximas?
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <AlertDialogFooter className="flex flex-col sm:flex-row gap-2">
+              <AlertDialogFooter className="flex flex-col sm:flex-row gap-2 flex-wrap sm:justify-end">
                 <AlertDialogCancel disabled={isDeleting} className="cursor-pointer">
                   Cancelar
                 </AlertDialogCancel>

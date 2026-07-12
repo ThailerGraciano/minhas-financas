@@ -1,9 +1,9 @@
-import { getDashboardData, getBalancesByType, getBalanceEvolutionData, getInstallmentsChartData, getIncomeVsExpenseData } from '@/app/actions/dashboard';
+import { getDashboardData, getBalancesByType, getBalanceEvolutionData, getInstallmentsChartData, getIncomeVsExpenseData, getExpenseTreemapData } from '@/app/actions/dashboard';
 import { getSettings } from '@/app/actions/settings';
 import { CompetencyFilter } from '@/components/competency-filter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
-import { ArrowUpCircle, ArrowDownCircle, CreditCard as CreditCardIcon, TrendingUp } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, CreditCard as CreditCardIcon, TrendingUp, Grid3X3 } from 'lucide-react';
 import { Suspense } from 'react';
 import { AccountBalancesSummary } from '@/components/account-balances-summary';
 import { BalanceEvolutionChart, COLOR_PAST, COLOR_FUTURE } from '@/components/balance-evolution-chart';
@@ -12,6 +12,7 @@ import { GlobalIncomeExpenseChart } from '@/components/global-income-expense-cha
 import { AccountIncomeExpenseChart } from '@/components/account-income-expense-chart';
 import { AccountVsGlobalExpenseChart } from '@/components/account-vs-global-expense-chart';
 import { PurchasingPowerChart } from '@/components/purchasing-power-chart';
+import { ExpenseTreemap } from '@/components/charts/ExpenseTreemap';
 import { Layers } from 'lucide-react';
 
 export default async function DashboardPage(props: { searchParams?: Promise<{ [key: string]: string | string[] | undefined }> }) {
@@ -19,13 +20,14 @@ export default async function DashboardPage(props: { searchParams?: Promise<{ [k
   const monthParam = searchParams?.month as string | undefined;
   const currentMonth = monthParam || format(new Date(), 'yyyy-MM');
 
-  const [data, settingsData, balancesData, evolutionData, installmentsData, incomeVsExpenseData] = await Promise.all([
+  const [data, settingsData, balancesData, evolutionData, installmentsData, incomeVsExpenseData, treemapData] = await Promise.all([
     getDashboardData(currentMonth),
     getSettings(),
     getBalancesByType(),
     getBalanceEvolutionData(),
     getInstallmentsChartData(),
     getIncomeVsExpenseData(currentMonth),
+    getExpenseTreemapData(currentMonth),
   ]);
 
   const formatCurrency = (value: number) => {
@@ -44,7 +46,7 @@ export default async function DashboardPage(props: { searchParams?: Promise<{ [k
       <AccountBalancesSummary balances={balancesData.balancesByType} totalBalance={balancesData.totalBalance} />
 
       {/* Gráfico de Evolução de Saldo */}
-      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full overflow-hidden">
+      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
         <div className="flex flex-row items-center gap-2 mb-4">
           <TrendingUp className="h-5 w-5 text-primary" />
           <div>
@@ -72,7 +74,7 @@ export default async function DashboardPage(props: { searchParams?: Promise<{ [k
       </div>
 
       {/* Gráfico de Parcelas */}
-      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full overflow-hidden">
+      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
         <div className="flex flex-row items-center gap-2 mb-4">
           <Layers className="h-5 w-5 text-primary" />
           <div>
@@ -118,9 +120,23 @@ export default async function DashboardPage(props: { searchParams?: Promise<{ [k
         <AccountVsGlobalExpenseChart initialData={incomeVsExpenseData.accountVsGlobal} competencyMonth={currentMonth} />
       </div>
 
+      {/* Mapa de Despesas */}
+      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
+        <div className="flex flex-row items-center gap-2 mb-4">
+          <Grid3X3 className="h-5 w-5 text-primary" />
+          <div>
+            <h2 className="text-xl font-bold">Mapeamento de Despesas</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Visualize onde o seu dinheiro está sendo gasto neste mês
+            </p>
+          </div>
+        </div>
+        <ExpenseTreemap data={treemapData} />
+      </div>
+
       {/* Contas e Faturas */}
       <div className="grid gap-6 md:grid-cols-2">
-        <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm">
+        <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
           <h2 className="text-xl font-bold mb-4">Saldos por Conta</h2>
           <div className="space-y-4">
             {data.accounts.map(acc => (
@@ -137,7 +153,7 @@ export default async function DashboardPage(props: { searchParams?: Promise<{ [k
           </div>
         </div>
 
-        <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm">
+        <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
           <h2 className="text-xl font-bold mb-4">Faturas Abertas</h2>
           <div className="space-y-4">
             {data.cardInvoices.map(invoice => (

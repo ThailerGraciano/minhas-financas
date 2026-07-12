@@ -5,9 +5,16 @@ import { createTransaction } from "@/app/actions/transactions";
 import { CategoryIcon } from "@/components/category-icon";
 import { QuickCategoryDialog } from "@/components/quick-category-dialog";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,7 +34,10 @@ type Account = FormData["accounts"][0];
 type CreditCard = FormData["creditCards"][0];
 type NewTransaction = typeof transactions.$inferInsert;
 
-export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.ReactNode, onSuccess?: () => void } = {}) {
+export function TransactionFormDialog({
+  trigger,
+  onSuccess,
+}: { trigger?: React.ReactNode; onSuccess?: () => void } = {}) {
   const [open, setOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [formData, setFormData] = useState<FormData | null>(null);
@@ -40,7 +50,7 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("");
   const [selectedCreditCardId, setSelectedCreditCardId] = useState("");
   const [selectedInvoiceMonth, setSelectedInvoiceMonth] = useState("");
-  const [isTotalAmount, setIsTotalAmount] = useState(false);
+  const [isTotalAmount, setIsTotalAmount] = useState(true);
 
   const router = useRouter();
 
@@ -96,7 +106,6 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
     }
   };
 
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsPending(true);
@@ -139,19 +148,20 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
 
       if (expenseType === "installment") {
         baseData.installmentTotal = Number(form.get("installmentTotal"));
+        baseData.current_installment = Number(form.get("current_installment"));
         baseData.isTotalAmount = isTotalAmount;
       }
     } else if (tab === "income") {
       baseData.type = "income";
       baseData.accountId = Number(form.get("accountIdIncome"));
-      
+
       baseData.isFixed = expenseType === "fixed";
 
       if (expenseType === "installment") {
         baseData.installmentTotal = Number(form.get("installmentTotal"));
+        baseData.current_installment = Number(form.get("current_installment"));
         baseData.isTotalAmount = isTotalAmount;
       }
-
     } else if (tab === "transfer") {
       baseData.type = "transfer";
       baseData.accountId = Number(form.get("accountIdTransferOrigin"));
@@ -175,13 +185,13 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
     const data = await getTransactionFormData();
     setFormData(data);
     setSelectedCategoryId(newCategoryId);
-    
+
     if (newSubcategoryId) {
       setSelectedSubcategoryId(newSubcategoryId);
     } else {
       // Find "Geral" subcategory for this category to select it
-      const cat = data.categories.find(c => c.id === Number(newCategoryId));
-      const geralSub = cat?.subcategories.find(sc => sc.name === 'Geral');
+      const cat = data.categories.find((c) => c.id === Number(newCategoryId));
+      const geralSub = cat?.subcategories.find((sc) => sc.name === "Geral");
       if (geralSub) {
         setSelectedSubcategoryId(String(geralSub.id));
       } else {
@@ -222,13 +232,15 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {trigger ? trigger : (
+        {trigger ? (
+          trigger
+        ) : (
           <Button className="cursor-pointer fixed bottom-20 md:bottom-8 right-4 md:right-8 rounded-full h-14 w-14 shadow-2xl p-0 bg-gradient-to-br from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 transition-all hover:scale-110 active:scale-95 z-[100] border-none flex items-center justify-center">
             <Plus className="h-7 w-7 text-white pointer-events-none" />
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[650px]">
         <DialogHeader>
           <DialogTitle>Nova Transação</DialogTitle>
           <DialogDescription className="sr-only">
@@ -256,24 +268,38 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-6">
               <div className="grid gap-3">
-                <Label htmlFor="description" className="text-muted-foreground ml-1">Descrição</Label>
-                <Input id="description" name="description" required placeholder="Ex: Mercado, Salário..." className="text-lg" />
+                <Label htmlFor="description" className="text-muted-foreground ml-1">
+                  Descrição
+                </Label>
+                <Input
+                  id="description"
+                  name="description"
+                  required
+                  placeholder="Ex: Mercado, Salário..."
+                  className="text-lg"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-5">
                 <div className="grid gap-3">
-                  <Label htmlFor="amount" className="text-muted-foreground ml-1">Valor</Label>
+                  <Label htmlFor="amount" className="text-muted-foreground ml-1">
+                    Valor
+                  </Label>
                   <CurrencyInput id="amount" name="amount" required />
                 </div>
                 <div className="grid gap-3">
-                  <Label htmlFor="date" className="text-muted-foreground ml-1">Data</Label>
+                  <Label htmlFor="date" className="text-muted-foreground ml-1">
+                    Data
+                  </Label>
                   <DatePicker id="date" name="date" defaultValue={format(new Date(), "yyyy-MM-dd")} required />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-5">
                 <div className="grid gap-3">
-                  <Label htmlFor="categoryId" className="text-muted-foreground ml-1">Categoria</Label>
+                  <Label htmlFor="categoryId" className="text-muted-foreground ml-1">
+                    Categoria
+                  </Label>
                   <input type="hidden" name="categoryId" value={selectedCategoryId} required />
                   <div className="flex gap-2">
                     <Select value={selectedCategoryId} onValueChange={handleCategoryChange}>
@@ -296,23 +322,33 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
                 </div>
                 <div className="grid gap-3">
                   <Label htmlFor="subcategoryId" className="text-muted-foreground ml-1">Subcategoria</Label>
-                  <select
-                    name="subcategoryId"
-                    value={selectedSubcategoryId}
-                    onChange={(e) => setSelectedSubcategoryId(e.target.value)}
-                    className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10 disabled:opacity-50"
-                    disabled={!selectedCategoryId || activeSubcategories.length === 0}
-                    required={tab !== "transfer"}
-                  >
-                    {activeSubcategories.length === 0 && (
-                      <option value="">Selecione uma categoria primeiro</option>
-                    )}
-                    {activeSubcategories.map((sc: Subcategory) => (
-                      <option key={sc.id} value={sc.id}>
-                        {sc.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex gap-2">
+                    <select
+                      name="subcategoryId"
+                      value={selectedSubcategoryId}
+                      onChange={(e) => setSelectedSubcategoryId(e.target.value)}
+                      className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10 disabled:opacity-50"
+                      disabled={!selectedCategoryId}
+                      required={tab !== "transfer"}
+                    >
+                      {activeSubcategories.length === 0 && <option value="">Nenhuma subcategoria disponível</option>}
+                      {activeSubcategories.map((sc: Subcategory) => (
+                        <option key={sc.id} value={sc.id}>
+                          {sc.name}
+                        </option>
+                      ))}
+                    </select>
+                    <QuickCategoryDialog
+                      type={tab === "income" ? "income" : "expense"}
+                      onSuccess={(catId, subCatId) => {
+                        handleCategoryCreated(catId, subCatId);
+                        setSelectedSubcategoryId(subCatId);
+                      }}
+                      isSubcategoryMode={true}
+                      parentCategoryId={selectedCategoryId}
+                      parentCategoryName={filteredCategories.find(c => String(c.id) === selectedCategoryId)?.name}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -352,28 +388,48 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
 
                 {tab === "expense" && expenseType === "installment" && (
                   <div className="space-y-5">
-                    <div className="grid gap-3">
-                      <Label htmlFor="installmentTotal" className="text-muted-foreground ml-1">Quantidade de Parcelas</Label>
-                      <Input
-                        id="installmentTotal"
-                        name="installmentTotal"
-                        type="number"
-                        min="2"
-                        defaultValue="2"
-                        required
-                      />
+                    <div className="grid grid-cols-2 gap-5">
+                      <div className="grid gap-3">
+                        <Label htmlFor="current_installment" className="text-muted-foreground ml-1">
+                          Parcela Atual/Inicial
+                        </Label>
+                        <Input
+                          id="current_installment"
+                          name="current_installment"
+                          type="number"
+                          min="1"
+                          defaultValue="1"
+                          required
+                        />
+                        <p className="text-xs text-muted-foreground ml-1">
+                          Ex: Para a parcela 5 de 48, digite 5.
+                        </p>
+                      </div>
+                      <div className="grid gap-3">
+                        <Label htmlFor="installmentTotal" className="text-muted-foreground ml-1">
+                          Total de Parcelas
+                        </Label>
+                        <Input
+                          id="installmentTotal"
+                          name="installmentTotal"
+                          type="number"
+                          min="2"
+                          defaultValue="2"
+                          required
+                        />
+                      </div>
                     </div>
                     <div className="flex flex-row items-center justify-between rounded-lg border p-4">
                       <div className="space-y-0.5">
-                        <Label className="text-base cursor-pointer" onClick={() => setIsTotalAmount(!isTotalAmount)}>O valor digitado é o total da compra?</Label>
+                        <Label className="text-base cursor-pointer" onClick={() => setIsTotalAmount(!isTotalAmount)}>
+                          O valor digitado é o total da compra?
+                        </Label>
                         <p className="text-sm text-muted-foreground">
-                          Se marcado, o valor será dividido pelo número de parcelas. Se desmarcado, o valor será o de cada parcela individual.
+                          Se marcado, o valor será dividido pelo número de parcelas. Se desmarcado, o valor será o de
+                          cada parcela individual.
                         </p>
                       </div>
-                      <Switch
-                        checked={isTotalAmount}
-                        onCheckedChange={setIsTotalAmount}
-                      />
+                      <Switch checked={isTotalAmount} onCheckedChange={setIsTotalAmount} />
                     </div>
                   </div>
                 )}
@@ -392,7 +448,9 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
 
                 {paymentMethod === "account" && (
                   <div className="grid gap-3">
-                    <Label htmlFor="accountId" className="text-muted-foreground ml-1">Conta</Label>
+                    <Label htmlFor="accountId" className="text-muted-foreground ml-1">
+                      Conta
+                    </Label>
                     <select
                       name="accountId"
                       className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
@@ -410,7 +468,9 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
                 {paymentMethod === "credit_card" && (
                   <>
                     <div className="grid gap-3">
-                      <Label htmlFor="creditCardId" className="text-muted-foreground ml-1">Cartão de Crédito</Label>
+                      <Label htmlFor="creditCardId" className="text-muted-foreground ml-1">
+                        Cartão de Crédito
+                      </Label>
                       <select
                         name="creditCardId"
                         value={selectedCreditCardId}
@@ -429,7 +489,9 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
 
                     {selectedCreditCardId && invoiceOptions.length > 0 && (
                       <div className="grid gap-3">
-                        <Label htmlFor="invoiceMonth" className="text-muted-foreground ml-1">Fatura</Label>
+                        <Label htmlFor="invoiceMonth" className="text-muted-foreground ml-1">
+                          Fatura
+                        </Label>
                         <select
                           name="invoiceMonth"
                           value={selectedInvoiceMonth}
@@ -451,7 +513,9 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
 
               <TabsContent value="income" className="space-y-6">
                 <div className="grid gap-3">
-                  <Label htmlFor="accountIdIncome" className="text-muted-foreground ml-1">Depositar na Conta</Label>
+                  <Label htmlFor="accountIdIncome" className="text-muted-foreground ml-1">
+                    Depositar na Conta
+                  </Label>
                   <select
                     name="accountIdIncome"
                     id="accountIdIncome"
@@ -501,28 +565,48 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
 
                 {tab === "income" && expenseType === "installment" && (
                   <div className="space-y-5">
-                    <div className="grid gap-3">
-                      <Label htmlFor="installmentTotal" className="text-muted-foreground ml-1">Quantidade de Parcelas</Label>
-                      <Input
-                        id="installmentTotal"
-                        name="installmentTotal"
-                        type="number"
-                        min="2"
-                        defaultValue="2"
-                        required
-                      />
+                    <div className="grid grid-cols-2 gap-5">
+                      <div className="grid gap-3">
+                        <Label htmlFor="current_installment" className="text-muted-foreground ml-1">
+                          Parcela Atual/Inicial
+                        </Label>
+                        <Input
+                          id="current_installment"
+                          name="current_installment"
+                          type="number"
+                          min="1"
+                          defaultValue="1"
+                          required
+                        />
+                        <p className="text-xs text-muted-foreground ml-1">
+                          Ex: Para a parcela 5 de 48, digite 5.
+                        </p>
+                      </div>
+                      <div className="grid gap-3">
+                        <Label htmlFor="installmentTotal" className="text-muted-foreground ml-1">
+                          Total de Parcelas
+                        </Label>
+                        <Input
+                          id="installmentTotal"
+                          name="installmentTotal"
+                          type="number"
+                          min="2"
+                          defaultValue="2"
+                          required
+                        />
+                      </div>
                     </div>
                     <div className="flex flex-row items-center justify-between rounded-lg border p-4">
                       <div className="space-y-0.5">
-                        <Label className="text-base cursor-pointer" onClick={() => setIsTotalAmount(!isTotalAmount)}>O valor digitado é o total da compra?</Label>
+                        <Label className="text-base cursor-pointer" onClick={() => setIsTotalAmount(!isTotalAmount)}>
+                          O valor digitado é o total da compra?
+                        </Label>
                         <p className="text-sm text-muted-foreground">
-                          Se marcado, o valor será dividido pelo número de parcelas. Se desmarcado, o valor será o de cada parcela individual.
+                          Se marcado, o valor será dividido pelo número de parcelas. Se desmarcado, o valor será o de
+                          cada parcela individual.
                         </p>
                       </div>
-                      <Switch
-                        checked={isTotalAmount}
-                        onCheckedChange={setIsTotalAmount}
-                      />
+                      <Switch checked={isTotalAmount} onCheckedChange={setIsTotalAmount} />
                     </div>
                   </div>
                 )}
@@ -530,7 +614,9 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
 
               <TabsContent value="transfer" className="space-y-6">
                 <div className="grid gap-3">
-                  <Label htmlFor="accountIdTransferOrigin" className="text-muted-foreground ml-1">Conta de Origem</Label>
+                  <Label htmlFor="accountIdTransferOrigin" className="text-muted-foreground ml-1">
+                    Conta de Origem
+                  </Label>
                   <select
                     name="accountIdTransferOrigin"
                     id="accountIdTransferOrigin"
@@ -545,7 +631,9 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
                   </select>
                 </div>
                 <div className="grid gap-3">
-                  <Label htmlFor="accountIdTransferDest" className="text-muted-foreground ml-1">Conta de Destino</Label>
+                  <Label htmlFor="accountIdTransferDest" className="text-muted-foreground ml-1">
+                    Conta de Destino
+                  </Label>
                   <select
                     name="accountIdTransferDest"
                     id="accountIdTransferDest"
@@ -561,9 +649,7 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
                 </div>
               </TabsContent>
 
-              {formError && (
-                <p className="text-sm text-destructive text-center">{formError}</p>
-              )}
+              {formError && <p className="text-sm text-destructive text-center">{formError}</p>}
 
               <div className="pt-6 flex justify-end">
                 <Button type="submit" disabled={isPending} className="w-full sm:w-auto mt-2">

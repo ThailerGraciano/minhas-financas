@@ -1,0 +1,774 @@
+From 3cfd84e9065c472a1ed497dd9bd9515dda0cba32 Mon Sep 17 00:00:00 2001
+From: Thailer Graciano <thailer.graciano@outlook.com>
+Date: Tue, 7 Jul 2026 17:09:28 -0300
+Subject: [PATCH] ajustes de lauyout
+
+---
+ src/app/(main)/credit-cards/[id]/page.tsx     |  14 +-
+ src/app/(main)/page.tsx                       |   4 +-
+ .../(main)/transactions/transaction-list.tsx  |  47 ++--
+ src/app/actions/transactions.ts               |  28 ++-
+ src/app/layout.tsx                            |   1 -
+ src/auth.config.ts                            |   1 +
+ .../account-income-expense-chart.tsx          |   5 +-
+ .../account-vs-global-expense-chart.tsx       |   5 +-
+ .../global-income-expense-chart.tsx           |   2 +-
+ src/components/mode-toggle.tsx                |  38 +---
+ src/components/purchasing-power-chart.tsx     |   4 +-
+ src/components/transaction-form-dialog.tsx    | 201 ++++++++++++------
+ 12 files changed, 210 insertions(+), 140 deletions(-)
+
+diff --git a/src/app/(main)/credit-cards/[id]/page.tsx b/src/app/(main)/credit-cards/[id]/page.tsx
+index 4829bfe..9c311e8 100644
+--- a/src/app/(main)/credit-cards/[id]/page.tsx
++++ b/src/app/(main)/credit-cards/[id]/page.tsx
+@@ -45,8 +45,8 @@ export default async function CreditCardInvoicePage(props: {
+   };
+ 
+   const formatDate = (dateStr: string) => {
+-    const [year, month, day] = dateStr.split('-');
+-    return `${day}/${month}/${year}`;
++    const [, month, day] = dateStr.split('-');
++    return `${day}/${month}`;
+   };
+ 
+   return (
+@@ -161,11 +161,11 @@ export default async function CreditCardInvoicePage(props: {
+                   {summary.transactions.map((tx) => (
+                     <TableRow key={tx.id}>
+                       <TableCell className="font-medium whitespace-nowrap">{formatDate(tx.date)}</TableCell>
+-                      <TableCell>
+-                        <div className="flex flex-col">
+-                          <span className="font-medium">{tx.description}</span>
+-                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+-                            <span className="bg-muted px-1.5 py-0.5 rounded-sm">{tx.category?.name || 'Sem categoria'}</span>
++                      <TableCell className="max-w-[120px] sm:max-w-[250px]">
++                        <div className="flex flex-col overflow-hidden">
++                          <span className="font-medium truncate" title={tx.description}>{tx.description}</span>
++                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 overflow-hidden">
++                            <span className="bg-muted px-1.5 py-0.5 rounded-sm truncate" title={tx.category?.name || 'Sem categoria'}>{tx.category?.name || 'Sem categoria'}</span>
+                           </div>
+                         </div>
+                       </TableCell>
+diff --git a/src/app/(main)/page.tsx b/src/app/(main)/page.tsx
+index 85175e8..99eb97c 100644
+--- a/src/app/(main)/page.tsx
++++ b/src/app/(main)/page.tsx
+@@ -44,7 +44,7 @@ export default async function DashboardPage(props: { searchParams?: Promise<{ [k
+       <AccountBalancesSummary balances={balancesData.balancesByType} totalBalance={balancesData.totalBalance} />
+ 
+       {/* Gráfico de Evolução de Saldo */}
+-      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm">
++      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
+         <div className="flex flex-row items-center gap-2 mb-4">
+           <TrendingUp className="h-5 w-5 text-primary" />
+           <div>
+@@ -72,7 +72,7 @@ export default async function DashboardPage(props: { searchParams?: Promise<{ [k
+       </div>
+ 
+       {/* Gráfico de Parcelas */}
+-      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm">
++      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
+         <div className="flex flex-row items-center gap-2 mb-4">
+           <Layers className="h-5 w-5 text-primary" />
+           <div>
+diff --git a/src/app/(main)/transactions/transaction-list.tsx b/src/app/(main)/transactions/transaction-list.tsx
+index cdf374f..67eb0c3 100644
+--- a/src/app/(main)/transactions/transaction-list.tsx
++++ b/src/app/(main)/transactions/transaction-list.tsx
+@@ -22,13 +22,7 @@ import {
+   AlertDialogHeader,
+   AlertDialogTitle,
+ } from "@/components/ui/alert-dialog";
+-import {
+-  DropdownMenu,
+-  DropdownMenuContent,
+-  DropdownMenuItem,
+-  DropdownMenuTrigger,
+-} from "@/components/ui/dropdown-menu";
+-import { MoreHorizontal, Pencil, Trash } from "lucide-react";
++import { Pencil, Trash } from "lucide-react";
+ 
+ export type TransactionWithRelations = {
+   id: number;
+@@ -294,25 +288,22 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
+                   </div>
+ 
+                   {!tx.isGroup && (
+-                    <DropdownMenu>
+-                      <DropdownMenuTrigger className="p-2 hover:bg-muted rounded-full transition-colors focus:outline-none">
+-                        <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
+-                      </DropdownMenuTrigger>
+-                      <DropdownMenuContent align="end" className="rounded-2xl">
+-                        <DropdownMenuItem
+-                          className="cursor-pointer rounded-xl"
+-                          onClick={() => setTransactionToEdit(tx)}
+-                        >
+-                          <Pencil className="w-4 h-4 mr-2" /> Editar
+-                        </DropdownMenuItem>
+-                        <DropdownMenuItem
+-                          className="cursor-pointer text-destructive focus:text-destructive rounded-xl"
+-                          onClick={() => setTransactionToDelete(tx)}
+-                        >
+-                          <Trash className="w-4 h-4 mr-2" /> Excluir
+-                        </DropdownMenuItem>
+-                      </DropdownMenuContent>
+-                    </DropdownMenu>
++                    <div className="flex items-center gap-0.5 md:gap-1">
++                      <button
++                        onClick={() => setTransactionToEdit(tx)}
++                        className="p-2 text-muted-foreground hover:bg-muted hover:text-foreground rounded-full transition-colors focus:outline-none"
++                        title="Editar"
++                      >
++                        <Pencil className="w-4 h-4 md:w-[18px] md:h-[18px]" />
++                      </button>
++                      <button
++                        onClick={() => setTransactionToDelete(tx)}
++                        className="p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-full transition-colors focus:outline-none"
++                        title="Excluir"
++                      >
++                        <Trash className="w-4 h-4 md:w-[18px] md:h-[18px]" />
++                      </button>
++                    </div>
+                   )}
+                 </div>
+               </div>
+@@ -330,7 +321,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
+ 
+       {/* Delete Alert */}
+       <AlertDialog open={!!transactionToDelete} onOpenChange={(open) => !open && setTransactionToDelete(null)}>
+-        <AlertDialogContent>
++        <AlertDialogContent className="sm:max-w-[500px]">
+           {transactionToDelete &&
+           (transactionToDelete.fixedTransactionId ||
+             (transactionToDelete.installmentTotal && transactionToDelete.installmentTotal > 1)) ? (
+@@ -342,7 +333,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
+                   esta e todas as próximas?
+                 </AlertDialogDescription>
+               </AlertDialogHeader>
+-              <AlertDialogFooter className="flex flex-col sm:flex-row gap-2">
++              <AlertDialogFooter className="flex flex-col sm:flex-row gap-2 flex-wrap sm:justify-end">
+                 <AlertDialogCancel disabled={isDeleting} className="cursor-pointer">
+                   Cancelar
+                 </AlertDialogCancel>
+diff --git a/src/app/actions/transactions.ts b/src/app/actions/transactions.ts
+index 11596f5..eb0b1da 100644
+--- a/src/app/actions/transactions.ts
++++ b/src/app/actions/transactions.ts
+@@ -9,7 +9,7 @@ import { z } from 'zod';
+ import { auth } from '@/auth';
+ 
+ type NewTransaction = typeof transactions.$inferInsert;
+-type CreateTransactionInput = Omit<NewTransaction, 'userId'> & { destinationAccountId?: number; isFixed?: boolean; isTotalAmount?: boolean };
++type CreateTransactionInput = Omit<NewTransaction, 'userId'> & { destinationAccountId?: number; isFixed?: boolean; isTotalAmount?: boolean; current_installment?: number };
+ 
+ const transactionSchema = z.object({
+   description: z.string().min(1, 'Descrição é obrigatória'),
+@@ -20,7 +20,17 @@ const transactionSchema = z.object({
+   type: z.string().min(1),
+   status: z.string().min(1),
+   isTotalAmount: z.boolean().optional().default(false),
+-}).passthrough();
++  installmentTotal: z.coerce.number().optional(),
++  current_installment: z.coerce.number().min(1).default(1),
++}).passthrough().superRefine((data, ctx) => {
++  if (data.installmentTotal && data.current_installment > data.installmentTotal) {
++    ctx.addIssue({
++      code: z.ZodIssueCode.custom,
++      message: 'A parcela inicial não pode ser maior que o total de parcelas.',
++      path: ['current_installment'],
++    });
++  }
++});
+ 
+ const subcategoryRequiredTypes = ['income', 'expense', 'credit_card_expense'];
+ 
+@@ -127,7 +137,7 @@ export async function createTransaction(data: CreateTransactionInput): Promise<{
+   }
+ 
+   try {
+-    const { isFixed, destinationAccountId, isTotalAmount, ...txData } = data;
++    const { isFixed, destinationAccountId, isTotalAmount, current_installment, ...txData } = data;
+ 
+     if (txData.type === 'transfer' && destinationAccountId) {
+       const result = await db.transaction(async (tx) => {
+@@ -210,22 +220,26 @@ export async function createTransaction(data: CreateTransactionInput): Promise<{
+         lastParcelAmount = lastValue.toFixed(2);
+       }
+ 
++      const currentInstallment = current_installment || 1;
++
+       const [parentTx] = await db.insert(transactions).values({
+         ...txData,
++        description: `${txData.description} (${currentInstallment}/${txData.installmentTotal})`,
+         userId,
+-        amount: baseParcelAmount,
+-        installmentCurrent: 1,
++        amount: currentInstallment === txData.installmentTotal ? lastParcelAmount : baseParcelAmount,
++        installmentCurrent: currentInstallment,
+       }).returning();
+ 
+       const installmentsToInsert: NewTransaction[] = [];
+       const baseDate = parseISO(data.date);
+ 
+-      for (let i = 2; i <= txData.installmentTotal; i++) {
+-        const nextDate = addMonths(baseDate, i - 1);
++      for (let i = currentInstallment + 1; i <= txData.installmentTotal; i++) {
++        const nextDate = addMonths(baseDate, i - currentInstallment);
+         const isLast = i === txData.installmentTotal;
+ 
+         installmentsToInsert.push({
+           ...txData,
++          description: `${txData.description} (${i}/${txData.installmentTotal})`,
+           userId,
+           amount: isLast ? lastParcelAmount : baseParcelAmount,
+           date: format(nextDate, 'yyyy-MM-dd'),
+diff --git a/src/app/layout.tsx b/src/app/layout.tsx
+index 7418270..b08fd61 100644
+--- a/src/app/layout.tsx
++++ b/src/app/layout.tsx
+@@ -21,7 +21,6 @@ export default function RootLayout({
+         <ThemeProvider
+           attribute="class"
+           defaultTheme="dark"
+-          enableSystem
+           disableTransitionOnChange
+         >
+           {children}
+diff --git a/src/auth.config.ts b/src/auth.config.ts
+index 3ccba81..77faa73 100644
+--- a/src/auth.config.ts
++++ b/src/auth.config.ts
+@@ -11,4 +11,5 @@ export const authConfig = {
+       return true; // Lógica de proteção de rotas pode ser feita aqui
+     },
+   },
++  trustHost: true,
+ } satisfies NextAuthConfig;
+diff --git a/src/components/account-income-expense-chart.tsx b/src/components/account-income-expense-chart.tsx
+index 17e1615..7c80ec6 100644
+--- a/src/components/account-income-expense-chart.tsx
++++ b/src/components/account-income-expense-chart.tsx
+@@ -55,6 +55,7 @@ export function AccountIncomeExpenseChart({ initialData, competencyMonth }: Acco
+   const [isPending, startTransition] = useTransition();
+ 
+   useEffect(() => {
++    // eslint-disable-next-line react-hooks/set-state-in-effect
+     setData(initialData);
+     setShowOnlyPaid(false);
+   }, [initialData]);
+@@ -71,14 +72,14 @@ export function AccountIncomeExpenseChart({ initialData, competencyMonth }: Acco
+ 
+   if (!data || data.length === 0) {
+     return (
+-      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm flex items-center justify-center h-[260px] text-sm text-muted-foreground">
++      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm flex items-center justify-center h-[260px] text-sm text-muted-foreground w-full min-w-0">
+         Nenhuma conta cadastrada para exibir o gráfico.
+       </div>
+     );
+   }
+ 
+   return (
+-    <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm">
++    <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
+       <div className="flex items-center justify-between mb-4">
+         <h2 className="text-xl font-bold">Receitas e Despesas por Conta</h2>
+         <div className="flex items-center space-x-2">
+diff --git a/src/components/account-vs-global-expense-chart.tsx b/src/components/account-vs-global-expense-chart.tsx
+index 426b30d..96f02fe 100644
+--- a/src/components/account-vs-global-expense-chart.tsx
++++ b/src/components/account-vs-global-expense-chart.tsx
+@@ -55,6 +55,7 @@ export function AccountVsGlobalExpenseChart({ initialData, competencyMonth }: Ac
+   const [isPending, startTransition] = useTransition();
+ 
+   useEffect(() => {
++    // eslint-disable-next-line react-hooks/set-state-in-effect
+     setData(initialData);
+     setShowOnlyPaid(false);
+   }, [initialData]);
+@@ -71,14 +72,14 @@ export function AccountVsGlobalExpenseChart({ initialData, competencyMonth }: Ac
+ 
+   if (!data || data.length === 0) {
+     return (
+-      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm flex items-center justify-center h-[260px] text-sm text-muted-foreground">
++      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm flex items-center justify-center h-[260px] text-sm text-muted-foreground w-full min-w-0">
+         Nenhuma conta cadastrada para exibir o gráfico.
+       </div>
+     );
+   }
+ 
+   return (
+-    <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm">
++    <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
+       <div className="flex items-center justify-between mb-4">
+         <h2 className="text-xl font-bold">Poder de Pagamento (Receitas vs Despesa Global)</h2>
+         <div className="flex items-center space-x-2">
+diff --git a/src/components/global-income-expense-chart.tsx b/src/components/global-income-expense-chart.tsx
+index e97b99e..1b36a54 100644
+--- a/src/components/global-income-expense-chart.tsx
++++ b/src/components/global-income-expense-chart.tsx
+@@ -73,7 +73,7 @@ export function GlobalIncomeExpenseChart({ initialData, competencyMonth }: Globa
+   const chartData = [data];
+ 
+   return (
+-    <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm">
++    <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
+       <div className="flex items-center justify-between mb-4">
+         <h2 className="text-xl font-bold">Comparativo Geral</h2>
+         <div className="flex items-center space-x-2">
+diff --git a/src/components/mode-toggle.tsx b/src/components/mode-toggle.tsx
+index d4c2ffb..c8963c2 100644
+--- a/src/components/mode-toggle.tsx
++++ b/src/components/mode-toggle.tsx
+@@ -5,36 +5,20 @@ import { Moon, Sun } from 'lucide-react';
+ import { useTheme } from 'next-themes';
+ 
+ import { Button } from '@/components/ui/button';
+-import {
+-  DropdownMenu,
+-  DropdownMenuContent,
+-  DropdownMenuItem,
+-  DropdownMenuTrigger,
+-} from '@/components/ui/dropdown-menu';
+ 
+ export function ModeToggle() {
+-  const { setTheme } = useTheme();
++  const { theme, setTheme } = useTheme();
+ 
+   return (
+-    <DropdownMenu>
+-      <DropdownMenuTrigger asChild>
+-        <Button variant="outline" size="icon">
+-          <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+-          <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+-          <span className="sr-only">Toggle theme</span>
+-        </Button>
+-      </DropdownMenuTrigger>
+-      <DropdownMenuContent align="end">
+-        <DropdownMenuItem onClick={() => setTheme('light')}>
+-          Claro
+-        </DropdownMenuItem>
+-        <DropdownMenuItem onClick={() => setTheme('dark')}>
+-          Escuro
+-        </DropdownMenuItem>
+-        <DropdownMenuItem onClick={() => setTheme('system')}>
+-          Sistema
+-        </DropdownMenuItem>
+-      </DropdownMenuContent>
+-    </DropdownMenu>
++    <Button
++      variant="outline"
++      size="icon"
++      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
++      className="bg-transparent border-transparent"
++    >
++      <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-muted-foreground" />
++      <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-muted-foreground" />
++      <span className="sr-only">Alternar tema</span>
++    </Button>
+   );
+ }
+diff --git a/src/components/purchasing-power-chart.tsx b/src/components/purchasing-power-chart.tsx
+index c0ae231..70e0576 100644
+--- a/src/components/purchasing-power-chart.tsx
++++ b/src/components/purchasing-power-chart.tsx
+@@ -77,14 +77,14 @@ export function PurchasingPowerChart({ initialData, competencyMonth }: Purchasin
+ 
+   if (!data || data.length === 0) {
+     return (
+-      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm flex items-center justify-center h-[260px] text-sm text-muted-foreground">
++      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm flex items-center justify-center h-[260px] text-sm text-muted-foreground w-full min-w-0">
+         Nenhuma conta cadastrada para exibir o gráfico.
+       </div>
+     );
+   }
+ 
+   return (
+-    <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm">
++    <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
+       <div className="flex items-center justify-between mb-4">
+         <h2 className="text-xl font-bold">Poder de Compra (Saldo + Receita vs Despesa)</h2>
+         <div className="flex items-center space-x-2">
+diff --git a/src/components/transaction-form-dialog.tsx b/src/components/transaction-form-dialog.tsx
+index cf0e7ad..51e70ba 100644
+--- a/src/components/transaction-form-dialog.tsx
++++ b/src/components/transaction-form-dialog.tsx
+@@ -5,9 +5,16 @@ import { createTransaction } from "@/app/actions/transactions";
+ import { CategoryIcon } from "@/components/category-icon";
+ import { QuickCategoryDialog } from "@/components/quick-category-dialog";
+ import { Button } from "@/components/ui/button";
+-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+ import { CurrencyInput } from "@/components/ui/currency-input";
+ import { DatePicker } from "@/components/ui/date-picker";
++import {
++  Dialog,
++  DialogContent,
++  DialogDescription,
++  DialogHeader,
++  DialogTitle,
++  DialogTrigger,
++} from "@/components/ui/dialog";
+ import { Input } from "@/components/ui/input";
+ import { Label } from "@/components/ui/label";
+ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+@@ -27,7 +34,10 @@ type Account = FormData["accounts"][0];
+ type CreditCard = FormData["creditCards"][0];
+ type NewTransaction = typeof transactions.$inferInsert;
+ 
+-export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.ReactNode, onSuccess?: () => void } = {}) {
++export function TransactionFormDialog({
++  trigger,
++  onSuccess,
++}: { trigger?: React.ReactNode; onSuccess?: () => void } = {}) {
+   const [open, setOpen] = useState(false);
+   const [isPending, setIsPending] = useState(false);
+   const [formData, setFormData] = useState<FormData | null>(null);
+@@ -40,7 +50,7 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
+   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("");
+   const [selectedCreditCardId, setSelectedCreditCardId] = useState("");
+   const [selectedInvoiceMonth, setSelectedInvoiceMonth] = useState("");
+-  const [isTotalAmount, setIsTotalAmount] = useState(false);
++  const [isTotalAmount, setIsTotalAmount] = useState(true);
+ 
+   const router = useRouter();
+ 
+@@ -96,7 +106,6 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
+     }
+   };
+ 
+-
+   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+     e.preventDefault();
+     setIsPending(true);
+@@ -139,19 +148,20 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
+ 
+       if (expenseType === "installment") {
+         baseData.installmentTotal = Number(form.get("installmentTotal"));
++        baseData.current_installment = Number(form.get("current_installment"));
+         baseData.isTotalAmount = isTotalAmount;
+       }
+     } else if (tab === "income") {
+       baseData.type = "income";
+       baseData.accountId = Number(form.get("accountIdIncome"));
+-      
++
+       baseData.isFixed = expenseType === "fixed";
+ 
+       if (expenseType === "installment") {
+         baseData.installmentTotal = Number(form.get("installmentTotal"));
++        baseData.current_installment = Number(form.get("current_installment"));
+         baseData.isTotalAmount = isTotalAmount;
+       }
+-
+     } else if (tab === "transfer") {
+       baseData.type = "transfer";
+       baseData.accountId = Number(form.get("accountIdTransferOrigin"));
+@@ -175,13 +185,13 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
+     const data = await getTransactionFormData();
+     setFormData(data);
+     setSelectedCategoryId(newCategoryId);
+-    
++
+     if (newSubcategoryId) {
+       setSelectedSubcategoryId(newSubcategoryId);
+     } else {
+       // Find "Geral" subcategory for this category to select it
+-      const cat = data.categories.find(c => c.id === Number(newCategoryId));
+-      const geralSub = cat?.subcategories.find(sc => sc.name === 'Geral');
++      const cat = data.categories.find((c) => c.id === Number(newCategoryId));
++      const geralSub = cat?.subcategories.find((sc) => sc.name === "Geral");
+       if (geralSub) {
+         setSelectedSubcategoryId(String(geralSub.id));
+       } else {
+@@ -222,7 +232,9 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
+   return (
+     <Dialog open={open} onOpenChange={setOpen}>
+       <DialogTrigger asChild>
+-        {trigger ? trigger : (
++        {trigger ? (
++          trigger
++        ) : (
+           <Button className="cursor-pointer fixed bottom-20 md:bottom-8 right-4 md:right-8 rounded-full h-14 w-14 shadow-2xl p-0 bg-gradient-to-br from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 transition-all hover:scale-110 active:scale-95 z-[100] border-none flex items-center justify-center">
+             <Plus className="h-7 w-7 text-white pointer-events-none" />
+           </Button>
+@@ -256,24 +268,38 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
+ 
+             <form onSubmit={handleSubmit} className="mt-6 space-y-6">
+               <div className="grid gap-3">
+-                <Label htmlFor="description" className="text-muted-foreground ml-1">Descrição</Label>
+-                <Input id="description" name="description" required placeholder="Ex: Mercado, Salário..." className="text-lg" />
++                <Label htmlFor="description" className="text-muted-foreground ml-1">
++                  Descrição
++                </Label>
++                <Input
++                  id="description"
++                  name="description"
++                  required
++                  placeholder="Ex: Mercado, Salário..."
++                  className="text-lg"
++                />
+               </div>
+ 
+               <div className="grid grid-cols-2 gap-5">
+                 <div className="grid gap-3">
+-                  <Label htmlFor="amount" className="text-muted-foreground ml-1">Valor</Label>
++                  <Label htmlFor="amount" className="text-muted-foreground ml-1">
++                    Valor
++                  </Label>
+                   <CurrencyInput id="amount" name="amount" required />
+                 </div>
+                 <div className="grid gap-3">
+-                  <Label htmlFor="date" className="text-muted-foreground ml-1">Data</Label>
++                  <Label htmlFor="date" className="text-muted-foreground ml-1">
++                    Data
++                  </Label>
+                   <DatePicker id="date" name="date" defaultValue={format(new Date(), "yyyy-MM-dd")} required />
+                 </div>
+               </div>
+ 
+               <div className="grid grid-cols-2 gap-5">
+                 <div className="grid gap-3">
+-                  <Label htmlFor="categoryId" className="text-muted-foreground ml-1">Categoria</Label>
++                  <Label htmlFor="categoryId" className="text-muted-foreground ml-1">
++                    Categoria
++                  </Label>
+                   <input type="hidden" name="categoryId" value={selectedCategoryId} required />
+                   <div className="flex gap-2">
+                     <Select value={selectedCategoryId} onValueChange={handleCategoryChange}>
+@@ -291,11 +317,16 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
+                         ))}
+                       </SelectContent>
+                     </Select>
+-                    <QuickCategoryDialog type={tab === "income" ? "income" : "expense"} onSuccess={handleCategoryCreated} />
++                    <QuickCategoryDialog
++                      type={tab === "income" ? "income" : "expense"}
++                      onSuccess={handleCategoryCreated}
++                    />
+                   </div>
+                 </div>
+                 <div className="grid gap-3">
+-                  <Label htmlFor="subcategoryId" className="text-muted-foreground ml-1">Subcategoria</Label>
++                  <Label htmlFor="subcategoryId" className="text-muted-foreground ml-1">
++                    Subcategoria
++                  </Label>
+                   <select
+                     name="subcategoryId"
+                     value={selectedSubcategoryId}
+@@ -304,9 +335,7 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
+                     disabled={!selectedCategoryId || activeSubcategories.length === 0}
+                     required={tab !== "transfer"}
+                   >
+-                    {activeSubcategories.length === 0 && (
+-                      <option value="">Selecione uma categoria primeiro</option>
+-                    )}
++                    {activeSubcategories.length === 0 && <option value="">Selecione uma categoria primeiro</option>}
+                     {activeSubcategories.map((sc: Subcategory) => (
+                       <option key={sc.id} value={sc.id}>
+                         {sc.name}
+@@ -352,28 +381,48 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
+ 
+                 {tab === "expense" && expenseType === "installment" && (
+                   <div className="space-y-5">
+-                    <div className="grid gap-3">
+-                      <Label htmlFor="installmentTotal" className="text-muted-foreground ml-1">Quantidade de Parcelas</Label>
+-                      <Input
+-                        id="installmentTotal"
+-                        name="installmentTotal"
+-                        type="number"
+-                        min="2"
+-                        defaultValue="2"
+-                        required
+-                      />
++                    <div className="grid grid-cols-2 gap-5">
++                      <div className="grid gap-3">
++                        <Label htmlFor="current_installment" className="text-muted-foreground ml-1">
++                          Parcela Atual/Inicial
++                        </Label>
++                        <Input
++                          id="current_installment"
++                          name="current_installment"
++                          type="number"
++                          min="1"
++                          defaultValue="1"
++                          required
++                        />
++                        <p className="text-xs text-muted-foreground ml-1">
++                          Ex: Para a parcela 5 de 48, digite 5.
++                        </p>
++                      </div>
++                      <div className="grid gap-3">
++                        <Label htmlFor="installmentTotal" className="text-muted-foreground ml-1">
++                          Total de Parcelas
++                        </Label>
++                        <Input
++                          id="installmentTotal"
++                          name="installmentTotal"
++                          type="number"
++                          min="2"
++                          defaultValue="2"
++                          required
++                        />
++                      </div>
+                     </div>
+                     <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+                       <div className="space-y-0.5">
+-                        <Label className="text-base cursor-pointer" onClick={() => setIsTotalAmount(!isTotalAmount)}>O valor digitado é o total da compra?</Label>
++                        <Label className="text-base cursor-pointer" onClick={() => setIsTotalAmount(!isTotalAmount)}>
++                          O valor digitado é o total da compra?
++                        </Label>
+                         <p className="text-sm text-muted-foreground">
+-                          Se marcado, o valor será dividido pelo número de parcelas. Se desmarcado, o valor será o de cada parcela individual.
++                          Se marcado, o valor será dividido pelo número de parcelas. Se desmarcado, o valor será o de
++                          cada parcela individual.
+                         </p>
+                       </div>
+-                      <Switch
+-                        checked={isTotalAmount}
+-                        onCheckedChange={setIsTotalAmount}
+-                      />
++                      <Switch checked={isTotalAmount} onCheckedChange={setIsTotalAmount} />
+                     </div>
+                   </div>
+                 )}
+@@ -392,7 +441,9 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
+ 
+                 {paymentMethod === "account" && (
+                   <div className="grid gap-3">
+-                    <Label htmlFor="accountId" className="text-muted-foreground ml-1">Conta</Label>
++                    <Label htmlFor="accountId" className="text-muted-foreground ml-1">
++                      Conta
++                    </Label>
+                     <select
+                       name="accountId"
+                       className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
+@@ -410,7 +461,9 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
+                 {paymentMethod === "credit_card" && (
+                   <>
+                     <div className="grid gap-3">
+-                      <Label htmlFor="creditCardId" className="text-muted-foreground ml-1">Cartão de Crédito</Label>
++                      <Label htmlFor="creditCardId" className="text-muted-foreground ml-1">
++                        Cartão de Crédito
++                      </Label>
+                       <select
+                         name="creditCardId"
+                         value={selectedCreditCardId}
+@@ -429,7 +482,9 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
+ 
+                     {selectedCreditCardId && invoiceOptions.length > 0 && (
+                       <div className="grid gap-3">
+-                        <Label htmlFor="invoiceMonth" className="text-muted-foreground ml-1">Fatura</Label>
++                        <Label htmlFor="invoiceMonth" className="text-muted-foreground ml-1">
++                          Fatura
++                        </Label>
+                         <select
+                           name="invoiceMonth"
+                           value={selectedInvoiceMonth}
+@@ -451,7 +506,9 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
+ 
+               <TabsContent value="income" className="space-y-6">
+                 <div className="grid gap-3">
+-                  <Label htmlFor="accountIdIncome" className="text-muted-foreground ml-1">Depositar na Conta</Label>
++                  <Label htmlFor="accountIdIncome" className="text-muted-foreground ml-1">
++                    Depositar na Conta
++                  </Label>
+                   <select
+                     name="accountIdIncome"
+                     id="accountIdIncome"
+@@ -501,28 +558,48 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
+ 
+                 {tab === "income" && expenseType === "installment" && (
+                   <div className="space-y-5">
+-                    <div className="grid gap-3">
+-                      <Label htmlFor="installmentTotal" className="text-muted-foreground ml-1">Quantidade de Parcelas</Label>
+-                      <Input
+-                        id="installmentTotal"
+-                        name="installmentTotal"
+-                        type="number"
+-                        min="2"
+-                        defaultValue="2"
+-                        required
+-                      />
++                    <div className="grid grid-cols-2 gap-5">
++                      <div className="grid gap-3">
++                        <Label htmlFor="current_installment" className="text-muted-foreground ml-1">
++                          Parcela Atual/Inicial
++                        </Label>
++                        <Input
++                          id="current_installment"
++                          name="current_installment"
++                          type="number"
++                          min="1"
++                          defaultValue="1"
++                          required
++                        />
++                        <p className="text-xs text-muted-foreground ml-1">
++                          Ex: Para a parcela 5 de 48, digite 5.
++                        </p>
++                      </div>
++                      <div className="grid gap-3">
++                        <Label htmlFor="installmentTotal" className="text-muted-foreground ml-1">
++                          Total de Parcelas
++                        </Label>
++                        <Input
++                          id="installmentTotal"
++                          name="installmentTotal"
++                          type="number"
++                          min="2"
++                          defaultValue="2"
++                          required
++                        />
++                      </div>
+                     </div>
+                     <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+                       <div className="space-y-0.5">
+-                        <Label className="text-base cursor-pointer" onClick={() => setIsTotalAmount(!isTotalAmount)}>O valor digitado é o total da compra?</Label>
++                        <Label className="text-base cursor-pointer" onClick={() => setIsTotalAmount(!isTotalAmount)}>
++                          O valor digitado é o total da compra?
++                        </Label>
+                         <p className="text-sm text-muted-foreground">
+-                          Se marcado, o valor será dividido pelo número de parcelas. Se desmarcado, o valor será o de cada parcela individual.
++                          Se marcado, o valor será dividido pelo número de parcelas. Se desmarcado, o valor será o de
++                          cada parcela individual.
+                         </p>
+                       </div>
+-                      <Switch
+-                        checked={isTotalAmount}
+-                        onCheckedChange={setIsTotalAmount}
+-                      />
++                      <Switch checked={isTotalAmount} onCheckedChange={setIsTotalAmount} />
+                     </div>
+                   </div>
+                 )}
+@@ -530,7 +607,9 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
+ 
+               <TabsContent value="transfer" className="space-y-6">
+                 <div className="grid gap-3">
+-                  <Label htmlFor="accountIdTransferOrigin" className="text-muted-foreground ml-1">Conta de Origem</Label>
++                  <Label htmlFor="accountIdTransferOrigin" className="text-muted-foreground ml-1">
++                    Conta de Origem
++                  </Label>
+                   <select
+                     name="accountIdTransferOrigin"
+                     id="accountIdTransferOrigin"
+@@ -545,7 +624,9 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
+                   </select>
+                 </div>
+                 <div className="grid gap-3">
+-                  <Label htmlFor="accountIdTransferDest" className="text-muted-foreground ml-1">Conta de Destino</Label>
++                  <Label htmlFor="accountIdTransferDest" className="text-muted-foreground ml-1">
++                    Conta de Destino
++                  </Label>
+                   <select
+                     name="accountIdTransferDest"
+                     id="accountIdTransferDest"
+@@ -561,9 +642,7 @@ export function TransactionFormDialog({ trigger, onSuccess }: { trigger?: React.
+                 </div>
+               </TabsContent>
+ 
+-              {formError && (
+-                <p className="text-sm text-destructive text-center">{formError}</p>
+-              )}
++              {formError && <p className="text-sm text-destructive text-center">{formError}</p>}
+ 
+               <div className="pt-6 flex justify-end">
+                 <Button type="submit" disabled={isPending} className="w-full sm:w-auto mt-2">

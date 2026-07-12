@@ -55,6 +55,7 @@ export function AccountVsGlobalExpenseChart({ initialData, competencyMonth }: Ac
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setData(initialData);
     setShowOnlyPaid(false);
   }, [initialData]);
@@ -71,14 +72,14 @@ export function AccountVsGlobalExpenseChart({ initialData, competencyMonth }: Ac
 
   if (!data || data.length === 0) {
     return (
-      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm flex items-center justify-center h-[260px] text-sm text-muted-foreground">
+      <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm flex items-center justify-center h-[260px] text-sm text-muted-foreground w-full min-w-0">
         Nenhuma conta cadastrada para exibir o gráfico.
       </div>
     );
   }
 
   return (
-    <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full overflow-hidden">
+    <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">Poder de Pagamento (Receitas vs Despesa Global)</h2>
         <div className="flex items-center space-x-2">

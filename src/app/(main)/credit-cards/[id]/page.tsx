@@ -45,8 +45,8 @@ export default async function CreditCardInvoicePage(props: {
   };
 
   const formatDate = (dateStr: string) => {
-    const [year, month, day] = dateStr.split('-');
-    return `${day}/${month}/${year}`;
+    const [, month, day] = dateStr.split('-');
+    return `${day}/${month}`;
   };
 
   return (
@@ -161,11 +161,11 @@ export default async function CreditCardInvoicePage(props: {
                   {summary.transactions.map((tx) => (
                     <TableRow key={tx.id}>
                       <TableCell className="font-medium whitespace-nowrap">{formatDate(tx.date)}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{tx.description}</span>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                            <span className="bg-muted px-1.5 py-0.5 rounded-sm">{tx.category?.name || 'Sem categoria'}</span>
+                      <TableCell className="max-w-[120px] sm:max-w-[250px]">
+                        <div className="flex flex-col overflow-hidden">
+                          <span className="font-medium truncate" title={tx.description}>{tx.description}</span>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 overflow-hidden">
+                            <span className="bg-muted px-1.5 py-0.5 rounded-sm truncate" title={tx.category?.name || 'Sem categoria'}>{tx.category?.name || 'Sem categoria'}</span>
                           </div>
                         </div>
                       </TableCell>

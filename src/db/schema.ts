@@ -19,7 +19,7 @@ export const accounts = pgTable('accounts', {
   id: serial('id').primaryKey(),
   userId: uuid('user_id').references(() => users.id).notNull(),
   name: varchar('name', { length: 255 }).notNull(),
-  type: varchar('type', { length: 50 }).notNull(), // checking, savings, wallet, stash
+  type: varchar('type', { length: 50 }).notNull(), // checking, savings, wallet, stash, food, meal
   currentBalance: numeric('current_balance', { precision: 12, scale: 2 }).default('0').notNull(),
 });
 

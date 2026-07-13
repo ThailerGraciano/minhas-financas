@@ -1,15 +1,23 @@
 'use server';
 
 import { db } from '@/db';
-import { transactions, fixedTransactions } from '@/db/schema';
+import { transactions, fixedTransactions, settings } from '@/db/schema';
 import { eq, or, and, gte, lte } from 'drizzle-orm';
-import { addMonths, format, parseISO, endOfMonth } from 'date-fns';
+import { addMonths, subMonths, format, parseISO, endOfMonth, getDate } from 'date-fns';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { auth } from '@/auth';
 
 type NewTransaction = typeof transactions.$inferInsert;
 type CreateTransactionInput = Omit<NewTransaction, 'userId'> & { destinationAccountId?: number; isFixed?: boolean; isTotalAmount?: boolean; current_installment?: number };
+
+function getCompetencyMonth(date: Date, closingDay: number): string {
+  const day = getDate(date);
+  if (day > closingDay) {
+    return format(addMonths(date, 1), 'yyyy-MM');
+  }
+  return format(date, 'yyyy-MM');
+}
 
 const transactionSchema = z.object({
   description: z.string().min(1, 'Descrição é obrigatória'),
@@ -40,6 +48,9 @@ export async function getTransactions(month?: string) {
   const userId = session.user.id;
 
   const currentMonth = month || format(new Date(), 'yyyy-MM');
+
+  const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
+  const closingDay = appSettings?.closingDay || 25;
 
   const realTransactions = await db.query.transactions.findMany({
     where: and(eq(transactions.competencyMonth, currentMonth), eq(transactions.userId, userId)),
@@ -77,11 +88,20 @@ export async function getTransactions(month?: string) {
     .filter(ft => !materializedFixedIds.has(ft.id))
     .map(ft => {
       const dayStr = ft.startDate.split('-')[2];
-      const targetDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), parseInt(dayStr));
-      const finalDate = targetDate.getMonth() !== monthDate.getMonth()
-        ? endOfMonth(monthDate)
+      const dayNum = parseInt(dayStr, 10);
+      
+      let targetMonthDate = new Date(monthDate);
+      if (dayNum > closingDay) {
+        targetMonthDate = subMonths(targetMonthDate, 1);
+      }
+
+      const targetDate = new Date(targetMonthDate.getFullYear(), targetMonthDate.getMonth(), dayNum);
+      const finalDate = targetDate.getMonth() !== targetMonthDate.getMonth()
+        ? endOfMonth(targetMonthDate)
         : targetDate;
       const dateStr = format(finalDate, 'yyyy-MM-dd');
+
+      if (dateStr < ft.startDate) return null;
 
       const tempId = -Math.floor(Math.random() * 1000000) - 1;
 
@@ -109,7 +129,8 @@ export async function getTransactions(month?: string) {
         category: ft.category,
         creditCard: ft.creditCard,
       } as typeof realTransactions[0];
-    });
+    })
+    .filter((t): t is NonNullable<typeof t> => t !== null);
 
   const allTransactions = [...realTransactions, ...virtualTransactions];
 
@@ -128,6 +149,11 @@ export async function createTransaction(data: CreateTransactionInput): Promise<{
     const firstError = parsed.error.issues[0]?.message || 'Dados inválidos';
     return { success: false, error: firstError };
   }
+
+  const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
+  const closingDay = appSettings?.closingDay || 25;
+  const parsedDate = parseISO(data.date);
+  data.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
 
   if (
     subcategoryRequiredTypes.includes(data.type) &&
@@ -490,6 +516,14 @@ export async function updateTransaction(id: number, inputData: Partial<CreateTra
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
     const userId = session.user.id;
+
+    const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
+    const closingDay = appSettings?.closingDay || 25;
+
+    if (inputData.date) {
+      const parsedDate = parseISO(inputData.date);
+      inputData.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
+    }
 
     const result = await db.transaction(async (tx) => {
       const [oldTx] = await tx.select().from(transactions).where(and(eq(transactions.id, id), eq(transactions.userId, userId)));

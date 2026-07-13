@@ -109,6 +109,8 @@ export function AccountFormDialog({
                 <option value="savings">Poupança</option>
                 <option value="wallet">Carteira (Dinheiro)</option>
                 <option value="stash">Caixinha</option>
+                <option value="food">Alimentação</option>
+                <option value="meal">Refeição</option>
               </select>
             </div>
             <div className="grid gap-2">

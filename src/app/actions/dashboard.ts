@@ -71,6 +71,8 @@ export async function getBalancesByType() {
     savings: 'Poupança',
     wallet: 'Carteira',
     stash: 'Caixinhas',
+    food: 'Alimentação',
+    meal: 'Refeição',
   };
 
   const balancesByType = Object.entries(grouped).map(([type, total]) => ({

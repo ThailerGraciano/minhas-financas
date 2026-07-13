@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Wallet, PiggyBank, Landmark, Archive, MoreVertical, Pencil, SlidersHorizontal } from 'lucide-react';
+import { Wallet, PiggyBank, Landmark, Archive, MoreVertical, Pencil, SlidersHorizontal, Utensils, Coffee } from 'lucide-react';
 import { AccountFormDialog } from './account-form-dialog';
 import { AdjustBalanceDialog } from './adjust-balance-dialog';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,8 @@ const getTypeIcon = (type: string) => {
     case 'savings': return <PiggyBank className="w-5 h-5 text-blue-500" />;
     case 'wallet': return <Wallet className="w-5 h-5 text-green-500" />;
     case 'stash': return <Archive className="w-5 h-5 text-amber-500" />;
+    case 'food': return <Utensils className="w-5 h-5 text-orange-500" />;
+    case 'meal': return <Coffee className="w-5 h-5 text-red-500" />;
     default: return <Landmark className="w-5 h-5 text-purple-500" />;
   }
 };
@@ -38,6 +40,8 @@ const getTypeName = (type: string) => {
     case 'checking': return 'Conta Corrente';
     case 'savings': return 'Poupança';
     case 'stash': return 'Caixinha';
+    case 'food': return 'Alimentação';
+    case 'meal': return 'Refeição';
     default: return 'Carteira';
   }
 };

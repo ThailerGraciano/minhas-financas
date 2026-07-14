@@ -115,3 +115,116 @@ export async function deleteCategory(id: number) {
     return { success: false, error: 'Falha ao excluir a categoria.' };
   }
 }
+
+export async function toggleCategoryPrediction(categoryId: number, isPredictable: boolean) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
+    await db.transaction(async (tx) => {
+      await tx.update(categories)
+        .set({ isPredictable })
+        .where(and(eq(categories.id, categoryId), eq(categories.userId, userId)));
+      
+      await tx.update(subcategories)
+        .set({ isPredictable })
+        .where(and(eq(subcategories.categoryId, categoryId), eq(subcategories.userId, userId)));
+    });
+
+    revalidatePath('/categories');
+    revalidatePath('/planning');
+    return { success: true };
+  } catch (error) {
+    console.error('Error toggling category prediction:', error);
+    return { success: false, error: 'Falha ao atualizar a previsão da categoria.' };
+  }
+}
+
+export async function toggleSubcategoryPrediction(subcategoryId: number, isPredictable: boolean) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
+    await db.update(subcategories)
+      .set({ isPredictable })
+      .where(and(eq(subcategories.id, subcategoryId), eq(subcategories.userId, userId)));
+
+    revalidatePath('/categories');
+    revalidatePath('/planning');
+    return { success: true };
+  } catch (error) {
+    console.error('Error toggling subcategory prediction:', error);
+    return { success: false, error: 'Falha ao atualizar a previsão da subcategoria.' };
+  }
+}
+
+export async function updateCategoryName(id: number, name: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
+    await db.update(categories)
+      .set({ name })
+      .where(and(eq(categories.id, id), eq(categories.userId, userId)));
+    
+    revalidatePath('/categories');
+    revalidatePath('/');
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating category name:', error);
+    return { success: false, error: 'Falha ao atualizar o nome da categoria.' };
+  }
+}
+
+export async function updateSubcategoryName(id: number, name: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
+    await db.update(subcategories)
+      .set({ name })
+      .where(and(eq(subcategories.id, id), eq(subcategories.userId, userId)));
+    
+    revalidatePath('/categories');
+    revalidatePath('/');
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating subcategory name:', error);
+    return { success: false, error: 'Falha ao atualizar o nome da subcategoria.' };
+  }
+}
+
+export async function deleteSubcategory(id: number) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
+    // Check if subcategory is linked to any transaction
+    const linkedTransactions = await db
+      .select({ id: transactions.id })
+      .from(transactions)
+      .where(and(eq(transactions.subcategoryId, id), eq(transactions.userId, userId)))
+      .limit(1);
+
+    if (linkedTransactions.length > 0) {
+      return { 
+        success: false, 
+        error: 'Esta subcategoria não pode ser excluída pois possui despesas/receitas vinculadas a ela.' 
+      };
+    }
+
+    await db.delete(subcategories).where(and(eq(subcategories.id, id), eq(subcategories.userId, userId)));
+
+    revalidatePath('/categories');
+    revalidatePath('/');
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting subcategory:', error);
+    return { success: false, error: 'Falha ao excluir a subcategoria.' };
+  }
+}

@@ -10,7 +10,7 @@ import { Plus, MoreVertical, Palette, Trash2, Loader2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-import { CATEGORY_ICONS_LIST, CategoryIcon } from '@/components/category-icon';
+import { CATEGORY_ICONS_LIST } from '@/components/category-icon';
 
 export function AddCategoryDialog() {
   const [open, setOpen] = useState(false);

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { getCreditCardsWithSummary } from '@/app/actions/credit-cards';
 import { CompetencyFilter } from '@/components/competency-filter';
 import { CreditCardList, CreditCardType } from './credit-card-list';
+import { CreditCardsSummary } from './credit-cards-summary';
 import { format } from 'date-fns';
 
 export function CreditCardsClientPage({ closingDay, initialCards }: { closingDay: number; initialCards: CreditCardType[] }) {
@@ -46,6 +47,11 @@ export function CreditCardsClientPage({ closingDay, initialCards }: { closingDay
           />
         </div>
       </div>
+
+      {cards.length > 0 && (
+        <CreditCardsSummary cards={cards} selectedMonth={selectedMonth} />
+      )}
+
       <CreditCardList cards={cards} selectedMonth={selectedMonth} />
     </>
   );

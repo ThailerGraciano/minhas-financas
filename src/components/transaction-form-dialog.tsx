@@ -328,21 +328,24 @@ export function TransactionFormDialog({
                     Subcategoria
                   </Label>
                   <div className="flex gap-2">
-                    <select
+                    <Select
                       name="subcategoryId"
                       value={selectedSubcategoryId}
-                      onChange={(e) => setSelectedSubcategoryId(e.target.value)}
-                      className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10 disabled:opacity-50"
+                      onValueChange={setSelectedSubcategoryId}
                       disabled={!selectedCategoryId}
                       required={tab !== "transfer"}
                     >
-                      {activeSubcategories.length === 0 && <option value="">Nenhuma subcategoria disponível</option>}
-                      {activeSubcategories.map((sc: Subcategory) => (
-                        <option key={sc.id} value={sc.id}>
-                          {sc.name}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10 disabled:opacity-50">
+                        <SelectValue placeholder={activeSubcategories.length === 0 ? "Nenhuma subcategoria disponível" : "Selecione..."} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {activeSubcategories.map((sc: Subcategory) => (
+                          <SelectItem key={sc.id} value={String(sc.id)}>
+                            {sc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <QuickCategoryDialog
                       type={tab === "income" ? "income" : "expense"}
                       onSuccess={(catId, subCatId) => {
@@ -439,14 +442,19 @@ export function TransactionFormDialog({
 
                 <div className="grid gap-3">
                   <Label className="text-muted-foreground ml-1">Método de Pagamento</Label>
-                  <select
+                  <Select
+                    name="paymentMethod"
                     value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
+                    onValueChange={setPaymentMethod}
                   >
-                    <option value="account">Conta</option>
-                    <option value="credit_card">Cartão de Crédito</option>
-                  </select>
+                    <SelectTrigger className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="account">Conta</SelectItem>
+                      <SelectItem value="credit_card">Cartão de Crédito</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {paymentMethod === "account" && (
@@ -454,17 +462,18 @@ export function TransactionFormDialog({
                     <Label htmlFor="accountId" className="text-muted-foreground ml-1">
                       Conta
                     </Label>
-                    <select
-                      name="accountId"
-                      className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
-                      required
-                    >
-                      {formData.accounts.map((a: Account) => (
-                        <option key={a.id} value={a.id}>
-                          {a.name}
-                        </option>
-                      ))}
-                    </select>
+                    <Select name="accountId" required>
+                      <SelectTrigger className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {formData.accounts.map((a: Account) => (
+                          <SelectItem key={a.id} value={String(a.id)}>
+                            {a.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 )}
 
@@ -474,20 +483,23 @@ export function TransactionFormDialog({
                       <Label htmlFor="creditCardId" className="text-muted-foreground ml-1">
                         Cartão de Crédito
                       </Label>
-                      <select
+                      <Select
                         name="creditCardId"
                         value={selectedCreditCardId}
-                        onChange={(e) => handleCreditCardChange(e.target.value)}
-                        className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
+                        onValueChange={handleCreditCardChange}
                         required
                       >
-                        <option value="">Selecione...</option>
-                        {formData.creditCards.map((c: CreditCard) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
+                        <SelectTrigger className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10">
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {formData.creditCards.map((c: CreditCard) => (
+                            <SelectItem key={c.id} value={String(c.id)}>
+                              {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     {selectedCreditCardId && invoiceOptions.length > 0 && (
@@ -495,19 +507,23 @@ export function TransactionFormDialog({
                         <Label htmlFor="invoiceMonth" className="text-muted-foreground ml-1">
                           Fatura
                         </Label>
-                        <select
+                        <Select
                           name="invoiceMonth"
                           value={selectedInvoiceMonth}
-                          onChange={(e) => setSelectedInvoiceMonth(e.target.value)}
-                          className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
+                          onValueChange={setSelectedInvoiceMonth}
                           required
                         >
-                          {invoiceOptions.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
+                          <SelectTrigger className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10">
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {invoiceOptions.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     )}
                   </>
@@ -519,18 +535,18 @@ export function TransactionFormDialog({
                   <Label htmlFor="accountIdIncome" className="text-muted-foreground ml-1">
                     Depositar na Conta
                   </Label>
-                  <select
-                    name="accountIdIncome"
-                    id="accountIdIncome"
-                    className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
-                    required
-                  >
-                    {formData.accounts.map((a: Account) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Select name="accountIdIncome" required>
+                    <SelectTrigger className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formData.accounts.map((a: Account) => (
+                        <SelectItem key={a.id} value={String(a.id)}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="grid gap-3">
@@ -618,35 +634,35 @@ export function TransactionFormDialog({
                   <Label htmlFor="accountIdTransferOrigin" className="text-muted-foreground ml-1">
                     Conta de Origem
                   </Label>
-                  <select
-                    name="accountIdTransferOrigin"
-                    id="accountIdTransferOrigin"
-                    className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
-                    required
-                  >
-                    {formData.accounts.map((a: Account) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Select name="accountIdTransferOrigin" required>
+                    <SelectTrigger className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formData.accounts.map((a: Account) => (
+                        <SelectItem key={a.id} value={String(a.id)}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="grid gap-3">
                   <Label htmlFor="accountIdTransferDest" className="text-muted-foreground ml-1">
                     Conta de Destino
                   </Label>
-                  <select
-                    name="accountIdTransferDest"
-                    id="accountIdTransferDest"
-                    className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10"
-                    required
-                  >
-                    {formData.accounts.map((a: Account) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
+                  <Select name="accountIdTransferDest" required>
+                    <SelectTrigger className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formData.accounts.map((a: Account) => (
+                        <SelectItem key={a.id} value={String(a.id)}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </TabsContent>
 

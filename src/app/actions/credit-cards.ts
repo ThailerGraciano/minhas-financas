@@ -274,3 +274,38 @@ export async function getCreditCardsWithSummary(competencyMonth: string) {
 
   return cardsWithSummary;
 }
+
+export async function getCreditCardsCategorySummary(competencyMonth: string) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
+  const cardTxs = await db.query.transactions.findMany({
+    where: (t, { eq, and }) => and(
+      eq(t.competencyMonth, competencyMonth),
+      eq(t.type, 'credit_card_expense'),
+      eq(t.userId, userId)
+    ),
+    with: {
+      category: true,
+    }
+  });
+
+  const categoryMap = new Map<string, number>();
+
+  for (const t of cardTxs) {
+    const amount = Number(t.amount);
+    const categoryName = t.category?.name || 'Sem Categoria';
+    categoryMap.set(categoryName, (categoryMap.get(categoryName) || 0) + amount);
+  }
+
+  const result = Array.from(categoryMap.entries()).map(([category, value]) => ({
+    category,
+    value
+  }));
+
+  // Sort descending by value
+  result.sort((a, b) => b.value - a.value);
+
+  return result;
+}

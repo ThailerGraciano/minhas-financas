@@ -234,23 +234,23 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="subcategoryId">Subcategoria</Label>
-                <select
-                  name="subcategoryId"
+                <Select
                   value={selectedSubcategoryId}
-                  onChange={(e) => setSelectedSubcategoryId(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
+                  onValueChange={setSelectedSubcategoryId}
                   disabled={!selectedCategoryId || activeSubcategories.length === 0}
                   required={transaction.type !== "transfer"}
                 >
-                  {activeSubcategories.length === 0 && (
-                    <option value="">Selecione a categoria</option>
-                  )}
-                  {activeSubcategories.map((sc: Subcategory) => (
-                    <option key={sc.id} value={sc.id}>
-                      {sc.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full h-10 bg-background text-sm flex items-center justify-between">
+                    <SelectValue placeholder={activeSubcategories.length === 0 ? "Selecione a categoria" : "Selecione..."} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeSubcategories.map((sc: Subcategory) => (
+                      <SelectItem key={sc.id} value={String(sc.id)}>
+                        {sc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

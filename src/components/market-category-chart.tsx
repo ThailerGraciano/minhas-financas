@@ -1,40 +1,45 @@
-'use client';
+"use client";
 
-import { Pie, PieChart, Cell } from 'recharts';
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
-} from '@/components/ui/chart';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { Cell, Pie, PieChart } from "recharts";
 
 interface MarketCategoryChartProps {
   data: { category: string; value: number }[];
 }
 
 const COLORS = [
-  'var(--color-chart-1)',
-  'var(--color-chart-2)',
-  'var(--color-chart-3)',
-  'var(--color-chart-4)',
-  'var(--color-chart-5)',
+  "#FF6B6B", // Vibrant Red
+  "#4ECDC4", // Vibrant Teal
+  "#45B7D1", // Vibrant Blue
+  "#FDCB6E", // Vibrant Yellow
+  "#6C5CE7", // Vibrant Purple
+  "#FFA07A", // Vibrant Salmon
+  "#2ECC71", // Vibrant Emerald
+  "#9B59B6", // Vibrant Amethyst
+  "#F1C40F", // Vibrant Sunflower
+  "#E74C3C", // Vibrant Alizarin
+  "#3498DB", // Vibrant Peter River
+  "#1ABC9C", // Vibrant Turquoise
+  "#D35400", // Vibrant Pumpkin
+  "#8E44AD", // Vibrant Wisteria
+  "#27AE60", // Vibrant Nephritis
 ];
 
 const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
+  new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
     maximumFractionDigits: 2,
   }).format(value);
 
 export function MarketCategoryChart({ data }: MarketCategoryChartProps) {
-  const chartData = data.map((item, index) => ({
-    ...item,
-    fill: COLORS[index % COLORS.length],
-  }));
+  const chartData = [...data]
+    .sort((a, b) => b.value - a.value)
+    .map((item, index) => ({
+      ...item,
+      fill: COLORS[index % COLORS.length],
+    }));
 
   const config = data.reduce((acc, item, index) => {
     acc[item.category] = {
@@ -44,7 +49,7 @@ export function MarketCategoryChart({ data }: MarketCategoryChartProps) {
     return acc;
   }, {} as ChartConfig);
 
-  config.value = { label: 'Valor' };
+  config.value = { label: "Valor" };
 
   if (data.length === 0) {
     return (
@@ -69,25 +74,42 @@ export function MarketCategoryChart({ data }: MarketCategoryChartProps) {
           <PieChart>
             <ChartTooltip
               cursor={false}
-              content={<ChartTooltipContent nameKey="category" formatter={(value) => formatCurrency(Number(value))} hideLabel />}
+              content={<ChartTooltipContent hideLabel formatter={(value) => formatCurrency(Number(value))} />}
             />
-            <Pie
-              data={chartData}
-              dataKey="value"
-              nameKey="category"
-              innerRadius={60}
-              strokeWidth={5}
-            >
+            <Pie data={chartData} dataKey="value" nameKey="category" innerRadius={60} strokeWidth={5}>
               {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.fill} />
               ))}
             </Pie>
-            <ChartLegend
-              content={<ChartLegendContent nameKey="category" />}
-              className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
-            />
           </PieChart>
         </ChartContainer>
+
+        <div className="mt-6">
+          <div className="rounded-xl border bg-card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50 text-left text-muted-foreground">
+                  <th className="px-4 py-3 font-medium rounded-tl-xl">Categoria</th>
+                  <th className="px-4 py-3 font-medium text-right rounded-tr-xl">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {chartData.map((item, index) => (
+                  <tr key={index} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+                    <td className="px-4 py-3 flex items-center gap-3">
+                      <div
+                        className="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm"
+                        style={{ backgroundColor: item.fill }}
+                      />
+                      <span className="font-medium truncate">{item.category}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium">{formatCurrency(item.value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

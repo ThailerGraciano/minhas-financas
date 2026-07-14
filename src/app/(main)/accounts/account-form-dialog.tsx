@@ -7,6 +7,7 @@ import { CurrencyInput } from '@/components/ui/currency-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus } from 'lucide-react';
 
 type Account = {
@@ -98,20 +99,19 @@ export function AccountFormDialog({
             </div>
             <div className="grid gap-2">
               <Label htmlFor="type">Tipo</Label>
-              <select
-                id="type" 
-                name="type" 
-                required
-                defaultValue={accountToEdit?.type || 'checking'}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="checking">Conta Corrente</option>
-                <option value="savings">Poupança</option>
-                <option value="wallet">Carteira (Dinheiro)</option>
-                <option value="stash">Caixinha</option>
-                <option value="food">Alimentação</option>
-                <option value="meal">Refeição</option>
-              </select>
+              <Select name="type" defaultValue={accountToEdit?.type || 'checking'} required>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione o tipo..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="checking">Conta Corrente</SelectItem>
+                  <SelectItem value="savings">Poupança</SelectItem>
+                  <SelectItem value="wallet">Carteira (Dinheiro)</SelectItem>
+                  <SelectItem value="stash">Caixinha</SelectItem>
+                  <SelectItem value="food">Alimentação</SelectItem>
+                  <SelectItem value="meal">Refeição</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="currentBalance">{accountToEdit ? 'Saldo Atual' : 'Saldo Atual Inicial'}</Label>

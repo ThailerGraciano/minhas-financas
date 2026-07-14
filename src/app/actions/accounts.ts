@@ -1,28 +1,32 @@
-'use server';
+"use server";
 
-import { db } from '@/db';
-import { accounts, categories, transactions, fixedTransactions } from '@/db/schema';
-import { and, eq, gte, lte, desc } from 'drizzle-orm';
-import { format, parse, endOfMonth, isValid } from 'date-fns';
-import { revalidatePath } from 'next/cache';
-import { auth } from '@/auth';
+import { auth } from "@/auth";
+import { db } from "@/db";
+import { accounts, categories, fixedTransactions, transactions } from "@/db/schema";
+import { endOfMonth, format, isValid, parse } from "date-fns";
+import { and, desc, eq, gte, lte } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 
 export async function getAccounts() {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
-  return await db.select().from(accounts).where(eq(accounts.userId, session.user.id)).orderBy(desc(accounts.currentBalance));
+  return await db
+    .select()
+    .from(accounts)
+    .where(eq(accounts.userId, session.user.id))
+    .orderBy(desc(accounts.currentBalance));
 }
 
-export async function createAccount(data: Omit<typeof accounts.$inferInsert, 'userId'>) {
+export async function createAccount(data: Omit<typeof accounts.$inferInsert, "userId">) {
   try {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
     await db.insert(accounts).values({ ...data, userId: session.user.id });
-    revalidatePath('/accounts');
+    revalidatePath("/accounts");
     return { success: true };
   } catch (error) {
-    console.error('Error creating account:', error);
-    return { success: false, error: 'Failed to create account' };
+    console.error("Error creating account:", error);
+    return { success: false, error: "Failed to create account" };
   }
 }
 
@@ -30,18 +34,22 @@ export async function updateAccount(id: number, data: Partial<typeof accounts.$i
   try {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
-    await db.update(accounts).set(data).where(and(eq(accounts.id, id), eq(accounts.userId, session.user.id)));
-    revalidatePath('/accounts');
+    await db
+      .update(accounts)
+      .set(data)
+      .where(and(eq(accounts.id, id), eq(accounts.userId, session.user.id)));
+    revalidatePath("/accounts");
     return { success: true };
   } catch (error) {
-    console.error('Error updating account:', error);
-    return { success: false, error: 'Failed to update account' };
+    console.error("Error updating account:", error);
+    return { success: false, error: "Failed to update account" };
   }
 }
 
 export async function adjustAccountBalance(
   accountId: number,
   realBalance: number,
+  createTransaction: boolean = true,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const session = await auth();
@@ -49,9 +57,12 @@ export async function adjustAccountBalance(
     const userId = session.user.id;
 
     // 1. Busca conta e saldo atual
-    const [account] = await db.select().from(accounts).where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)));
+    const [account] = await db
+      .select()
+      .from(accounts)
+      .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)));
     if (!account) {
-      return { success: false, error: 'Conta não encontrada.' };
+      return { success: false, error: "Conta não encontrada." };
     }
 
     const currentBalance = Number(account.currentBalance);
@@ -61,50 +72,53 @@ export async function adjustAccountBalance(
       return { success: true }; // Nenhum ajuste necessário
     }
 
-    // 2. Busca ou cria a categoria de sistema "Ajuste de Saldo"
-    const ADJUSTMENT_CATEGORY_NAME = 'Ajuste de Saldo';
-    const adjustmentType = diff > 0 ? 'income' : 'expense';
+    if (createTransaction) {
+      // 2. Busca ou cria a categoria de sistema "Ajuste de Saldo"
+      const ADJUSTMENT_CATEGORY_NAME = "Ajuste de Saldo";
+      const adjustmentType = diff > 0 ? "income" : "expense";
 
-    let [adjustCategory] = await db
-      .select()
-      .from(categories)
-      .where(and(eq(categories.name, ADJUSTMENT_CATEGORY_NAME), eq(categories.userId, userId)))
-      .limit(1);
+      let [adjustCategory] = await db
+        .select()
+        .from(categories)
+        .where(and(eq(categories.name, ADJUSTMENT_CATEGORY_NAME), eq(categories.userId, userId)))
+        .limit(1);
 
-    if (!adjustCategory) {
-      [adjustCategory] = await db
-        .insert(categories)
-        .values({ userId, name: ADJUSTMENT_CATEGORY_NAME, type: adjustmentType, icon: 'SlidersHorizontal' })
-        .returning();
+      if (!adjustCategory) {
+        [adjustCategory] = await db
+          .insert(categories)
+          .values({ userId, name: ADJUSTMENT_CATEGORY_NAME, type: adjustmentType, icon: "SlidersHorizontal" })
+          .returning();
+      }
+
+      // 3. Insere a transação de ajuste (a trigger atualiza o saldo automaticamente)
+      const today = format(new Date(), "yyyy-MM-dd");
+      const competencyMonth = format(new Date(), "yyyy-MM");
+
+      await db.insert(transactions).values({
+        userId,
+        type: adjustmentType,
+        accountId,
+        categoryId: adjustCategory.id,
+        amount: Math.abs(diff).toFixed(2),
+        description: "Ajuste de saldo",
+        date: today,
+        competencyMonth,
+        status: "paid",
+      });
     }
 
-    // 3. Insere a transação de ajuste (a trigger atualiza o saldo automaticamente)
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const competencyMonth = format(new Date(), 'yyyy-MM');
-
-    await db.insert(transactions).values({
-      userId,
-      type: adjustmentType,
-      accountId,
-      categoryId: adjustCategory.id,
-      amount: Math.abs(diff).toFixed(2),
-      description: 'Ajuste de saldo',
-      date: today,
-      competencyMonth,
-      status: 'paid',
-    });
-
     // Force update the account balance directly to guarantee sync
-    await db.update(accounts)
+    await db
+      .update(accounts)
       .set({ currentBalance: realBalance.toFixed(2) })
       .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)));
 
-    revalidatePath('/accounts');
-    revalidatePath('/');
+    revalidatePath("/accounts");
+    revalidatePath("/");
     return { success: true };
   } catch (error) {
-    console.error('Error adjusting account balance:', error);
-    return { success: false, error: 'Falha ao ajustar o saldo.' };
+    console.error("Error adjusting account balance:", error);
+    return { success: false, error: "Falha ao ajustar o saldo." };
   }
 }
 
@@ -116,16 +130,13 @@ type TransactionRow = {
 function calcDelta(rows: TransactionRow[]): number {
   return rows.reduce((acc, row) => {
     const amount = Number(row.amount);
-    if (row.type === 'income') return acc + amount;
-    if (row.type === 'expense' || row.type === 'credit_card_expense') return acc - amount;
+    if (row.type === "income") return acc + amount;
+    if (row.type === "expense" || row.type === "credit_card_expense") return acc - amount;
     return acc;
   }, 0);
 }
 
-export async function getHistoricalBalance(
-  accountId: number,
-  targetDate: Date,
-): Promise<number | null> {
+export async function getHistoricalBalance(accountId: number, targetDate: Date): Promise<number | null> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
@@ -144,7 +155,7 @@ export async function getHistoricalBalance(
   const target = new Date(targetDate);
   target.setHours(0, 0, 0, 0);
 
-  const targetStr = format(target, 'yyyy-MM-dd');
+  const targetStr = format(target, "yyyy-MM-dd");
 
   if (target <= today) {
     const paidRows = await db
@@ -153,9 +164,9 @@ export async function getHistoricalBalance(
       .where(
         and(
           eq(transactions.accountId, accountId),
-          eq(transactions.status, 'paid'),
+          eq(transactions.status, "paid"),
           lte(transactions.date, targetStr),
-          eq(transactions.userId, userId)
+          eq(transactions.userId, userId),
         ),
       );
 
@@ -166,7 +177,7 @@ export async function getHistoricalBalance(
 
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
-  const tomorrowStr = format(tomorrow, 'yyyy-MM-dd');
+  const tomorrowStr = format(tomorrow, "yyyy-MM-dd");
 
   const pendingReal = await db
     .select({ type: transactions.type, amount: transactions.amount })
@@ -174,18 +185,18 @@ export async function getHistoricalBalance(
     .where(
       and(
         eq(transactions.accountId, accountId),
-        eq(transactions.status, 'pending'),
+        eq(transactions.status, "pending"),
         gte(transactions.date, tomorrowStr),
         lte(transactions.date, targetStr),
-        eq(transactions.userId, userId)
+        eq(transactions.userId, userId),
       ),
     );
 
   const activeFixed = await db
     .select({
-      id:        fixedTransactions.id,
-      type:      fixedTransactions.type,
-      amount:    fixedTransactions.amount,
+      id: fixedTransactions.id,
+      type: fixedTransactions.type,
+      amount: fixedTransactions.amount,
       startDate: fixedTransactions.startDate,
       accountId: fixedTransactions.accountId,
     })
@@ -195,7 +206,7 @@ export async function getHistoricalBalance(
         eq(fixedTransactions.active, true),
         eq(fixedTransactions.accountId, accountId),
         lte(fixedTransactions.startDate, targetStr),
-        eq(fixedTransactions.userId, userId)
+        eq(fixedTransactions.userId, userId),
       ),
     );
 
@@ -209,7 +220,7 @@ export async function getHistoricalBalance(
           eq(transactions.accountId, accountId),
           gte(transactions.date, tomorrowStr),
           lte(transactions.date, targetStr),
-          eq(transactions.userId, userId)
+          eq(transactions.userId, userId),
         ),
       );
 
@@ -226,7 +237,7 @@ export async function getHistoricalBalance(
     if (materializedFixedIds.has(ft.id)) continue;
 
     const ftStartDate = new Date(ft.startDate);
-    let cursor = new Date(tomorrow);
+    const cursor = new Date(tomorrow);
     cursor.setDate(ftStartDate.getDate());
     if (cursor < tomorrow) {
       cursor.setMonth(cursor.getMonth() + 1);
@@ -243,12 +254,12 @@ export async function getHistoricalBalance(
 }
 
 export async function getAccountsBalancesByCompetency(competencyMonth: string) {
-  let dateObj = parse(competencyMonth, 'yyyy-MM', new Date());
+  let dateObj = parse(competencyMonth, "yyyy-MM", new Date());
   if (!isValid(dateObj)) {
-    dateObj = parse(competencyMonth, 'MM/yyyy', new Date());
+    dateObj = parse(competencyMonth, "MM/yyyy", new Date());
   }
   if (!isValid(dateObj)) {
-    throw new Error('Mês de competência inválido. Utilize YYYY-MM ou MM/YYYY.');
+    throw new Error("Mês de competência inválido. Utilize YYYY-MM ou MM/YYYY.");
   }
 
   const targetDate = endOfMonth(dateObj);
@@ -264,7 +275,7 @@ export async function getAccountsBalancesByCompetency(competencyMonth: string) {
         type: acc.type,
         calculated_balance: balance ?? 0,
       };
-    })
+    }),
   );
 
   return results;

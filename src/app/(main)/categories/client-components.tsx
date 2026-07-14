@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Plus, MoreVertical, Palette, Trash2, Loader2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import { CATEGORY_ICONS_LIST, CategoryIcon } from '@/components/category-icon';
 
@@ -49,10 +50,15 @@ export function AddCategoryDialog() {
           </div>
           <div className="grid gap-2">
             <Label htmlFor="type">Tipo</Label>
-            <select id="type" name="type" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" required>
-              <option value="expense">Despesa</option>
-              <option value="income">Receita</option>
-            </select>
+            <Select name="type" defaultValue="expense" required>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione o tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="expense">Despesa</SelectItem>
+                <SelectItem value="income">Receita</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           
           <div className="grid gap-2">

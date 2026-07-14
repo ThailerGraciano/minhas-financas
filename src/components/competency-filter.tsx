@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface CompetencyFilterProps {
   /** Dia de fechamento do ciclo financeiro (ex: 25) */
@@ -95,20 +96,18 @@ export function CompetencyFilter({ closingDay, value, onChange }: CompetencyFilt
           <ChevronLeft className="h-4 w-4" />
         </Button>
 
-        <div className="relative">
-          <select
-            value={currentMonth}
-            onChange={(e) => navigateToMonth(e.target.value)}
-            className="appearance-none bg-transparent text-sm font-semibold px-3 py-1.5 pr-7 cursor-pointer focus:outline-none capitalize min-w-[160px] text-center"
-          >
+        <Select value={currentMonth} onValueChange={navigateToMonth}>
+          <SelectTrigger className="h-8 border-0 bg-transparent shadow-none font-semibold focus:ring-0 focus:ring-offset-0 capitalize min-w-[150px] data-[state=open]:bg-muted/50">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
             {monthOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
+              <SelectItem key={opt.value} value={opt.value} className="capitalize">
                 {opt.label}
-              </option>
+              </SelectItem>
             ))}
-          </select>
-          <Calendar className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-        </div>
+          </SelectContent>
+        </Select>
 
         <Button
           variant="ghost"

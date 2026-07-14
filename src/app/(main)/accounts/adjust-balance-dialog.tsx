@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { SlidersHorizontal, AlertTriangle } from 'lucide-react';
+import { SlidersHorizontal, AlertTriangle, Info } from 'lucide-react';
 import { adjustAccountBalance } from '@/app/actions/accounts';
 import { Button } from '@/components/ui/button';
 import { CurrencyInput } from '@/components/ui/currency-input';
@@ -42,6 +42,7 @@ export function AdjustBalanceDialog({
   const open = isControlled ? controlledOpen : uncontrolledOpen;
 
   const [realBalance, setRealBalance] = useState<number>(Number(account.currentBalance));
+  const [adjustmentMode, setAdjustmentMode] = useState<'transaction' | 'initial_balance'>('transaction');
   const [error, setError] = useState('');
   const [isPending, startTransition] = useTransition();
 
@@ -64,7 +65,8 @@ export function AdjustBalanceDialog({
     setError('');
 
     startTransition(async () => {
-      const result = await adjustAccountBalance(account.id, realBalance);
+      const createTransaction = adjustmentMode === 'transaction';
+      const result = await adjustAccountBalance(account.id, realBalance, createTransaction);
       if (result.success) {
         handleOpenChange(false);
       } else {
@@ -110,13 +112,45 @@ export function AdjustBalanceDialog({
               />
             </div>
 
-            <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-600 dark:text-amber-400">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <p>
-                Isso criará uma transação de ajuste automático para sincronizar
-                seu saldo.
-              </p>
+            <div className="grid gap-3">
+              <Label className="text-muted-foreground ml-1">Opção de Ajuste</Label>
+              <div className="flex flex-col gap-3 p-4 rounded-xl bg-muted/20 border border-border/50">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={adjustmentMode === "transaction"}
+                    onChange={() => setAdjustmentMode("transaction")}
+                    className="accent-primary h-4 w-4"
+                  />
+                  Criar transação de ajuste
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={adjustmentMode === "initial_balance"}
+                    onChange={() => setAdjustmentMode("initial_balance")}
+                    className="accent-primary h-4 w-4"
+                  />
+                  Apenas corrigir valor inicial
+                </label>
+              </div>
             </div>
+
+            {adjustmentMode === "transaction" ? (
+              <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>
+                  Isso criará uma transação de ajuste automático no seu histórico para sincronizar seu saldo.
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3 rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-sm text-blue-600 dark:text-blue-400">
+                <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>
+                  O saldo será corrigido diretamente, sem criar nenhuma transação no histórico.
+                </p>
+              </div>
+            )}
 
             {error && (
               <p className="text-sm text-destructive">{error}</p>

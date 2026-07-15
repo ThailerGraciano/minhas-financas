@@ -278,12 +278,11 @@ function SubcategoryItem({ subcategory }: { subcategory: Subcategory }) {
         )}
       </div>
 
-      <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+      <div className="flex items-center gap-3">
         <Switch
           checked={subcategory.isPredictable}
           onCheckedChange={handleTogglePrediction}
           disabled={isPending}
-          className="scale-75"
         />
         <Button
           variant="ghost"

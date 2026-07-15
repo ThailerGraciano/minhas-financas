@@ -24,18 +24,18 @@ export function Navigation() {
   return (
     <>
       {/* Top Header - Desktop & Tablet */}
-      <header className="hidden md:flex h-20 items-center justify-between px-8 w-full sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="hidden md:flex h-20 items-center justify-between px-4 lg:px-8 w-full sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 gap-4">
         
         {/* Logo */}
-        <div className="flex items-center gap-2 w-48">
+        <div className="flex items-center gap-2 shrink-0">
           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold">
             MF
           </div>
-          <span className="text-xl font-bold tracking-tight">Finanças</span>
+          <span className="text-xl font-bold tracking-tight hidden lg:block">Finanças</span>
         </div>
 
         {/* Horizontal Nav - Pill shaped */}
-        <nav className="flex-1 flex justify-center items-center gap-1 overflow-x-auto no-scrollbar px-2">
+        <nav className="flex-1 flex justify-start xl:justify-center items-center gap-1 overflow-x-auto no-scrollbar px-2 pb-1 -mb-1">
           {navItems.map((item) => {
             const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
             return (
@@ -43,7 +43,7 @@ export function Navigation() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-full px-3 lg:px-4 py-2 text-sm font-medium transition-all duration-300 whitespace-nowrap",
+                  "flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-all duration-300 whitespace-nowrap",
                   isActive 
                     ? "bg-foreground text-background shadow-md scale-105" 
                     : "text-muted-foreground hover:bg-card hover:text-foreground"
@@ -56,10 +56,10 @@ export function Navigation() {
         </nav>
 
         {/* Right Section: Profile & Settings */}
-        <div className="flex items-center justify-end gap-4 w-48">
+        <div className="flex items-center justify-end gap-2 lg:gap-4 shrink-0">
           <Link 
             href="/settings"
-            className="w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+            className="w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0"
           >
             <Settings className="w-5 h-5" />
           </Link>

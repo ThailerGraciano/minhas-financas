@@ -39,7 +39,6 @@ export function ClientDataLoader<T>({
   useEffect(() => {
     if (selectedMonth !== currentMonth) {
       let active = true;
-      setIsLoading(true);
       fetchAction(selectedMonth)
         .then((newData) => {
           if (active) {
@@ -54,10 +53,18 @@ export function ClientDataLoader<T>({
       return () => {
         active = false;
       };
-    } else if (selectedMonth === currentMonth && data !== initialData) {
-      setData(initialData);
     }
-  }, [selectedMonth, currentMonth, fetchAction, initialData]); // Omitted 'data' to prevent unnecessary re-runs
+  }, [selectedMonth, currentMonth, fetchAction]);
+
+  const handleMonthChange = (month: string) => {
+    setSelectedMonth(month);
+    if (month !== currentMonth) {
+      setIsLoading(true);
+    } else {
+      setData(initialData);
+      setIsLoading(false);
+    }
+  };
 
   return (
     <>
@@ -67,7 +74,7 @@ export function ClientDataLoader<T>({
           <CompetencyFilter 
             closingDay={closingDay} 
             value={selectedMonth} 
-            onChange={setSelectedMonth} 
+            onChange={handleMonthChange} 
           />
           {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
         </div>

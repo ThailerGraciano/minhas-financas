@@ -6,6 +6,8 @@ import { eq, and } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { format } from 'date-fns';
 import { auth } from '@/auth';
+import { getTargetInvoiceMonth, buildCreditCardCompetencyCondition } from '@/lib/competency-utils';
+import { settings } from '@/db/schema';
 
 export async function getCreditCards() {
   const session = await auth();
@@ -358,17 +360,21 @@ export async function getCreditCardsWithSummary(competencyMonth: string) {
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
 
+  const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
+  const closingDay = appSettings?.closingDay || 25;
+
   const cards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
 
   const cardsWithSummary = await Promise.all(
     cards.map(async (card) => {
+      const targetInvoiceMonth = getTargetInvoiceMonth(competencyMonth, closingDay, card.dueDay);
       // Busca transações do cartão na competência informada
       const cardTxs = await db.select()
         .from(transactions)
         .where(
           and(
             eq(transactions.creditCardId, card.id),
-            eq(transactions.competencyMonth, competencyMonth),
+            eq(transactions.competencyMonth, targetInvoiceMonth),
             eq(transactions.type, 'credit_card_expense'),
             eq(transactions.userId, userId)
           )
@@ -405,28 +411,42 @@ export async function getCreditCardsCategorySummary(competencyMonth: string) {
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
 
+  const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
+  const closingDay = appSettings?.closingDay || 25;
+
+  const userCards = await db.select({ id: creditCards.id, dueDay: creditCards.dueDay }).from(creditCards).where(eq(creditCards.userId, userId));
+  const condition = buildCreditCardCompetencyCondition(competencyMonth, closingDay, userId, userCards);
+
   const cardTxs = await db.query.transactions.findMany({
-    where: (t, { eq, and }) => and(
-      eq(t.competencyMonth, competencyMonth),
-      eq(t.type, 'credit_card_expense'),
-      eq(t.userId, userId)
-    ),
+    where: condition,
     with: {
       category: true,
+      subcategory: true,
     }
   });
 
-  const categoryMap = new Map<string, number>();
+  const categoryMap = new Map<string, { value: number; subcategories: Map<string, number> }>();
 
   for (const t of cardTxs) {
     const amount = Number(t.amount);
     const categoryName = t.category?.name || 'Sem Categoria';
-    categoryMap.set(categoryName, (categoryMap.get(categoryName) || 0) + amount);
+    const subcategoryName = t.subcategory?.name || 'Geral';
+    
+    if (!categoryMap.has(categoryName)) {
+      categoryMap.set(categoryName, { value: 0, subcategories: new Map() });
+    }
+    
+    const catData = categoryMap.get(categoryName)!;
+    catData.value += amount;
+    catData.subcategories.set(subcategoryName, (catData.subcategories.get(subcategoryName) || 0) + amount);
   }
 
-  const result = Array.from(categoryMap.entries()).map(([category, value]) => ({
+  const result = Array.from(categoryMap.entries()).map(([category, data]) => ({
     category,
-    value
+    value: data.value,
+    subcategories: Array.from(data.subcategories.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
   }));
 
   // Sort descending by value

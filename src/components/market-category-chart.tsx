@@ -4,8 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Cell, Pie, PieChart } from "recharts";
 
+import React, { useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+
 interface MarketCategoryChartProps {
-  data: { category: string; value: number }[];
+  data: { 
+    category: string; 
+    value: number; 
+    subcategories?: { name: string; value: number }[];
+  }[];
 }
 
 const COLORS = [
@@ -34,6 +41,15 @@ const formatCurrency = (value: number) =>
   }).format(value);
 
 export function MarketCategoryChart({ data }: MarketCategoryChartProps) {
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }));
+  };
+
   const chartData = [...data]
     .sort((a, b) => b.value - a.value)
     .map((item, index) => ({
@@ -94,18 +110,49 @@ export function MarketCategoryChart({ data }: MarketCategoryChartProps) {
                 </tr>
               </thead>
               <tbody>
-                {chartData.map((item, index) => (
-                  <tr key={index} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
-                    <td className="px-4 py-3 flex items-center gap-3">
-                      <div
-                        className="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm"
-                        style={{ backgroundColor: item.fill }}
-                      />
-                      <span className="font-medium truncate">{item.category}</span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium">{formatCurrency(item.value)}</td>
-                  </tr>
-                ))}
+                {chartData.map((item, index) => {
+                  const hasSubcategories = item.subcategories && item.subcategories.length > 0;
+                  const isExpanded = expandedCategories[item.category];
+
+                  return (
+                    <React.Fragment key={index}>
+                      <tr 
+                        className={`border-b last:border-0 hover:bg-muted/50 transition-colors ${hasSubcategories ? 'cursor-pointer' : ''}`}
+                        onClick={() => hasSubcategories && toggleCategory(item.category)}
+                      >
+                        <td className="px-4 py-3 flex items-center gap-2">
+                          {hasSubcategories ? (
+                            isExpanded ? (
+                              <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                            )
+                          ) : (
+                            <div className="w-4 h-4 shrink-0" />
+                          )}
+                          <div
+                            className="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm"
+                            style={{ backgroundColor: item.fill }}
+                          />
+                          <span className="font-medium truncate">{item.category}</span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-medium">{formatCurrency(item.value)}</td>
+                      </tr>
+                      {isExpanded && item.subcategories && (
+                        item.subcategories.map((sub, subIndex) => (
+                          <tr key={`sub-${index}-${subIndex}`} className="border-b last:border-0 bg-muted/20">
+                            <td className="px-4 py-2 pl-12 flex items-center gap-2 text-muted-foreground">
+                              <span className="text-sm truncate">{sub.name}</span>
+                            </td>
+                            <td className="px-4 py-2 text-right text-sm text-muted-foreground">
+                              {formatCurrency(sub.value)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>

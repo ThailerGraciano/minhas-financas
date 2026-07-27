@@ -1,11 +1,12 @@
 'use server';
 
 import { db } from '@/db';
-import { accounts, creditCards, transactions, fixedTransactions } from '@/db/schema';
+import { accounts, creditCards, transactions, fixedTransactions, settings } from '@/db/schema';
 import { and, eq, gte, inArray, isNotNull, lte, gt } from 'drizzle-orm';
 import { addDays, addMonths, endOfMonth, format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { auth } from '@/auth';
+import { buildGlobalCompetencyCondition } from '@/lib/competency-utils';
 
 import { getTransactions } from './transactions';
 
@@ -16,13 +17,19 @@ export async function getDashboardData(month?: string) {
 
   const currentMonth = month || format(new Date(), 'yyyy-MM');
 
+  const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
+  const closingDay = appSettings?.closingDay || 25;
+
   const allAccounts = await db.select().from(accounts).where(eq(accounts.userId, userId));
   const totalBalance = allAccounts.reduce((acc, curr) => acc + Number(curr.currentBalance), 0);
+
+  const allCards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
+  const condition = buildGlobalCompetencyCondition(currentMonth, closingDay, userId, allCards);
 
   const monthTransactions = await db
     .select()
     .from(transactions)
-    .where(and(eq(transactions.competencyMonth, currentMonth), eq(transactions.userId, userId)));
+    .where(condition);
 
   let totalIncome = 0;
   let totalExpense = 0;
@@ -32,7 +39,6 @@ export async function getDashboardData(month?: string) {
     if (t.type === 'expense' || t.type === 'credit_card_expense') totalExpense += Number(t.amount);
   });
 
-  const allCards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
   const cardInvoices = allCards.map(card => {
     const cardExpenses = monthTransactions.filter(
       t => t.creditCardId === card.id && t.type === 'credit_card_expense',
@@ -389,11 +395,15 @@ export async function getExpenseTreemapData(competencyMonth: string) {
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
 
+  const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
+  const closingDay = appSettings?.closingDay || 25;
+  const userCards = await db.select({ id: creditCards.id, dueDay: creditCards.dueDay }).from(creditCards).where(eq(creditCards.userId, userId));
+  const condition = buildGlobalCompetencyCondition(competencyMonth, closingDay, userId, userCards);
+
   const rawTransactions = await db.query.transactions.findMany({
     where: and(
       inArray(transactions.type, ['expense', 'credit_card_expense']),
-      eq(transactions.competencyMonth, competencyMonth),
-      eq(transactions.userId, userId)
+      condition
     ),
     with: {
       category: true,

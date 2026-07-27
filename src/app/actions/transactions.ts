@@ -2,11 +2,12 @@
 
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { fixedTransactions, settings, transactions } from "@/db/schema";
+import { fixedTransactions, settings, transactions, creditCards } from "@/db/schema";
 import { addMonths, endOfMonth, format, getDate, parseISO, subMonths } from "date-fns";
 import { and, eq, gte, lte, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { buildGlobalCompetencyCondition } from "@/lib/competency-utils";
 
 type NewTransaction = typeof transactions.$inferInsert;
 type CreateTransactionInput = Omit<NewTransaction, "userId"> & {
@@ -60,8 +61,15 @@ export async function getTransactions(month?: string) {
   const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
   const closingDay = appSettings?.closingDay || 25;
 
+  const userCards = await db.query.creditCards.findMany({
+    where: eq(creditCards.userId, userId),
+    columns: { id: true, dueDay: true },
+  });
+
+  const condition = buildGlobalCompetencyCondition(currentMonth, closingDay, userId, userCards);
+
   const realTransactions = await db.query.transactions.findMany({
-    where: and(eq(transactions.competencyMonth, currentMonth), eq(transactions.userId, userId)),
+    where: condition,
     with: {
       account: true,
       category: true,

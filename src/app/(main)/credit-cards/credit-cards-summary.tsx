@@ -48,7 +48,7 @@ export function CreditCardsSummary({ cards, selectedMonth }: CreditCardsSummaryP
   const percentageUsed = totalLimit > 0 ? (totalInvoice / totalLimit) * 100 : 0;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <div className="grid grid-cols-1 gap-6 mb-8">
       {/* Resumo das Faturas */}
       <Card className="rounded-[2rem] border-transparent shadow-sm flex flex-col h-full overflow-hidden">
         <CardHeader className="pb-2">

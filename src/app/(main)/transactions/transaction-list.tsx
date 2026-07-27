@@ -43,7 +43,7 @@ export type TransactionWithRelations = {
   subcategoryId?: number | null;
   isGroup?: boolean;
   account?: { id: number; name: string } | null;
-  creditCard?: { id: number; name: string } | null;
+  creditCard?: { id: number; name: string; dueDay: number } | null;
   category?: { id: number; name: string; icon?: string | null } | null;
   subcategory?: { id: number; name: string } | null;
 };
@@ -146,13 +146,22 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
       filteredTxs.forEach((tx) => {
         if (tx.type === "credit_card_expense" && tx.creditCardId) {
           if (!grouped.has(tx.creditCardId)) {
+            let groupDate = tx.date;
+            
+            // Lógica forçada para o dia de vencimento real da fatura
+            const cardDueDay = tx.creditCard?.dueDay;
+            if (tx.competencyMonth && cardDueDay) {
+              const dueDayStr = String(cardDueDay).padStart(2, "0");
+              groupDate = `${tx.competencyMonth}-${dueDayStr}`;
+            }
+
             grouped.set(tx.creditCardId, {
               id: -(tx.creditCardId + 900000),
               isGroup: true,
               type: "expense",
               description: `Fatura: ${tx.creditCard?.name || "Cartão"}`,
               amount: 0,
-              date: tx.date,
+              date: groupDate,
               status: tx.status,
               isFixed: null,
               installmentCurrent: null,
@@ -165,10 +174,6 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
           const group = grouped.get(tx.creditCardId)!;
           group.amount = Number(group.amount) + Number(tx.amount);
           if (tx.status === "pending") group.status = "pending";
-
-          if (new Date(tx.date) > new Date(group.date)) {
-            group.date = tx.date;
-          }
         } else {
           otherTxs.push(tx);
         }

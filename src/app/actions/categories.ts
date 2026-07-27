@@ -13,7 +13,11 @@ export async function getCategories() {
 
   return await db.query.categories.findMany({
     where: eq(categories.userId, userId),
-    with: { subcategories: true },
+    with: { 
+      subcategories: {
+        orderBy: (subcategories, { asc }) => [asc(subcategories.name)]
+      }
+    },
     orderBy: (categories, { asc }) => [asc(categories.name)]
   });
 }

@@ -7,7 +7,7 @@ import { marketReceipts, marketItems, marketReceiptTransactions, transactions, s
 import { desc, inArray, eq, and, gte, lte } from 'drizzle-orm';
 import { SYSTEM_PROMPT } from '@/lib/prompts';
 import { auth } from '@/auth';
-import { subMonths, parse, format, addMonths } from 'date-fns';
+import { subMonths, parse, format, addMonths, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const receiptItemSchema = z.object({
@@ -134,6 +134,8 @@ export async function getRecentMarketTransactions() {
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
 
+    const futureLimit = format(addDays(new Date(), 7), 'yyyy-MM-dd');
+
   const recent = await db
     .select({
       id: transactions.id,
@@ -143,9 +145,13 @@ export async function getRecentMarketTransactions() {
       type: transactions.type,
     })
     .from(transactions)
-    .where(and(inArray(transactions.type, ['expense', 'credit_card_expense']), eq(transactions.userId, userId)))
+    .where(and(
+      inArray(transactions.type, ['expense', 'credit_card_expense']), 
+      eq(transactions.userId, userId),
+      lte(transactions.date, futureLimit)
+    ))
     .orderBy(desc(transactions.date), desc(transactions.id))
-    .limit(30);
+    .limit(50);
   
   return recent;
 }

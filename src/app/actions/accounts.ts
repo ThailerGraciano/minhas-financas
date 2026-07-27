@@ -273,7 +273,7 @@ export async function getAccountsBalancesByCompetency(competencyMonth: string) {
         id: acc.id,
         name: acc.name,
         type: acc.type,
-        calculated_balance: balance ?? 0,
+        currentBalance: (balance ?? 0).toString(),
       };
     }),
   );

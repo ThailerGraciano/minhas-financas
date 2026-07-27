@@ -2,7 +2,7 @@
 
 import { db } from '@/db';
 import { accounts, creditCards, categories } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, asc } from 'drizzle-orm';
 import { auth } from '@/auth';
 
 export async function getTransactionFormData() {
@@ -10,12 +10,17 @@ export async function getTransactionFormData() {
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
 
-  const accs = await db.select().from(accounts).where(eq(accounts.userId, userId));
-  const cards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
+  const accs = await db.select().from(accounts).where(eq(accounts.userId, userId)).orderBy(asc(accounts.name));
+  const cards = await db.select().from(creditCards).where(eq(creditCards.userId, userId)).orderBy(asc(creditCards.name));
   
   let cats = await db.query.categories.findMany({
     where: eq(categories.userId, userId),
-    with: { subcategories: true },
+    orderBy: (cats, { asc }) => [asc(cats.name)],
+    with: { 
+      subcategories: {
+        orderBy: (subcats, { asc }) => [asc(subcats.name)]
+      } 
+    },
   });
   
   // Create a default category se não existir para evitar bloqueio

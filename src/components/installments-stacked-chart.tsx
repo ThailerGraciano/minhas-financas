@@ -111,7 +111,7 @@ export function InstallmentsStackedChart({
   }
 
   return (
-    <ChartContainer config={chartConfig} className="min-h-[250px] w-full">
+    <ChartContainer config={chartConfig} className="min-h-[350px] w-full">
       <BarChart accessibilityLayer data={data} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
         <CartesianGrid vertical={false} />
         <XAxis

@@ -1,35 +1,24 @@
 import { getTransactions } from '@/app/actions/transactions';
 import { getSettings } from '@/app/actions/settings';
-import { CompetencyFilter } from '@/components/competency-filter';
-import { TransactionList } from './transaction-list';
-import { format } from 'date-fns';
-import { Suspense } from 'react';
+import { TransactionsClientPage } from './transactions-client-page';
+import { getDefaultCompetencyMonth } from '@/lib/date-utils';
 
 export const metadata = {
   title: 'Transações | Minhas Finanças',
 };
 
-export default async function TransactionsPage(props: { searchParams?: Promise<{ [key: string]: string | string[] | undefined }> }) {
-  const searchParams = await props.searchParams;
-  const monthParam = searchParams?.month as string | undefined;
+export default async function TransactionsPage() {
+  const settingsData = await getSettings();
+  const currentMonth = getDefaultCompetencyMonth(settingsData.closingDay);
   
-  const currentMonth = monthParam || format(new Date(), 'yyyy-MM');
-  
-  const [transactions, settingsData] = await Promise.all([
-    getTransactions(currentMonth),
-    getSettings(),
-  ]);
+  const initialTransactions = await getTransactions(currentMonth);
 
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">Transações</h1>
-        <Suspense fallback={null}>
-          <CompetencyFilter closingDay={settingsData.closingDay} />
-        </Suspense>
-      </div>
-      
-      <TransactionList transactions={transactions} />
+      <TransactionsClientPage 
+        closingDay={settingsData.closingDay}
+        initialTransactions={initialTransactions}
+      />
     </div>
   );
 }

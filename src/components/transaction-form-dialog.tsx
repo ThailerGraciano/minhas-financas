@@ -26,6 +26,7 @@ import { ptBR } from "date-fns/locale";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 type FormData = NonNullable<Awaited<ReturnType<typeof getTransactionFormData>>>;
 type Category = FormData["categories"][0];
@@ -51,6 +52,7 @@ export function TransactionFormDialog({
   const [selectedCreditCardId, setSelectedCreditCardId] = useState("");
   const [selectedInvoiceMonth, setSelectedInvoiceMonth] = useState("");
   const [isTotalAmount, setIsTotalAmount] = useState(true);
+  const [formKey, setFormKey] = useState(0);
 
   const router = useRouter();
 
@@ -83,7 +85,7 @@ export function TransactionFormDialog({
     const baseDate = new Date(year, month - 1, 1);
 
     const options: { value: string; label: string }[] = [];
-    for (let i = 0; i < 7; i++) {
+    for (let i = -3; i < 7; i++) {
       const d = addMonths(baseDate, i);
       const value = format(d, "yyyy-MM");
       const label = format(d, "MMMM/yyyy", { locale: ptBR });
@@ -110,6 +112,9 @@ export function TransactionFormDialog({
     e.preventDefault();
     setIsPending(true);
     setFormError("");
+
+    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement;
+    const action = submitter?.value || "save-and-close";
 
     const form = new FormData(e.currentTarget);
     const description = form.get("description") as string;
@@ -172,10 +177,24 @@ export function TransactionFormDialog({
 
     setIsPending(false);
     if (res.success) {
-      setOpen(false);
+      toast.success("Transação salva com sucesso!");
+      if (action === "save-and-continue") {
+        setTab("expense");
+        setExpenseType("single");
+        setPaymentMethod("account");
+        setSelectedCategoryId("");
+        setSelectedSubcategoryId("");
+        setSelectedCreditCardId("");
+        setSelectedInvoiceMonth("");
+        setIsTotalAmount(true);
+        setFormKey(prev => prev + 1);
+      } else {
+        setOpen(false);
+      }
       if (onSuccess) onSuccess();
       router.refresh();
     } else {
+      toast.error(res.error || "Erro ao salvar a transação.");
       setFormError(res.error || "Erro ao salvar a transação.");
     }
   };
@@ -266,7 +285,7 @@ export function TransactionFormDialog({
               <TabsTrigger value="transfer">Transferência</TabsTrigger>
             </TabsList>
 
-            <form onSubmit={handleSubmit} className="mt-6 space-y-6">
+            <form key={formKey} onSubmit={handleSubmit} className="mt-6 space-y-6">
               <div className="grid gap-3">
                 <Label htmlFor="description" className="text-muted-foreground ml-1">
                   Descrição
@@ -507,23 +526,22 @@ export function TransactionFormDialog({
                         <Label htmlFor="invoiceMonth" className="text-muted-foreground ml-1">
                           Fatura
                         </Label>
-                        <Select
-                          name="invoiceMonth"
-                          value={selectedInvoiceMonth}
-                          onValueChange={setSelectedInvoiceMonth}
-                          required
-                        >
-                          <SelectTrigger className="flex h-12 w-full rounded-xl border border-transparent bg-muted/40 px-4 py-2 text-base hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10">
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {invoiceOptions.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex flex-wrap gap-4 p-4 rounded-xl bg-muted/20 border border-border/50 max-h-48 overflow-y-auto">
+                          {invoiceOptions.map((opt) => (
+                            <label key={opt.value} className="flex items-center gap-2 text-sm cursor-pointer">
+                              <input
+                                type="radio"
+                                name="invoiceMonth"
+                                value={opt.value}
+                                checked={selectedInvoiceMonth === opt.value}
+                                onChange={() => setSelectedInvoiceMonth(opt.value)}
+                                className="accent-primary"
+                                required
+                              />{" "}
+                              {opt.label}
+                            </label>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </>
@@ -668,8 +686,11 @@ export function TransactionFormDialog({
 
               {formError && <p className="text-sm text-destructive text-center">{formError}</p>}
 
-              <div className="pt-6 flex justify-end">
-                <Button type="submit" disabled={isPending} className="w-full sm:w-auto mt-2">
+              <div className="pt-6 flex flex-col-reverse sm:flex-row justify-end gap-3">
+                <Button type="submit" name="action" value="save-and-continue" disabled={isPending} variant="outline" className="w-full sm:w-auto mt-2">
+                  {isPending ? "Salvando..." : "Salvar e Continuar"}
+                </Button>
+                <Button type="submit" name="action" value="save-and-close" disabled={isPending} className="w-full sm:w-auto mt-2">
                   {isPending ? "Salvando..." : "Salvar Transação"}
                 </Button>
               </div>

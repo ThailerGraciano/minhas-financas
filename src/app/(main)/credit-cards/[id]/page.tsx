@@ -4,13 +4,14 @@ import { CompetencyFilter } from '@/components/competency-filter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, CreditCard as CreditCardIcon, CalendarClock } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { notFound } from 'next/navigation';
-import { TransactionStatusToggle } from './transaction-status-toggle';
 import { PayInvoiceDialog } from './pay-invoice-dialog';
+import { PrepayInvoiceDialog } from './prepay-invoice-dialog';
+import { InvoiceTransactionList } from './invoice-transaction-list';
+import { getDefaultCompetencyMonth } from '@/lib/date-utils';
 
 export default async function CreditCardInvoicePage(props: {
   params: Promise<{ id: string }>;
@@ -25,13 +26,13 @@ export default async function CreditCardInvoicePage(props: {
 
   const searchParams = await props.searchParams;
   const monthParam = searchParams?.month as string | undefined;
-  const currentMonth = monthParam || format(new Date(), 'yyyy-MM');
-
   const card = await getCreditCard(id);
 
   if (!card) {
     notFound();
   }
+
+  const currentMonth = monthParam || getDefaultCompetencyMonth(card.closingDay);
 
   const summary = await getInvoiceSummary(id, currentMonth);
   const accounts = await getAccounts();
@@ -67,12 +68,20 @@ export default async function CreditCardInvoicePage(props: {
           </div>
         </div>
         
-        <PayInvoiceDialog 
-          creditCardId={id}
-          competencyMonth={currentMonth}
-          pendingAmount={summary.pending_amount}
-          accounts={accounts}
-        />
+        <div className="flex flex-col sm:flex-row gap-2">
+          <PrepayInvoiceDialog 
+            creditCardId={id}
+            competencyMonth={currentMonth}
+            pendingAmount={summary.pending_amount}
+            accounts={accounts}
+          />
+          <PayInvoiceDialog 
+            creditCardId={id}
+            competencyMonth={currentMonth}
+            pendingAmount={summary.pending_amount}
+            accounts={accounts}
+          />
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-muted/30 rounded-lg border">
@@ -147,39 +156,7 @@ export default async function CreditCardInvoicePage(props: {
               Nenhuma despesa registrada nesta fatura.
             </div>
           ) : (
-            <div className="rounded-md border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {summary.transactions.map((tx) => (
-                    <TableRow key={tx.id}>
-                      <TableCell className="font-medium whitespace-nowrap">{formatDate(tx.date)}</TableCell>
-                      <TableCell className="max-w-[120px] sm:max-w-[250px]">
-                        <div className="flex flex-col overflow-hidden">
-                          <span className="font-medium truncate" title={tx.description}>{tx.description}</span>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 overflow-hidden">
-                            <span className="bg-muted px-1.5 py-0.5 rounded-sm truncate" title={tx.category?.name || 'Sem categoria'}>{tx.category?.name || 'Sem categoria'}</span>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className={`font-semibold ${tx.status === 'paid' ? 'text-green-600' : 'text-red-500'}`}>
-                        {formatCurrency(Number(tx.amount))}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <TransactionStatusToggle transactionId={tx.id} initialStatus={tx.status} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <InvoiceTransactionList transactions={summary.transactions} />
           )}
         </CardContent>
       </Card>

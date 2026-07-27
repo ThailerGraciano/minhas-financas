@@ -43,9 +43,49 @@ export async function getProjectedCashFlow(accountId?: string) {
     orderBy: [asc(transactions.date)],
   });
 
+  // 2.5 Group credit card transactions into invoices
+  const processedTxs = [];
+  // Use a string map key: creditCardId-competencyMonth
+  const ccGroups = new Map<string, typeof allPendingTxs[0]>();
+
+  for (const tx of allPendingTxs) {
+    if (tx.type === 'credit_card_expense' && tx.creditCardId && tx.creditCard && tx.competencyMonth) {
+      const groupKey = `${tx.creditCardId}-${tx.competencyMonth}`;
+      if (!ccGroups.has(groupKey)) {
+        const dueDayStr = String(tx.creditCard.dueDay).padStart(2, '0');
+        const paymentDate = `${tx.competencyMonth}-${dueDayStr}`;
+        ccGroups.set(groupKey, {
+          ...tx,
+          id: -(tx.creditCardId * 100000 + parseInt(tx.competencyMonth.replace('-', ''))),
+          type: 'credit_card_expense',
+          amount: '0',
+          date: paymentDate,
+          description: `Fatura: ${tx.creditCard.name}`,
+          category: { 
+            id: 0, 
+            name: 'Fatura', 
+            userId: tx.userId, 
+            type: 'expense', 
+            icon: 'credit-card', 
+            isPredictable: false 
+          }
+        });
+      }
+      const group = ccGroups.get(groupKey)!;
+      group.amount = String(Number(group.amount) + Number(tx.amount));
+    } else {
+      processedTxs.push(tx);
+    }
+  }
+
+  // Push all grouped invoices to processedTxs
+  for (const group of ccGroups.values()) {
+    processedTxs.push(group);
+  }
+
   // Split into overdue (before today) and projected (today and future)
-  const overdueTransactions = allPendingTxs.filter(tx => tx.date < todayDate);
-  const futurePendingTxs = allPendingTxs.filter(tx => tx.date >= todayDate);
+  const overdueTransactions = processedTxs.filter(tx => tx.date < todayDate);
+  const futurePendingTxs = processedTxs.filter(tx => tx.date >= todayDate);
 
   // 3. Group by date map (only for future/today transactions)
   const grouped = new Map<string, typeof futurePendingTxs>();

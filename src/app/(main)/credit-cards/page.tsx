@@ -4,6 +4,7 @@ import { CreditCardFormDialog } from './credit-card-form-dialog';
 import { CreditCardsClientPage } from './credit-cards-client-page';
 import { format } from 'date-fns';
 import { Suspense } from 'react';
+import { getDefaultCompetencyMonth } from '@/lib/date-utils';
 
 export const metadata = {
   title: 'Cartões | Minhas Finanças',
@@ -11,7 +12,7 @@ export const metadata = {
 
 export default async function CreditCardsPage() {
   const settingsData = await getSettings();
-  const currentMonth = format(new Date(), 'yyyy-MM');
+  const currentMonth = getDefaultCompetencyMonth(settingsData.closingDay);
   const initialCards = await getCreditCardsWithSummary(currentMonth);
   
   return (

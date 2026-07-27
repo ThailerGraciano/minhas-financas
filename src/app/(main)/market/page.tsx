@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { format } from 'date-fns';
 import { ShoppingCart, PiggyBank } from 'lucide-react';
 import { getSettings } from '@/app/actions/settings';
+import { getDefaultCompetencyMonth } from '@/lib/date-utils';
 import { getMarketDashboardData, getMarketReceipts, getMarketCategoryHistory } from '@/app/actions/market';
 import { CompetencyFilter } from '@/components/competency-filter';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,10 +21,11 @@ export const metadata = {
 export default async function MarketPage(props: { searchParams?: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const searchParams = await props.searchParams;
   const monthParam = searchParams?.month as string | undefined;
-  const currentMonth = monthParam || format(new Date(), 'yyyy-MM');
 
-  const [settingsData, dashboardData, receipts, categoryHistory] = await Promise.all([
-    getSettings(),
+  const settingsData = await getSettings();
+  const currentMonth = monthParam || getDefaultCompetencyMonth(settingsData.closingDay);
+
+  const [dashboardData, receipts, categoryHistory] = await Promise.all([
     getMarketDashboardData(currentMonth),
     getMarketReceipts(currentMonth),
     getMarketCategoryHistory(currentMonth, 3),

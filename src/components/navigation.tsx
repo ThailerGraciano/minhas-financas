@@ -104,16 +104,16 @@ export function Navigation() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center justify-center w-full h-full space-y-1 text-[10px] font-medium transition-all",
+                  "flex flex-col items-center justify-center flex-1 min-w-0 h-full space-y-1 text-[10px] font-medium transition-all",
                   isActive 
                     ? "text-primary scale-110" 
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <div className={cn("p-1.5 rounded-full transition-colors", isActive ? "bg-primary/10" : "")}>
+                <div className={cn("p-1.5 rounded-full transition-colors shrink-0", isActive ? "bg-primary/10" : "")}>
                   <Icon className="h-5 w-5" />
                 </div>
-                <span>{item.name}</span>
+                <span className="truncate w-full text-center px-0.5">{item.name}</span>
               </Link>
             );
           })}

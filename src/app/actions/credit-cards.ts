@@ -228,6 +228,131 @@ export async function payFullInvoice(
   }
 }
 
+export async function prepayInvoice(
+  creditCardId: string | number,
+  competencyMonth: string,
+  accountId: string | number,
+  amount: number,
+  date: string
+): Promise<{ success: boolean; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+  const parsedCardId = Number(creditCardId);
+  const parsedAccountId = Number(accountId);
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      // 1. Get pending amount to ensure they don't prepay more than owed
+      const cardTransactions = await tx.select()
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.creditCardId, parsedCardId),
+            eq(transactions.competencyMonth, competencyMonth),
+            eq(transactions.type, 'credit_card_expense'),
+            eq(transactions.userId, userId)
+          )
+        );
+
+      let pendingAmount = 0;
+      for (const t of cardTransactions) {
+        if (t.status === 'pending') {
+          pendingAmount += Number(t.amount);
+        }
+      }
+
+      if (pendingAmount <= 0) {
+        throw new Error('Não há valor pendente para adiantar nesta fatura');
+      }
+
+      if (amount > pendingAmount) {
+        throw new Error('O valor do adiantamento não pode ser maior que o saldo devedor pendente da fatura');
+      }
+
+      // 2. Find or create Category for "Pagamento de Fatura"
+      let category = await tx.query.categories.findFirst({
+        where: (categories, { eq, and }) => and(eq(categories.name, 'Pagamento de Fatura'), eq(categories.userId, userId))
+      });
+      let subcategoryId = null;
+
+      if (!category) {
+        const [newCategory] = await tx.insert(categories)
+          .values({ userId, name: 'Pagamento de Fatura', type: 'expense', icon: 'CreditCard' })
+          .returning();
+        
+        const [newSubcategory] = await tx.insert(subcategories)
+          .values({ userId, name: 'Geral', categoryId: newCategory.id })
+          .returning();
+          
+        category = newCategory;
+        subcategoryId = newSubcategory.id;
+      } else {
+        const subcategory = await tx.query.subcategories.findFirst({
+          where: (subcategories, { eq, and }) => and(eq(subcategories.categoryId, category!.id), eq(subcategories.userId, userId))
+        });
+        subcategoryId = subcategory?.id || null;
+        
+        if (!subcategoryId) {
+          const [newSubcategory] = await tx.insert(subcategories)
+            .values({ userId, name: 'Geral', categoryId: category.id })
+            .returning();
+          subcategoryId = newSubcategory.id;
+        }
+      }
+
+      // 3. Create the transfer transaction (money leaving the checking account)
+      await tx.insert(transactions).values({
+        userId,
+        type: 'transfer',
+        accountId: parsedAccountId,
+        categoryId: category.id,
+        subcategoryId: subcategoryId,
+        amount: amount.toString(),
+        description: `Adiantamento de Fatura - ${competencyMonth}`,
+        date: date,
+        competencyMonth: competencyMonth,
+        status: 'paid',
+      });
+
+      // 4. Create the negative expense on the credit card (reducing pending amount)
+      await tx.insert(transactions).values({
+        userId,
+        type: 'credit_card_expense',
+        creditCardId: parsedCardId,
+        categoryId: category.id,
+        subcategoryId: subcategoryId,
+        amount: (-amount).toString(), // Negative amount
+        description: `Adiantamento de Fatura`,
+        date: date,
+        competencyMonth: competencyMonth,
+        status: 'pending', // Keeps it pending so it reduces the pending sum, and gets marked as paid later
+      });
+
+      // 5. Deduct from checking account balance
+      const [account] = await tx.select().from(accounts).where(and(eq(accounts.id, parsedAccountId), eq(accounts.userId, userId)));
+      if (account) {
+        const newBalance = Number(account.currentBalance) - amount;
+        await tx.update(accounts)
+          .set({ currentBalance: newBalance.toString() })
+          .where(and(eq(accounts.id, parsedAccountId), eq(accounts.userId, userId)));
+      }
+
+      return { success: true };
+    });
+
+    revalidatePath('/credit-cards');
+    revalidatePath(`/credit-cards/${parsedCardId}`);
+    revalidatePath('/dashboard');
+    revalidatePath('/transactions');
+    revalidatePath('/planning');
+    return result;
+  } catch (error) {
+    console.error('Error prepaying invoice:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Falha ao adiantar fatura' };
+  }
+}
+
 export async function getCreditCardsWithSummary(competencyMonth: string) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");

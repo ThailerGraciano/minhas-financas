@@ -159,7 +159,9 @@ export async function createTransaction(
   const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
   const closingDay = appSettings?.closingDay || 25;
   const parsedDate = parseISO(data.date);
-  data.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
+  if (!data.creditCardId) {
+    data.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
+  }
 
   if (subcategoryRequiredTypes.includes(data.type) && (!data.subcategoryId || data.subcategoryId <= 0)) {
     return { success: false, error: "Subcategoria é obrigatória para receitas e despesas" };
@@ -270,9 +272,11 @@ export async function createTransaction(
 
       const installmentsToInsert: NewTransaction[] = [];
       const baseDate = parseISO(data.date);
+      const baseCompetency = txData.competencyMonth ? parseISO(`${txData.competencyMonth}-01`) : baseDate;
 
       for (let i = currentInstallment + 1; i <= txData.installmentTotal; i++) {
         const nextDate = addMonths(baseDate, i - currentInstallment);
+        const nextCompetency = addMonths(baseCompetency, i - currentInstallment);
         const isLast = i === txData.installmentTotal;
 
         installmentsToInsert.push({
@@ -281,7 +285,7 @@ export async function createTransaction(
           userId,
           amount: isLast ? lastParcelAmount : baseParcelAmount,
           date: format(nextDate, "yyyy-MM-dd"),
-          competencyMonth: format(nextDate, "yyyy-MM"),
+          competencyMonth: format(nextCompetency, "yyyy-MM"),
           installmentCurrent: i,
           parentTransactionId: parentTx.id,
         });
@@ -553,11 +557,6 @@ export async function updateTransaction(
     const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
     const closingDay = appSettings?.closingDay || 25;
 
-    if (inputData.date) {
-      const parsedDate = parseISO(inputData.date);
-      inputData.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
-    }
-
     const result = await db.transaction(async (tx) => {
       const [oldTx] = await tx
         .select()
@@ -565,6 +564,12 @@ export async function updateTransaction(
         .where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
       if (!oldTx) {
         throw new Error("Transação não encontrada");
+      }
+
+      const isCreditCard = inputData.creditCardId !== undefined ? inputData.creditCardId : oldTx.creditCardId;
+      if (inputData.date && !isCreditCard) {
+        const parsedDate = parseISO(inputData.date);
+        inputData.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
       }
 
       const { destinationAccountId, ...data } = inputData;

@@ -12,10 +12,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { addMonths, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 type FormData = NonNullable<Awaited<ReturnType<typeof getTransactionFormData>>>;
 type Category = FormData["categories"][0];
 type Subcategory = Category["subcategories"][0];
+type CreditCard = FormData["creditCards"][0];
 
 interface TransactionProp {
   id: number | string;
@@ -28,6 +31,7 @@ interface TransactionProp {
   accountId?: number | string | null;
   creditCardId?: number | string | null;
   destinationAccountId?: number | string | null;
+  competencyMonth?: string;
 }
 
 interface EditTransactionDialogProps {
@@ -47,6 +51,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
   
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [selectedDestinationAccountId, setSelectedDestinationAccountId] = useState("");
+  const [selectedInvoiceMonth, setSelectedInvoiceMonth] = useState("");
   const [fullTransaction, setFullTransaction] = useState<TransactionProp | null>(null);
   
   const router = useRouter();
@@ -76,6 +81,9 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
           if (details.type === 'transfer' && details.destinationAccountId) {
             setSelectedDestinationAccountId(String(details.destinationAccountId));
           }
+          if (details.type === 'credit_card_expense' && details.competencyMonth) {
+            setSelectedInvoiceMonth(details.competencyMonth);
+          }
         }
       });
     }
@@ -93,6 +101,42 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
     return cat?.subcategories || [];
   }, [formData, selectedCategoryId]);
 
+  const getDefaultInvoiceMonth = (closingDay: number) => {
+    const today = new Date();
+    if (today.getDate() > closingDay) {
+      const next = addMonths(today, 1);
+      return format(next, "yyyy-MM");
+    }
+    return format(today, "yyyy-MM");
+  };
+
+  const invoiceOptions = useMemo(() => {
+    if (!selectedAccountId || !selectedAccountId.startsWith('cc-') || !formData?.creditCards) return [];
+    const cardId = Number(selectedAccountId.replace('cc-', ''));
+    const card = formData.creditCards.find((c: CreditCard) => c.id === cardId);
+    if (!card) return [];
+
+    let baseDate: Date;
+    if (transaction?.type === 'credit_card_expense' && transaction.competencyMonth) {
+      const [year, month] = transaction.competencyMonth.split("-").map(Number);
+      baseDate = new Date(year, month - 1, 1);
+    } else {
+      const defaultMonth = getDefaultInvoiceMonth(card.closingDay);
+      const [year, month] = defaultMonth.split("-").map(Number);
+      baseDate = new Date(year, month - 1, 1);
+    }
+
+    const options: { value: string; label: string }[] = [];
+    for (let i = -3; i < 7; i++) {
+      const d = addMonths(baseDate, i);
+      const value = format(d, "yyyy-MM");
+      const label = format(d, "MMMM/yyyy", { locale: ptBR });
+      const capitalizedLabel = label.charAt(0).toUpperCase() + label.slice(1);
+      options.push({ value, label: capitalizedLabel });
+    }
+    return options;
+  }, [selectedAccountId, formData?.creditCards, transaction?.type, transaction?.competencyMonth]);
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!transaction) return;
@@ -104,10 +148,21 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
     const amount = form.get("amount") as string;
     const date = form.get("date") as string;
 
-    const competencyMonth = date.substring(0, 7);
+    let competencyMonth = date.substring(0, 7);
+    const isCreditCard = selectedAccountId && selectedAccountId.startsWith('cc-');
+    if (isCreditCard && selectedInvoiceMonth) {
+      competencyMonth = selectedInvoiceMonth;
+    }
 
     const accountId = selectedAccountId && !selectedAccountId.startsWith('cc-') ? Number(selectedAccountId) : null;
     const creditCardId = selectedAccountId && selectedAccountId.startsWith('cc-') ? Number(selectedAccountId.replace('cc-', '')) : null;
+
+    let type = transaction.type;
+    if (transaction.type === 'expense' && isCreditCard) {
+      type = 'credit_card_expense';
+    } else if (transaction.type === 'credit_card_expense' && !isCreditCard) {
+      type = 'expense';
+    }
 
     const updateData = {
       description,
@@ -118,6 +173,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
       subcategoryId: selectedSubcategoryId ? Number(selectedSubcategoryId) : null,
       accountId,
       creditCardId,
+      type,
       destinationAccountId: selectedDestinationAccountId && transaction.type === 'transfer' ? Number(selectedDestinationAccountId) : undefined,
     };
 
@@ -191,11 +247,33 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
                     {formData.accounts.map((a: { id: string | number; name: string }) => (
                       <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
                     ))}
-                    {transaction.type === 'credit_card_expense' && formData.creditCards.map((c: { id: string | number; name: string }) => (
+                    {(transaction.type === 'credit_card_expense' || transaction.type === 'expense') && formData.creditCards.map((c: { id: string | number; name: string }) => (
                       <SelectItem key={`cc-${c.id}`} value={`cc-${c.id}`}>{c.name} (Cartão)</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            )}
+
+            {selectedAccountId && selectedAccountId.startsWith('cc-') && invoiceOptions.length > 0 && (
+              <div className="grid gap-2">
+                <Label htmlFor="invoiceMonth">Fatura</Label>
+                <div className="flex flex-wrap gap-4 p-4 rounded-xl bg-muted/20 border border-border/50 max-h-48 overflow-y-auto">
+                  {invoiceOptions.map((opt) => (
+                    <label key={opt.value} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        name="invoiceMonth"
+                        value={opt.value}
+                        checked={selectedInvoiceMonth === opt.value}
+                        onChange={() => setSelectedInvoiceMonth(opt.value)}
+                        className="accent-primary"
+                        required
+                      />{" "}
+                      {opt.label}
+                    </label>
+                  ))}
+                </div>
               </div>
             )}
 

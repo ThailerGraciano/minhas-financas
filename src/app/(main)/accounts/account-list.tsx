@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Wallet, PiggyBank, Landmark, Archive, MoreVertical, Pencil, SlidersHorizontal, Utensils, Coffee } from 'lucide-react';
+import { Wallet, PiggyBank, Landmark, Archive, MoreVertical, Pencil, SlidersHorizontal, Utensils, Coffee, List } from 'lucide-react';
+import Link from 'next/link';
 import { AccountFormDialog } from './account-form-dialog';
 import { AdjustBalanceDialog } from './adjust-balance-dialog';
 import { Button } from '@/components/ui/button';
@@ -53,10 +54,10 @@ function AccountCard({ account }: { account: Account }) {
   return (
     <Card className="transition-all hover:shadow-md">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <div className="flex items-center gap-2">
+        <Link href={`/transactions?accountId=${account.id}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           {getTypeIcon(account.type)}
           <CardTitle className="text-sm font-medium">{account.name}</CardTitle>
-        </div>
+        </Link>
 
         {/* Actions dropdown */}
         <DropdownMenu>
@@ -71,6 +72,13 @@ function AccountCard({ account }: { account: Account }) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild>
+              <Link href={`/transactions?accountId=${account.id}`} className="cursor-pointer flex items-center w-full">
+                <List className="mr-2 h-4 w-4" />
+                Ver Extrato
+              </Link>
+            </DropdownMenuItem>
+
             <DropdownMenuItem
               onSelect={(e) => {
                 e.preventDefault();
@@ -111,10 +119,12 @@ function AccountCard({ account }: { account: Account }) {
       </CardHeader>
 
       <CardContent>
-        <div className="text-2xl font-bold">{formatCurrency(account.currentBalance)}</div>
-        <p className="text-xs text-muted-foreground mt-1">
-          {getTypeName(account.type)}
-        </p>
+        <Link href={`/transactions?accountId=${account.id}`} className="block group">
+          <div className="text-2xl font-bold group-hover:text-primary transition-colors">{formatCurrency(account.currentBalance)}</div>
+          <p className="text-xs text-muted-foreground mt-1">
+            {getTypeName(account.type)}
+          </p>
+        </Link>
       </CardContent>
     </Card>
   );

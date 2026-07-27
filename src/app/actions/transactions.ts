@@ -51,7 +51,7 @@ const transactionSchema = z
 
 const subcategoryRequiredTypes = ["income", "expense", "credit_card_expense"];
 
-export async function getTransactions(month?: string) {
+export async function getTransactions(month?: string, accountId?: number) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
@@ -67,9 +67,13 @@ export async function getTransactions(month?: string) {
   });
 
   const condition = buildGlobalCompetencyCondition(currentMonth, closingDay, userId, userCards);
+  let finalCondition = condition;
+  if (accountId) {
+    finalCondition = and(condition, eq(transactions.accountId, accountId)) as typeof condition;
+  }
 
   const realTransactions = await db.query.transactions.findMany({
-    where: condition,
+    where: finalCondition,
     with: {
       account: true,
       category: true,
@@ -81,12 +85,17 @@ export async function getTransactions(month?: string) {
   const monthDate = parseISO(`${currentMonth}-01`);
   const lastDayOfMonth = format(endOfMonth(monthDate), "yyyy-MM-dd");
 
+  let fixedCondition = and(
+    eq(fixedTransactions.active, true),
+    lte(fixedTransactions.startDate, lastDayOfMonth),
+    eq(fixedTransactions.userId, userId),
+  );
+  if (accountId) {
+    fixedCondition = and(fixedCondition, eq(fixedTransactions.accountId, accountId)) as typeof fixedCondition;
+  }
+
   const activeFixedTxs = await db.query.fixedTransactions.findMany({
-    where: and(
-      eq(fixedTransactions.active, true),
-      lte(fixedTransactions.startDate, lastDayOfMonth),
-      eq(fixedTransactions.userId, userId),
-    ),
+    where: fixedCondition,
     with: {
       account: true,
       category: true,

@@ -2,9 +2,9 @@
 
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { fixedTransactions, settings, transactions, creditCards } from "@/db/schema";
+import { fixedTransactions, settings, transactions, creditCards, accounts } from "@/db/schema";
 import { addMonths, endOfMonth, format, getDate, parseISO, subMonths } from "date-fns";
-import { and, eq, gte, lte, or } from "drizzle-orm";
+import { and, eq, gte, lte, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { buildGlobalCompetencyCondition } from "@/lib/competency-utils";
@@ -23,6 +23,41 @@ function getCompetencyMonth(date: Date, closingDay: number): string {
     return format(addMonths(date, 1), "yyyy-MM");
   }
   return format(date, "yyyy-MM");
+}
+
+async function applyBalanceDelta(
+  tx: any,
+  accountId: number | null | undefined,
+  amount: number | string,
+  type: string,
+  status: string,
+  parentTransactionId?: number | null,
+  isRevert = false
+) {
+  if (!accountId || status !== "paid") return;
+
+  let delta = 0;
+  const numAmount = Number(amount);
+
+  if (type === "income") {
+    delta = numAmount;
+  } else if (type === "expense" || type === "credit_card_expense") {
+    delta = -numAmount;
+  } else if (type === "transfer") {
+    if (!parentTransactionId) {
+      delta = -numAmount; // Saída
+    } else {
+      delta = numAmount; // Entrada
+    }
+  }
+
+  if (delta === 0) return;
+  if (isRevert) delta = -delta;
+
+  await tx
+    .update(accounts)
+    .set({ currentBalance: sql`${accounts.currentBalance} + ${delta}` })
+    .where(eq(accounts.id, accountId));
 }
 
 const transactionSchema = z
@@ -231,15 +266,17 @@ export async function createTransaction(
           const nextCompetency = addMonths(baseCompetency, i);
           
           if (isTransfer) {
+            const status = i === 0 ? txData.status || "pending" : "pending";
             const [originTx] = await tx.insert(transactions).values({
               ...txData,
               userId,
               description: `${txData.description} (Saída)`,
               date: format(nextDate, "yyyy-MM-dd"),
               competencyMonth: format(nextCompetency, "yyyy-MM"),
-              status: i === 0 ? txData.status || "pending" : "pending",
+              status,
               fixedTransactionId: fixedTx.id,
             }).returning();
+            await applyBalanceDelta(tx, txData.accountId, txData.amount, txData.type, status, null);
             
             await tx.insert(transactions).values({
               ...txData,
@@ -248,19 +285,22 @@ export async function createTransaction(
               description: `${txData.description} (Entrada)`,
               date: format(nextDate, "yyyy-MM-dd"),
               competencyMonth: format(nextCompetency, "yyyy-MM"),
-              status: i === 0 ? txData.status || "pending" : "pending",
+              status,
               fixedTransactionId: fixedTx.id,
               parentTransactionId: originTx.id,
             });
+            await applyBalanceDelta(tx, destinationAccountId, txData.amount, txData.type, status, originTx.id);
           } else {
+             const status = i === 0 ? txData.status || "pending" : "pending";
              await tx.insert(transactions).values({
               ...txData,
               userId,
               date: format(nextDate, "yyyy-MM-dd"),
               competencyMonth: format(nextCompetency, "yyyy-MM"),
-              status: i === 0 ? txData.status || "pending" : "pending",
+              status,
               fixedTransactionId: fixedTx.id,
             });
+            await applyBalanceDelta(tx, txData.accountId, txData.amount, txData.type, status, null);
           }
         }
         return { success: true };
@@ -304,6 +344,7 @@ export async function createTransaction(
              }).returning();
              originParentId = originTx.id;
              finalReturnId = originTx.id;
+             await applyBalanceDelta(tx, txData.accountId, originTx.amount, originTx.type, originTx.status || "pending", null);
 
              const [destTx] = await tx.insert(transactions).values({
                 ...txData,
@@ -315,6 +356,7 @@ export async function createTransaction(
                 parentTransactionId: originTx.id,
              }).returning();
              destParentId = destTx.id;
+             await applyBalanceDelta(tx, destinationAccountId, destTx.amount, destTx.type, destTx.status || "pending", originTx.id);
           } else {
              const [parentTx] = await tx.insert(transactions).values({
                 ...txData,
@@ -325,6 +367,7 @@ export async function createTransaction(
              }).returning();
              originParentId = parentTx.id;
              finalReturnId = parentTx.id;
+             await applyBalanceDelta(tx, txData.accountId, parentTx.amount, parentTx.type, parentTx.status || "pending", null);
           }
 
           const baseDate = parseISO(data.date);
@@ -393,14 +436,16 @@ export async function createTransaction(
             description: `${txData.description} (Saída)`,
           })
           .returning();
+        await applyBalanceDelta(tx, txData.accountId, txData.amount, txData.type, txData.status || "pending", null);
 
-        await tx.insert(transactions).values({
+        const [destTx] = await tx.insert(transactions).values({
           ...txData,
           userId,
           accountId: destinationAccountId,
           description: `${txData.description} (Entrada)`,
           parentTransactionId: originTx.id,
-        });
+        }).returning();
+        await applyBalanceDelta(tx, destinationAccountId, txData.amount, txData.type, txData.status || "pending", originTx.id);
 
         return { success: true, parentId: originTx.id };
       });
@@ -410,7 +455,10 @@ export async function createTransaction(
       revalidatePath("/planning");
       return result;
     } else {
-      await db.insert(transactions).values({ ...txData, userId });
+      await db.transaction(async (tx) => {
+        await tx.insert(transactions).values({ ...txData, userId });
+        await applyBalanceDelta(tx, txData.accountId, txData.amount, txData.type, txData.status || "pending", null);
+      });
 
       revalidatePath("/transactions");
       revalidatePath("/");
@@ -455,12 +503,17 @@ async function changeTransactionStatus(id: number, newStatus: "paid" | "pending"
 
       if (originTx && destTx) {
         await tx.update(transactions).set({ status: newStatus }).where(eq(transactions.id, originTx.id));
+        await applyBalanceDelta(tx, originTx.accountId, originTx.amount, originTx.type, "paid", null, newStatus === "pending");
+        
         await tx.update(transactions).set({ status: newStatus }).where(eq(transactions.id, destTx.id));
+        await applyBalanceDelta(tx, destTx.accountId, destTx.amount, destTx.type, "paid", originTx.id, newStatus === "pending");
       } else {
         await tx.update(transactions).set({ status: newStatus }).where(eq(transactions.id, id));
+        await applyBalanceDelta(tx, transactionItem.accountId, transactionItem.amount, transactionItem.type, "paid", transactionItem.parentTransactionId, newStatus === "pending");
       }
     } else {
       await tx.update(transactions).set({ status: newStatus }).where(eq(transactions.id, id));
+      await applyBalanceDelta(tx, transactionItem.accountId, transactionItem.amount, transactionItem.type, "paid", transactionItem.parentTransactionId, newStatus === "pending");
     }
 
     return { success: true };
@@ -661,7 +714,12 @@ export async function deleteTransaction(id: number, mode: "single" | "future" = 
         for (const targetId of idsToDelete) {
           const linkedDests = await tx.select().from(transactions).where(eq(transactions.parentTransactionId, targetId));
           for (const ld of linkedDests) {
+            await applyBalanceDelta(tx, ld.accountId, ld.amount, ld.type, ld.status || "pending", ld.parentTransactionId, true);
             await tx.delete(transactions).where(eq(transactions.id, ld.id));
+          }
+          const [originItem] = await tx.select().from(transactions).where(eq(transactions.id, targetId));
+          if (originItem) {
+             await applyBalanceDelta(tx, originItem.accountId, originItem.amount, originItem.type, originItem.status || "pending", originItem.parentTransactionId, true);
           }
           await tx.delete(transactions).where(eq(transactions.id, targetId));
         }
@@ -675,11 +733,14 @@ export async function deleteTransaction(id: number, mode: "single" | "future" = 
                 where: and(eq(transactions.parentTransactionId, transactionItem.id), eq(transactions.userId, userId)),
               });
 
+          await applyBalanceDelta(tx, transactionItem.accountId, transactionItem.amount, transactionItem.type, transactionItem.status || "pending", transactionItem.parentTransactionId, true);
           await tx.delete(transactions).where(eq(transactions.id, transactionItem.id));
           if (otherTx) {
+            await applyBalanceDelta(tx, otherTx.accountId, otherTx.amount, otherTx.type, otherTx.status || "pending", otherTx.parentTransactionId, true);
             await tx.delete(transactions).where(eq(transactions.id, otherTx.id));
           }
         } else {
+          await applyBalanceDelta(tx, transactionItem.accountId, transactionItem.amount, transactionItem.type, transactionItem.status || "pending", transactionItem.parentTransactionId, true);
           await tx.delete(transactions).where(eq(transactions.id, id));
         }
       }
@@ -744,21 +805,35 @@ export async function updateTransaction(
         const destAccountId = destinationAccountId;
         delete data.accountId; // Handle accountId separately
 
+        // Revert old deltas
+        const originOld = isDestinationTx ? otherTx : oldTx;
+        const destOld = isDestinationTx ? oldTx : otherTx;
+        if (originOld) {
+           await applyBalanceDelta(tx, originOld.accountId, originOld.amount, originOld.type, originOld.status || "pending", originOld.parentTransactionId, true);
+        }
+        if (destOld) {
+           await applyBalanceDelta(tx, destOld.accountId, destOld.amount, destOld.type, destOld.status || "pending", destOld.parentTransactionId, true);
+        }
+
         // Update origin
         const originId = isDestinationTx ? otherTx?.id : id;
         if (originId) {
           const originDesc = data.description ? `${data.description.replace(/\s*\(Saída\)|\s*\(Entrada\)/g, "")} (Saída)` : undefined;
-          await tx.update(transactions).set({ ...data, accountId: originAccountId, description: originDesc || data.description }).where(eq(transactions.id, originId));
+          const [updatedOrigin] = await tx.update(transactions).set({ ...data, accountId: originAccountId, description: originDesc || data.description }).where(eq(transactions.id, originId)).returning();
+          await applyBalanceDelta(tx, updatedOrigin.accountId, updatedOrigin.amount, updatedOrigin.type, updatedOrigin.status || "pending", updatedOrigin.parentTransactionId, false);
         }
 
         // Update destination
         const destId = isDestinationTx ? id : otherTx?.id;
         if (destId) {
           const destDesc = data.description ? `${data.description.replace(/\s*\(Saída\)|\s*\(Entrada\)/g, "")} (Entrada)` : undefined;
-          await tx.update(transactions).set({ ...data, accountId: destAccountId, description: destDesc || data.description }).where(eq(transactions.id, destId));
+          const [updatedDest] = await tx.update(transactions).set({ ...data, accountId: destAccountId, description: destDesc || data.description }).where(eq(transactions.id, destId)).returning();
+          await applyBalanceDelta(tx, updatedDest.accountId, updatedDest.amount, updatedDest.type, updatedDest.status || "pending", updatedDest.parentTransactionId, false);
         }
       } else {
-        await tx.update(transactions).set(data).where(eq(transactions.id, id));
+        await applyBalanceDelta(tx, oldTx.accountId, oldTx.amount, oldTx.type, oldTx.status || "pending", oldTx.parentTransactionId, true);
+        const [updatedTx] = await tx.update(transactions).set(data).where(eq(transactions.id, id)).returning();
+        await applyBalanceDelta(tx, updatedTx.accountId, updatedTx.amount, updatedTx.type, updatedTx.status || "pending", updatedTx.parentTransactionId, false);
       }
 
       return { success: true };

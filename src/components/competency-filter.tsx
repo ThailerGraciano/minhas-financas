@@ -13,6 +13,8 @@ interface CompetencyFilterProps {
   closingDay: number;
   /** Valor controlado opcional. Se passado, o componente não altera a URL. */
   value?: string;
+  /** Mês padrão a ser assumido quando não houver valor na URL (fallback). */
+  defaultMonth?: string;
   /** Callback para quando o mês muda. */
   onChange?: (month: string) => void;
 }
@@ -22,13 +24,15 @@ interface CompetencyFilterProps {
  * Usa searchParams (?month=YYYY-MM) para persistir o estado na URL,
  * permitindo que Server Components leiam o mês diretamente.
  */
-export function CompetencyFilter({ closingDay, value, onChange }: CompetencyFilterProps) {
+export function CompetencyFilter({ closingDay, value, defaultMonth, onChange }: CompetencyFilterProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const fallbackMonth = defaultMonth || format(new Date(), "yyyy-MM");
+
   // Se 'value' foi fornecido, usamos ele (controlled mode), senão usamos a URL
-  const currentMonth = value !== undefined ? value : (searchParams.get("month") || format(new Date(), "yyyy-MM"));
+  const currentMonth = value !== undefined ? value : (searchParams.get("month") || fallbackMonth);
   const currentDate = new Date(`${currentMonth}-01T00:00:00`);
 
   // Gera opções: 12 meses passados + mês atual + 12 meses futuros
@@ -56,8 +60,8 @@ export function CompetencyFilter({ closingDay, value, onChange }: CompetencyFilt
     }
     
     const params = new URLSearchParams(searchParams.toString());
-    // Se for o mês atual, remove o param para URL limpa
-    if (monthStr === format(new Date(), "yyyy-MM")) {
+    // Se for o mês padrão configurado, remove o param para URL limpa
+    if (monthStr === fallbackMonth) {
       params.delete("month");
     } else {
       params.set("month", monthStr);

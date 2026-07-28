@@ -85,7 +85,10 @@ export default async function CreditCardInvoicePage(props: {
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-muted/30 rounded-lg border">
-        <CompetencyFilter closingDay={card.closingDay} />
+        <CompetencyFilter 
+          closingDay={card.closingDay} 
+          defaultMonth={getDefaultCompetencyMonth(card.closingDay)} 
+        />
       </div>
 
       {/* Visual Summary */}

@@ -2,7 +2,7 @@
 
 import { db } from '@/db';
 import { transactions, accounts } from '@/db/schema';
-import { eq, and, asc } from 'drizzle-orm';
+import { eq, and, asc, or } from 'drizzle-orm';
 import { format, addDays } from 'date-fns';
 import { auth } from '@/auth';
 
@@ -29,8 +29,22 @@ export async function getProjectedCashFlow(accountId?: string) {
     eq(transactions.userId, userId)
   ];
   
+  let isCheckingAccount = false;
+  if (allAccounts.length === 1 && allAccounts[0].type === 'checking') {
+    isCheckingAccount = true;
+  }
+  
   if (accountId) {
-    conditions.push(eq(transactions.accountId, Number(accountId)));
+    if (isCheckingAccount) {
+      conditions.push(
+        or(
+          eq(transactions.accountId, Number(accountId)),
+          eq(transactions.type, 'credit_card_expense')
+        )
+      );
+    } else {
+      conditions.push(eq(transactions.accountId, Number(accountId)));
+    }
   }
 
   const allPendingTxs = await db.query.transactions.findMany({

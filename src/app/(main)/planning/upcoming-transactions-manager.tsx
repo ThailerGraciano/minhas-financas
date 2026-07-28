@@ -109,7 +109,7 @@ export function UpcomingTransactionsManager({
 
                 {/* Upcoming/Future Rows */}
                 {upcomingTransactions.map((tx) => {
-                  const isIncome = tx.type === 'income';
+                  const isIncome = tx.type === 'income' || (tx.type === 'transfer' && tx.description.includes('(Entrada)'));
                   return (
                     <TableRow key={tx.id} className="hover:bg-muted/30">
                       <TableCell className="font-medium whitespace-nowrap py-4">
@@ -178,7 +178,7 @@ export function UpcomingTransactionsManager({
               </TableHeader>
               <TableBody>
                 {overdueTransactions.map((tx) => {
-                  const isIncome = tx.type === 'income';
+                  const isIncome = tx.type === 'income' || (tx.type === 'transfer' && tx.description.includes('(Entrada)'));
                   return (
                     <TableRow key={tx.id} className="hover:bg-muted/40">
                       <TableCell className="font-medium whitespace-nowrap text-xs text-red-500">

@@ -1,6 +1,11 @@
 "use client";
 
-import { markTransactionAsPaid, payVirtualTransaction } from "@/app/actions/transactions";
+import {
+  deleteTransaction,
+  markTransactionAsPaid,
+  payVirtualTransaction,
+  toggleTransactionStatus,
+} from "@/app/actions/transactions";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ArrowDownCircle, ArrowRightLeft, ArrowUpCircle, CheckCircle2, Circle, CreditCard } from "lucide-react";
@@ -10,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
-import { deleteTransaction } from "@/app/actions/transactions";
+
 import { EditTransactionDialog } from "@/components/edit-transaction-dialog";
 import {
   AlertDialog,
@@ -66,10 +71,9 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
   };
 
   const handleMarkAsPaid = async (tx: TransactionWithRelations) => {
-    if (tx.status === "paid") return; // already paid
-
     setLoadingId(tx.id);
     if (tx.id < 0) {
+      // Virtual transactions are implicitly "pending". Toggling means we mark them as paid.
       await payVirtualTransaction({
         type: tx.type,
         accountId: tx.accountId ?? null,
@@ -83,7 +87,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
         fixedTransactionId: tx.fixedTransactionId ?? null,
       });
     } else {
-      await markTransactionAsPaid(tx.id);
+      await toggleTransactionStatus(tx.id, tx.status);
     }
     setLoadingId(null);
   };
@@ -241,19 +245,19 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
           Nenhuma transação encontrada para este período.
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4 -mx-2 sm:mx-0">
           {displayedTransactions.map((tx) => (
             <div
               key={tx.id}
-              className="bg-card rounded-[1.5rem] border-transparent shadow-sm transition-all hover:bg-card/80 mb-3"
+              className="bg-card rounded-2xl sm:rounded-[1.5rem] border-transparent shadow-sm transition-all hover:bg-card/80 mb-2 sm:mb-3"
             >
-              <div className="p-3 md:p-5 flex items-center justify-between gap-2 md:gap-3">
+              <div className="p-2.5 sm:p-3 md:p-5 flex items-center justify-between gap-1.5 sm:gap-2 md:gap-3">
                 <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1">
                   <button
                     onClick={() => handleMarkAsPaid(tx)}
-                    disabled={loadingId === tx.id || tx.status === "paid"}
+                    disabled={loadingId === tx.id}
                     className="shrink-0 focus:outline-none disabled:opacity-50 transition-transform hover:scale-110"
-                    title={tx.status === "paid" ? "Pago" : "Marcar como Pago"}
+                    title={tx.status === "paid" ? "Estornar pagamento" : "Marcar como Pago"}
                   >
                     {loadingId === tx.id ? (
                       <div className="w-5 h-5 md:w-6 md:h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
@@ -283,8 +287,8 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
 
                 <div className="flex items-center gap-2 md:gap-4 shrink-0">
                   <div className="flex flex-col items-end text-right">
-                    <span className={`font-bold text-sm md:text-base ${tx.type === "income" ? "text-green-600" : "text-foreground"}`}>
-                      {tx.type === "income" ? "+" : "-"}
+                    <span className={`font-bold text-sm md:text-base ${tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)")) ? "text-green-600" : "text-foreground"}`}>
+                      {tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)")) ? "+" : "-"}
                       {formatCurrency(tx.amount)}
                     </span>
                     <span className="text-[11px] md:text-xs text-muted-foreground">

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
+import { Loader2 } from 'lucide-react';
 import { registerUser } from '@/app/actions/auth';
 
 export default function RegisterPage() {
@@ -101,6 +102,7 @@ export default function RegisterPage() {
               className="w-full font-semibold transition-all"
               disabled={isLoading}
             >
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isLoading ? 'Criando conta...' : 'Cadastrar'}
             </Button>
           </form>

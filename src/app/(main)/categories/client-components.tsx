@@ -87,6 +87,7 @@ export function AddCategoryDialog() {
 
           <div className="flex justify-end pt-4">
             <Button type="submit" disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isPending ? 'Salvando...' : 'Salvar Categoria'}
             </Button>
           </div>
@@ -125,7 +126,8 @@ export function AddSubcategoryForm({ categoryId }: { categoryId: string }) {
         required
       />
       <Button type="submit" size="sm" disabled={isPending || !name.trim()}>
-        Adicionar
+        {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {isPending ? 'Adicionando...' : 'Adicionar'}
       </Button>
     </form>
   );

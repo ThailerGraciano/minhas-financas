@@ -107,10 +107,38 @@ export async function adjustAccountBalance(
       });
     }
 
+    let finalBalanceToSet = realBalance;
+
+    if (!createTransaction) {
+      // User requested formula: "o real já deve considerar o que dei baixa neste mes, assim o ajuste do saldo inical deve ser na verdade 1000 - 150"
+      const currentMonth = format(new Date(), "yyyy-MM");
+      const accountTransactions = await db.query.transactions.findMany({
+        where: and(
+          eq(transactions.accountId, accountId),
+          eq(transactions.userId, userId),
+          eq(transactions.status, 'paid'),
+          eq(transactions.competencyMonth, currentMonth)
+        )
+      });
+      
+      let paidIncomes = 0;
+      let paidExpenses = 0;
+      
+      for (const tx of accountTransactions) {
+        if (tx.type === 'income') {
+          paidIncomes += Number(tx.amount);
+        } else if (tx.type === 'expense' || tx.type === 'credit_card_expense') {
+          paidExpenses += Number(tx.amount);
+        }
+      }
+      
+      finalBalanceToSet = realBalance - paidIncomes + paidExpenses;
+    }
+
     // Force update the account balance directly to guarantee sync
     await db
       .update(accounts)
-      .set({ currentBalance: realBalance.toFixed(2) })
+      .set({ currentBalance: finalBalanceToSet.toFixed(2) })
       .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)));
 
     revalidatePath("/accounts");

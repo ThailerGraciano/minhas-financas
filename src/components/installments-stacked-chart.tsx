@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
 
 import {
   ChartConfig,
@@ -65,7 +65,7 @@ const CustomTooltip = ({ active, payload, label, hoveredKey }: CustomTooltipProp
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: entry.color || entry.fill }} />
                   <span className={`font-medium ${isHovered ? 'text-foreground' : 'text-muted-foreground'}`}>
-                    {entry.dataKey} {installmentText ? ` ${installmentText}` : ''}
+                    {entry.dataKey} {installmentText ? `(${installmentText})` : ''}
                   </span>
                 </div>
                 <span className="font-bold ml-4">
@@ -112,8 +112,26 @@ export function InstallmentsStackedChart({
 
   return (
     <ChartContainer config={chartConfig} className="min-h-[350px] w-full">
-      <BarChart accessibilityLayer data={data} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
-        <CartesianGrid vertical={false} />
+      <AreaChart accessibilityLayer data={data} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
+        <defs>
+          {keys.map((key, index) => {
+            const color = chartConfig[key]?.color || `hsl(${index * 40}, 70%, 50%)`;
+            return (
+              <linearGradient
+                key={key}
+                id={`fill-${index}`}
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop offset="5%" stopColor={color} stopOpacity={0.8} />
+                <stop offset="95%" stopColor={color} stopOpacity={0.1} />
+              </linearGradient>
+            );
+          })}
+        </defs>
+        <CartesianGrid vertical={false} strokeDasharray="3 3" />
         <XAxis
           dataKey="month"
           tickLine={false}
@@ -123,7 +141,11 @@ export function InstallmentsStackedChart({
         <YAxis 
           tickLine={false}
           axisLine={false}
-          tickFormatter={(value) => `R$ ${value}`}
+          tickFormatter={(value) => new Intl.NumberFormat("pt-BR", {
+              style: "currency",
+              currency: "BRL",
+              notation: "compact",
+          }).format(value)}
           width={80}
         />
         <ChartTooltip 
@@ -131,13 +153,16 @@ export function InstallmentsStackedChart({
           content={<CustomTooltip hoveredKey={hoveredKey} />} 
         />
         <ChartLegend content={<ChartLegendContent />} />
-        {keys.map((key) => {
+        {keys.map((key, index) => {
+          const color = chartConfig[key]?.color || `hsl(${index * 40}, 70%, 50%)`;
           return (
-            <Bar
+            <Area
               key={key}
+              type="monotone"
               dataKey={key}
               stackId="a"
-              fill={chartConfig[key]?.color || '#000000'}
+              stroke={color}
+              fill={`url(#fill-${index})`}
               opacity={hoveredKey ? (hoveredKey === key ? 1 : 0.2) : 1}
               onMouseEnter={() => setHoveredKey(key)}
               onMouseLeave={() => setHoveredKey(null)}
@@ -145,7 +170,7 @@ export function InstallmentsStackedChart({
             />
           );
         })}
-      </BarChart>
+      </AreaChart>
     </ChartContainer>
   )
 }

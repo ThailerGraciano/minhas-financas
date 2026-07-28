@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { addMonths, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Loader2 } from "lucide-react";
 
 type FormData = NonNullable<Awaited<ReturnType<typeof getTransactionFormData>>>;
 type Category = FormData["categories"][0];
@@ -72,18 +73,17 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
       setSelectedDestinationAccountId("");
 
       getTransactionDetailsForEdit(Number(transaction.id)).then((details: TransactionProp | null) => {
-        if (details) {
-          setFullTransaction(details);
-          setSelectedAccountId(
-            details.accountId ? String(details.accountId) : 
-            details.creditCardId ? `cc-${details.creditCardId}` : ""
-          );
-          if (details.type === 'transfer' && details.destinationAccountId) {
-            setSelectedDestinationAccountId(String(details.destinationAccountId));
-          }
-          if (details.type === 'credit_card_expense' && details.competencyMonth) {
-            setSelectedInvoiceMonth(details.competencyMonth);
-          }
+        const dataToUse = details || transaction;
+        setFullTransaction(dataToUse as TransactionProp);
+        setSelectedAccountId(
+          dataToUse.accountId ? String(dataToUse.accountId) : 
+          dataToUse.creditCardId ? `cc-${dataToUse.creditCardId}` : ""
+        );
+        if (dataToUse.type === 'transfer' && dataToUse.destinationAccountId) {
+          setSelectedDestinationAccountId(String(dataToUse.destinationAccountId));
+        }
+        if (dataToUse.type === 'credit_card_expense' && dataToUse.competencyMonth) {
+          setSelectedInvoiceMonth(dataToUse.competencyMonth);
         }
       });
     }
@@ -341,6 +341,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
                 Cancelar
               </Button>
               <Button type="submit" disabled={isPending}>
+                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isPending ? "Salvando..." : "Salvar Alterações"}
               </Button>
             </div>

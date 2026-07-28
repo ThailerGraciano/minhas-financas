@@ -61,6 +61,7 @@ export const fixedTransactions = pgTable('fixed_transactions', {
   description: varchar('description', { length: 255 }).notNull(),
   startDate: date('start_date').notNull(),
   active: boolean('active').default(true).notNull(),
+  destinationAccountId: integer('destination_account_id').references(() => accounts.id),
 });
 
 export const transactions = pgTable('transactions', {
@@ -81,6 +82,7 @@ export const transactions = pgTable('transactions', {
   installmentCurrent: integer('installment_current'),
   installmentTotal: integer('installment_total'),
   parentTransactionId: integer('parent_transaction_id').references((): AnyPgColumn => transactions.id),
+  installmentParentId: integer('installment_parent_id').references((): AnyPgColumn => transactions.id),
   observations: varchar('observations', { length: 500 }),
   paidAt: timestamp('paid_at'),
   importHash: varchar('import_hash', { length: 255 }).unique(),
@@ -181,6 +183,10 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
     fields: [transactions.parentTransactionId],
     references: [transactions.id],
   }),
+  installmentParent: one(transactions, {
+    fields: [transactions.installmentParentId],
+    references: [transactions.id],
+  }),
   fixedTransaction: one(fixedTransactions, {
     fields: [transactions.fixedTransactionId],
     references: [fixedTransactions.id],
@@ -207,6 +213,10 @@ export const fixedTransactionsRelations = relations(fixedTransactions, ({ one, m
   subcategory: one(subcategories, {
     fields: [fixedTransactions.subcategoryId],
     references: [subcategories.id],
+  }),
+  destinationAccount: one(accounts, {
+    fields: [fixedTransactions.destinationAccountId],
+    references: [accounts.id],
   }),
   transactions: many(transactions),
 }));

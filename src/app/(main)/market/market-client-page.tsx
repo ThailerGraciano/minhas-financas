@@ -27,8 +27,8 @@ export function MarketClientPage({ closingDay, initialData }: { closingDay: numb
       headerContent={<h1 className="text-3xl font-bold tracking-tight">Mercado Inteligente</h1>}
     >
       {(data) => (
-        <div className="space-y-6 mt-6">
-          <div className="grid gap-6 md:grid-cols-2">
+        <div className="space-y-6 mt-6 w-full min-w-0">
+          <div className="grid gap-6 md:grid-cols-2 min-w-0">
             <Card className="rounded-[2rem] border-transparent shadow-sm">
               <CardContent className="p-6 flex flex-col space-y-4">
                 <div className="flex items-center gap-2">
@@ -50,11 +50,11 @@ export function MarketClientPage({ closingDay, initialData }: { closingDay: numb
             </Card>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-6 lg:grid-cols-2 min-w-0">
             <MarketCategoryChart data={data.dashboardData.spendingByCategory} />
             <MarketCategoryItemsChart data={data.dashboardData.spendingByCategory} />
             
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 min-w-0">
               <MarketCategoryHistoryChart data={data.categoryHistory} />
             </div>
 

@@ -1,0 +1,4 @@
+ALTER TABLE "fixed_transactions" ADD COLUMN "destination_account_id" integer;--> statement-breakpoint
+ALTER TABLE "transactions" ADD COLUMN "installment_parent_id" integer;--> statement-breakpoint
+ALTER TABLE "fixed_transactions" ADD CONSTRAINT "fixed_transactions_destination_account_id_accounts_id_fk" FOREIGN KEY ("destination_account_id") REFERENCES "public"."accounts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "transactions" ADD CONSTRAINT "transactions_installment_parent_id_transactions_id_fk" FOREIGN KEY ("installment_parent_id") REFERENCES "public"."transactions"("id") ON DELETE no action ON UPDATE no action;

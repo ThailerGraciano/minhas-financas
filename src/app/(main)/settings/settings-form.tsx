@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
 
 export function SettingsForm({ initialClosingDay }: { initialClosingDay: number }) {
   const [isPending, setIsPending] = useState(false);
@@ -50,7 +51,7 @@ export function SettingsForm({ initialClosingDay }: { initialClosingDay: number 
               required 
             />
             <p className="text-sm text-muted-foreground">
-              Usado para calcular os totais mensais baseados em quando o seu mês contábil "vira".
+              Usado para calcular os totais mensais baseados em quando o seu mês contábil &quot;vira&quot;.
             </p>
           </div>
           {message && (
@@ -61,6 +62,7 @@ export function SettingsForm({ initialClosingDay }: { initialClosingDay: number 
         </CardContent>
         <CardFooter>
           <Button type="submit" disabled={isPending}>
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isPending ? 'Salvando...' : 'Salvar Alterações'}
           </Button>
         </CardFooter>

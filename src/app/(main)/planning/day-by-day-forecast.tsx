@@ -155,7 +155,7 @@ export function DayByDayForecast({ projection }: { projection: DayProjection[] }
                     </TableHeader>
                     <TableBody>
                       {selectedDay.transactions_of_the_day.map((tx: any) => {
-                        const isIncome = tx.type === 'income';
+                        const isIncome = tx.type === 'income' || (tx.type === 'transfer' && tx.description.includes('(Entrada)'));
                         return (
                           <TableRow key={tx.id}>
                             <TableCell>

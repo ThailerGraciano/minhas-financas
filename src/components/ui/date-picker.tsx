@@ -18,13 +18,32 @@ interface DatePickerProps {
   id?: string;
   name?: string;
   defaultValue?: string; // Format: YYYY-MM-DD
+  value?: string;
+  onChange?: (date: string) => void;
   required?: boolean;
 }
 
-export function DatePicker({ id, name, defaultValue, required }: DatePickerProps) {
-  const [date, setDate] = React.useState<Date | undefined>(
+export function DatePicker({ id, name, defaultValue, value, onChange, required }: DatePickerProps) {
+  const isControlled = value !== undefined;
+  
+  const [internalDate, setInternalDate] = React.useState<Date | undefined>(
     defaultValue ? parse(defaultValue, "yyyy-MM-dd", new Date()) : undefined
   )
+
+  const date = isControlled 
+    ? (value ? parse(value, "yyyy-MM-dd", new Date()) : undefined)
+    : internalDate;
+
+  const handleSelect = (d: Date | undefined) => {
+    if (d) {
+      if (!isControlled) {
+        setInternalDate(d);
+      }
+      if (onChange) {
+        onChange(format(d, "yyyy-MM-dd"));
+      }
+    }
+  };
 
   return (
     <>
@@ -47,7 +66,7 @@ export function DatePicker({ id, name, defaultValue, required }: DatePickerProps
           <Calendar
             mode="single"
             selected={date}
-            onSelect={(d) => d && setDate(d)}
+            onSelect={handleSelect}
             initialFocus
             locale={ptBR}
           />

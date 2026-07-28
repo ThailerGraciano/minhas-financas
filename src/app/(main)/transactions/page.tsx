@@ -22,7 +22,7 @@ export default async function TransactionsPage(props: {
   const accounts = await getAccounts();
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
+    <div className="container mx-auto p-2 sm:p-4 md:p-8">
       <TransactionsClientPage 
         closingDay={settingsData.closingDay}
         initialTransactions={initialTransactions}

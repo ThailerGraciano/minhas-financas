@@ -68,7 +68,7 @@ export function MarketCategoryHistoryChart({ data }: MarketCategoryHistoryChartP
   }
 
   return (
-    <Card className="rounded-[2rem] border-transparent shadow-sm flex flex-col h-full w-full overflow-hidden">
+    <Card className="rounded-[2rem] border-transparent shadow-sm flex flex-col h-full w-full min-w-0 overflow-hidden">
       <CardHeader className="pb-2">
         <CardTitle className="text-xl font-bold">Evolução por Categoria</CardTitle>
         <CardDescription>Últimos 3 meses</CardDescription>

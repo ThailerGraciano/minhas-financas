@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { transactions } from "@/db/schema";
 import { addMonths, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -53,6 +53,12 @@ export function TransactionFormDialog({
   const [selectedInvoiceMonth, setSelectedInvoiceMonth] = useState("");
   const [isTotalAmount, setIsTotalAmount] = useState(true);
   const [formKey, setFormKey] = useState(0);
+  
+  const [transactionDate, setTransactionDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
+  const [isPaid, setIsPaid] = useState(false);
+
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const isPastOrToday = transactionDate <= todayStr;
 
   const router = useRouter();
 
@@ -132,7 +138,7 @@ export function TransactionFormDialog({
       competencyMonth,
       categoryId: Number(categoryId),
       subcategoryId: selectedSubcategoryId ? Number(selectedSubcategoryId) : null,
-      status: "pending",
+      status: isPaid && isPastOrToday ? "paid" : "pending",
     };
 
     if (tab === "expense") {
@@ -171,6 +177,14 @@ export function TransactionFormDialog({
       baseData.type = "transfer";
       baseData.accountId = Number(form.get("accountIdTransferOrigin"));
       baseData.destinationAccountId = Number(form.get("accountIdTransferDest"));
+
+      baseData.isFixed = expenseType === "fixed";
+
+      if (expenseType === "installment") {
+        baseData.installmentTotal = Number(form.get("installmentTotal"));
+        baseData.current_installment = Number(form.get("current_installment"));
+        baseData.isTotalAmount = isTotalAmount;
+      }
     }
 
     const res = await createTransaction(baseData as NewTransaction);
@@ -187,6 +201,8 @@ export function TransactionFormDialog({
         setSelectedCreditCardId("");
         setSelectedInvoiceMonth("");
         setIsTotalAmount(true);
+        setIsPaid(false);
+        setTransactionDate(format(new Date(), "yyyy-MM-dd"));
         setFormKey(prev => prev + 1);
       } else {
         setOpen(false);
@@ -276,6 +292,7 @@ export function TransactionFormDialog({
               setSelectedSubcategoryId("");
               setFormError("");
               setIsTotalAmount(false);
+              setIsPaid(false);
             }}
             className="w-full"
           >
@@ -310,9 +327,29 @@ export function TransactionFormDialog({
                   <Label htmlFor="date" className="text-muted-foreground ml-1">
                     Data
                   </Label>
-                  <DatePicker id="date" name="date" defaultValue={format(new Date(), "yyyy-MM-dd")} required />
+                  <DatePicker 
+                    id="date" 
+                    name="date" 
+                    value={transactionDate} 
+                    onChange={setTransactionDate} 
+                    required 
+                  />
                 </div>
               </div>
+
+              {isPastOrToday && (tab === "expense" || tab === "income") && (
+                <div className="flex flex-row items-center justify-between rounded-xl border p-4 bg-muted/20">
+                  <div className="space-y-0.5">
+                    <Label className="text-base cursor-pointer" onClick={() => setIsPaid(!isPaid)}>
+                      {tab === "expense" ? "Despesa já foi paga?" : "Receita já foi recebida?"}
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Marque se esta transação já foi efetivada.
+                    </p>
+                  </div>
+                  <Switch checked={isPaid} onCheckedChange={setIsPaid} />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-5">
                 <div className="grid gap-3">
@@ -649,6 +686,164 @@ export function TransactionFormDialog({
 
               <TabsContent value="transfer" className="space-y-6">
                 <div className="grid gap-3">
+                  <Label className="text-muted-foreground ml-1">Tipo de Transferência</Label>
+                  <div className="flex gap-6 p-4 rounded-xl bg-muted/20 border border-border/50">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={expenseType === "single"}
+                        onChange={() => setExpenseType("single")}
+                        className="accent-primary"
+                      />{" "}
+                      Única
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={expenseType === "fixed"}
+                        onChange={() => setExpenseType("fixed")}
+                        className="accent-primary"
+                      />{" "}
+                      Fixa
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={expenseType === "installment"}
+                        onChange={() => setExpenseType("installment")}
+                        className="accent-primary"
+                      />{" "}
+                      Parcelada
+                    </label>
+                  </div>
+                </div>
+
+                {tab === "transfer" && expenseType === "installment" && (
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-2 gap-5">
+                      <div className="grid gap-3">
+                        <Label htmlFor="current_installment" className="text-muted-foreground ml-1">
+                          Parcela Atual/Inicial
+                        </Label>
+                        <Input
+                          id="current_installment"
+                          name="current_installment"
+                          type="number"
+                          min="1"
+                          defaultValue="1"
+                          required
+                        />
+                        <p className="text-xs text-muted-foreground ml-1">Ex: Para a parcela 5 de 48, digite 5.</p>
+                      </div>
+                      <div className="grid gap-3">
+                        <Label htmlFor="installmentTotal" className="text-muted-foreground ml-1">
+                          Total de Parcelas
+                        </Label>
+                        <Input
+                          id="installmentTotal"
+                          name="installmentTotal"
+                          type="number"
+                          min="2"
+                          defaultValue="2"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <Label className="text-base cursor-pointer" onClick={() => setIsTotalAmount(!isTotalAmount)}>
+                          O valor digitado é o total da compra?
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Se marcado, o valor será dividido pelo número de parcelas. Se desmarcado, o valor será o de
+                          cada parcela individual.
+                        </p>
+                      </div>
+                      <Switch checked={isTotalAmount} onCheckedChange={setIsTotalAmount} />
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid gap-3">
+                  <Label className="text-muted-foreground ml-1">Tipo de Transferência</Label>
+                  <div className="flex gap-6 p-4 rounded-xl bg-muted/20 border border-border/50">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={expenseType === "single"}
+                        onChange={() => setExpenseType("single")}
+                        className="accent-primary"
+                      />{" "}
+                      Única
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={expenseType === "fixed"}
+                        onChange={() => setExpenseType("fixed")}
+                        className="accent-primary"
+                      />{" "}
+                      Fixa
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={expenseType === "installment"}
+                        onChange={() => setExpenseType("installment")}
+                        className="accent-primary"
+                      />{" "}
+                      Parcelada
+                    </label>
+                  </div>
+                </div>
+
+                {tab === "transfer" && expenseType === "installment" && (
+                  <div className="space-y-6 animate-in slide-in-from-top-2 duration-300">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-3">
+                        <Label htmlFor="current_installment" className="text-muted-foreground ml-1">
+                          Parcela Atual
+                        </Label>
+                        <Input
+                          id="current_installment"
+                          name="current_installment"
+                          type="number"
+                          min="1"
+                          defaultValue="1"
+                          required
+                        />
+                        <p className="text-xs text-muted-foreground ml-1">Ex: Para a parcela 5 de 48, digite 5.</p>
+                      </div>
+                      <div className="grid gap-3">
+                        <Label htmlFor="installmentTotal" className="text-muted-foreground ml-1">
+                          Total de Parcelas
+                        </Label>
+                        <Input
+                          id="installmentTotal"
+                          name="installmentTotal"
+                          type="number"
+                          min="2"
+                          defaultValue="2"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <Label className="text-base cursor-pointer" onClick={() => setIsTotalAmount(!isTotalAmount)}>
+                          O valor digitado é o total a ser transferido?
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Se marcado, o valor será dividido pelo número de parcelas. Se desmarcado, o valor será o de
+                          cada parcela individual.
+                        </p>
+                      </div>
+                      <Switch checked={isTotalAmount} onCheckedChange={setIsTotalAmount} />
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid gap-3">
                   <Label htmlFor="accountIdTransferOrigin" className="text-muted-foreground ml-1">
                     Conta de Origem
                   </Label>
@@ -688,9 +883,11 @@ export function TransactionFormDialog({
 
               <div className="pt-6 flex flex-col-reverse sm:flex-row justify-end gap-3">
                 <Button type="submit" name="action" value="save-and-continue" disabled={isPending} variant="outline" className="w-full sm:w-auto mt-2">
+                  {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {isPending ? "Salvando..." : "Salvar e Continuar"}
                 </Button>
                 <Button type="submit" name="action" value="save-and-close" disabled={isPending} className="w-full sm:w-auto mt-2">
+                  {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {isPending ? "Salvando..." : "Salvar Transação"}
                 </Button>
               </div>

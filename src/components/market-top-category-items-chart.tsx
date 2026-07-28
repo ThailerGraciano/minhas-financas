@@ -44,7 +44,7 @@ export function MarketTopCategoryItemsChart({ data }: MarketTopCategoryItemsChar
   const displayData = data.slice(0, 4);
 
   return (
-    <Card className="rounded-[2rem] border-transparent shadow-sm flex flex-col h-full md:col-span-2 w-full overflow-hidden">
+    <Card className="rounded-[2rem] border-transparent shadow-sm flex flex-col h-full md:col-span-2 w-full min-w-0 overflow-hidden">
       <CardHeader className="pb-4">
         <CardTitle className="text-xl font-bold">Top 3 Produtos por Categoria</CardTitle>
         <CardDescription>Os itens de maior valor em cada seção</CardDescription>

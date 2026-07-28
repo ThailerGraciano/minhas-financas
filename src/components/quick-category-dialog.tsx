@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -172,6 +172,7 @@ export function QuickCategoryDialog({ type, onSuccess, isSubcategoryMode, parent
               Cancelar
             </Button>
             <Button type="submit" disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isPending 
                 ? (isSubcategoryMode ? "Criando..." : "Criando...") 
                 : (isSubcategoryMode ? "Criar Subcategoria" : "Criar Categoria")

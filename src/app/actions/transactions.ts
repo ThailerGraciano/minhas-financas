@@ -100,6 +100,7 @@ export async function getTransactions(month?: string, accountId?: number) {
       account: true,
       category: true,
       creditCard: true,
+      destinationAccount: true,
     },
   });
 
@@ -109,7 +110,7 @@ export async function getTransactions(month?: string, accountId?: number) {
 
   const virtualTransactions = activeFixedTxs
     .filter((ft) => !materializedFixedIds.has(ft.id))
-    .map((ft) => {
+    .flatMap((ft) => {
       const dayStr = ft.startDate.split("-")[2];
       const dayNum = parseInt(dayStr, 10);
 
@@ -122,11 +123,11 @@ export async function getTransactions(month?: string, accountId?: number) {
       const finalDate = targetDate.getMonth() !== targetMonthDate.getMonth() ? endOfMonth(targetMonthDate) : targetDate;
       const dateStr = format(finalDate, "yyyy-MM-dd");
 
-      if (dateStr < ft.startDate) return null;
+      if (dateStr < ft.startDate) return [];
 
       const tempId = -Math.floor(Math.random() * 1000000) - 1;
 
-      return {
+      const origin = {
         id: tempId,
         userId: userId,
         type: ft.type,
@@ -135,7 +136,7 @@ export async function getTransactions(month?: string, accountId?: number) {
         categoryId: ft.categoryId,
         subcategoryId: ft.subcategoryId,
         amount: ft.amount,
-        description: ft.description,
+        description: ft.type === "transfer" ? `${ft.description} (Saída)` : ft.description,
         date: dateStr,
         competencyMonth: currentMonth,
         status: "pending",
@@ -144,14 +145,29 @@ export async function getTransactions(month?: string, accountId?: number) {
         installmentCurrent: null,
         installmentTotal: null,
         parentTransactionId: null,
+        installmentParentId: null,
         observations: null,
         paidAt: null,
         account: ft.account,
         category: ft.category,
         creditCard: ft.creditCard,
-      } as (typeof realTransactions)[0];
-    })
-    .filter((t): t is NonNullable<typeof t> => t !== null);
+        destinationAccountId: ft.type === "transfer" ? ft.destinationAccountId : null,
+      } as any;
+
+      if (ft.type === "transfer" && ft.destinationAccountId) {
+        const dest = {
+          ...origin,
+          id: tempId - 1,
+          accountId: ft.destinationAccountId,
+          description: `${ft.description} (Entrada)`,
+          parentTransactionId: origin.id,
+          account: ft.destinationAccount,
+        } as any;
+        return [origin, dest];
+      }
+
+      return [origin];
+    });
 
   const allTransactions = [...realTransactions, ...virtualTransactions];
 
@@ -186,8 +202,188 @@ export async function createTransaction(
 
   try {
     const { isFixed, destinationAccountId, isTotalAmount, current_installment, ...txData } = data;
+    const isTransfer = txData.type === "transfer" && destinationAccountId;
 
-    if (txData.type === "transfer" && destinationAccountId) {
+    if (isFixed) {
+      const result = await db.transaction(async (tx) => {
+        const [fixedTx] = await tx
+          .insert(fixedTransactions)
+          .values({
+            userId,
+            type: txData.type,
+            accountId: txData.accountId!,
+            creditCardId: txData.creditCardId || null,
+            categoryId: txData.categoryId,
+            subcategoryId: txData.subcategoryId || null,
+            amount: txData.amount,
+            description: txData.description,
+            startDate: txData.date,
+            active: true,
+            destinationAccountId: destinationAccountId || null,
+          })
+          .returning();
+
+        const baseDate = parseISO(txData.date);
+        const baseCompetency = parseISO(`${txData.competencyMonth}-01`);
+
+        for (let i = 0; i < 12; i++) {
+          const nextDate = addMonths(baseDate, i);
+          const nextCompetency = addMonths(baseCompetency, i);
+          
+          if (isTransfer) {
+            const [originTx] = await tx.insert(transactions).values({
+              ...txData,
+              userId,
+              description: `${txData.description} (Saída)`,
+              date: format(nextDate, "yyyy-MM-dd"),
+              competencyMonth: format(nextCompetency, "yyyy-MM"),
+              status: i === 0 ? txData.status || "pending" : "pending",
+              fixedTransactionId: fixedTx.id,
+            }).returning();
+            
+            await tx.insert(transactions).values({
+              ...txData,
+              userId,
+              accountId: destinationAccountId,
+              description: `${txData.description} (Entrada)`,
+              date: format(nextDate, "yyyy-MM-dd"),
+              competencyMonth: format(nextCompetency, "yyyy-MM"),
+              status: i === 0 ? txData.status || "pending" : "pending",
+              fixedTransactionId: fixedTx.id,
+              parentTransactionId: originTx.id,
+            });
+          } else {
+             await tx.insert(transactions).values({
+              ...txData,
+              userId,
+              date: format(nextDate, "yyyy-MM-dd"),
+              competencyMonth: format(nextCompetency, "yyyy-MM"),
+              status: i === 0 ? txData.status || "pending" : "pending",
+              fixedTransactionId: fixedTx.id,
+            });
+          }
+        }
+        return { success: true };
+      });
+
+      revalidatePath("/transactions");
+      revalidatePath("/");
+      revalidatePath("/planning");
+      return result;
+    }
+
+    if (txData.installmentTotal && txData.installmentTotal > 1) {
+      const totalInstallments = txData.installmentTotal;
+      let baseParcelAmount = txData.amount;
+      let lastParcelAmount = txData.amount;
+
+      if (isTotalAmount) {
+        const total = Number(txData.amount);
+        const installmentValue = Math.round((total / totalInstallments) * 100) / 100;
+        baseParcelAmount = installmentValue.toFixed(2);
+
+        const sumWithoutLast = installmentValue * (totalInstallments - 1);
+        const lastValue = Math.round((total - sumWithoutLast) * 100) / 100;
+        lastParcelAmount = lastValue.toFixed(2);
+      }
+
+      const currentInstallment = current_installment || 1;
+      
+      const result = await db.transaction(async (tx) => {
+          let originParentId: number | null = null;
+          let destParentId: number | null = null;
+          let finalReturnId: number | undefined = undefined;
+
+          if (isTransfer) {
+             const [originTx] = await tx.insert(transactions).values({
+                ...txData,
+                description: `${txData.description} (${currentInstallment}/${totalInstallments}) (Saída)`,
+                userId,
+                amount: currentInstallment === totalInstallments ? lastParcelAmount : baseParcelAmount,
+                installmentCurrent: currentInstallment,
+             }).returning();
+             originParentId = originTx.id;
+             finalReturnId = originTx.id;
+
+             const [destTx] = await tx.insert(transactions).values({
+                ...txData,
+                accountId: destinationAccountId,
+                description: `${txData.description} (${currentInstallment}/${totalInstallments}) (Entrada)`,
+                userId,
+                amount: currentInstallment === totalInstallments ? lastParcelAmount : baseParcelAmount,
+                installmentCurrent: currentInstallment,
+                parentTransactionId: originTx.id,
+             }).returning();
+             destParentId = destTx.id;
+          } else {
+             const [parentTx] = await tx.insert(transactions).values({
+                ...txData,
+                description: `${txData.description} (${currentInstallment}/${totalInstallments})`,
+                userId,
+                amount: currentInstallment === totalInstallments ? lastParcelAmount : baseParcelAmount,
+                installmentCurrent: currentInstallment,
+             }).returning();
+             originParentId = parentTx.id;
+             finalReturnId = parentTx.id;
+          }
+
+          const baseDate = parseISO(data.date);
+          const baseCompetency = txData.competencyMonth ? parseISO(`${txData.competencyMonth}-01`) : baseDate;
+
+          for (let i = currentInstallment + 1; i <= totalInstallments; i++) {
+             const nextDate = addMonths(baseDate, i - currentInstallment);
+             const nextCompetency = addMonths(baseCompetency, i - currentInstallment);
+             const isLast = i === totalInstallments;
+
+             if (isTransfer) {
+                const [originTx] = await tx.insert(transactions).values({
+                  ...txData,
+                  description: `${txData.description} (${i}/${totalInstallments}) (Saída)`,
+                  userId,
+                  amount: isLast ? lastParcelAmount : baseParcelAmount,
+                  date: format(nextDate, "yyyy-MM-dd"),
+                  competencyMonth: format(nextCompetency, "yyyy-MM"),
+                  status: "pending",
+                  installmentCurrent: i,
+                  installmentParentId: originParentId,
+                }).returning();
+                
+                await tx.insert(transactions).values({
+                  ...txData,
+                  accountId: destinationAccountId,
+                  description: `${txData.description} (${i}/${totalInstallments}) (Entrada)`,
+                  userId,
+                  amount: isLast ? lastParcelAmount : baseParcelAmount,
+                  date: format(nextDate, "yyyy-MM-dd"),
+                  competencyMonth: format(nextCompetency, "yyyy-MM"),
+                  status: "pending",
+                  installmentCurrent: i,
+                  parentTransactionId: originTx.id,
+                  installmentParentId: destParentId,
+                });
+             } else {
+                await tx.insert(transactions).values({
+                  ...txData,
+                  description: `${txData.description} (${i}/${totalInstallments})`,
+                  userId,
+                  amount: isLast ? lastParcelAmount : baseParcelAmount,
+                  date: format(nextDate, "yyyy-MM-dd"),
+                  competencyMonth: format(nextCompetency, "yyyy-MM"),
+                  status: "pending",
+                  installmentCurrent: i,
+                  installmentParentId: originParentId,
+                });
+             }
+          }
+          return { success: true, parentId: finalReturnId };
+      });
+      revalidatePath("/transactions");
+      revalidatePath("/");
+      revalidatePath("/planning");
+      return result;
+    }
+
+    if (isTransfer) {
       const result = await db.transaction(async (tx) => {
         const [originTx] = await tx
           .insert(transactions)
@@ -213,109 +409,6 @@ export async function createTransaction(
       revalidatePath("/");
       revalidatePath("/planning");
       return result;
-    }
-
-    if (isFixed) {
-      const result = await db.transaction(async (tx) => {
-        const [fixedTx] = await tx
-          .insert(fixedTransactions)
-          .values({
-            userId,
-            type: txData.type,
-            accountId: txData.accountId!,
-            creditCardId: txData.creditCardId || null,
-            categoryId: txData.categoryId,
-            subcategoryId: txData.subcategoryId || null,
-            amount: txData.amount,
-            description: txData.description,
-            startDate: txData.date,
-            active: true,
-          })
-          .returning();
-
-        const installmentsToInsert: NewTransaction[] = [];
-        const baseDate = parseISO(txData.date);
-
-        for (let i = 0; i < 12; i++) {
-          const nextDate = addMonths(baseDate, i);
-
-          installmentsToInsert.push({
-            ...txData,
-            userId,
-            date: format(nextDate, "yyyy-MM-dd"),
-            competencyMonth: format(nextDate, "yyyy-MM"),
-            status: i === 0 ? txData.status || "pending" : "pending",
-            fixedTransactionId: fixedTx.id,
-          });
-        }
-
-        await tx.insert(transactions).values(installmentsToInsert);
-
-        return { success: true };
-      });
-
-      revalidatePath("/transactions");
-      revalidatePath("/");
-      revalidatePath("/planning");
-      return result;
-    }
-
-    if (txData.installmentTotal && txData.installmentTotal > 1) {
-      let baseParcelAmount = txData.amount;
-      let lastParcelAmount = txData.amount;
-
-      if (isTotalAmount) {
-        const total = Number(txData.amount);
-        const installmentValue = Math.round((total / txData.installmentTotal) * 100) / 100;
-        baseParcelAmount = installmentValue.toFixed(2);
-
-        const sumWithoutLast = installmentValue * (txData.installmentTotal - 1);
-        const lastValue = Math.round((total - sumWithoutLast) * 100) / 100;
-        lastParcelAmount = lastValue.toFixed(2);
-      }
-
-      const currentInstallment = current_installment || 1;
-
-      const [parentTx] = await db
-        .insert(transactions)
-        .values({
-          ...txData,
-          description: `${txData.description} (${currentInstallment}/${txData.installmentTotal})`,
-          userId,
-          amount: currentInstallment === txData.installmentTotal ? lastParcelAmount : baseParcelAmount,
-          installmentCurrent: currentInstallment,
-        })
-        .returning();
-
-      const installmentsToInsert: NewTransaction[] = [];
-      const baseDate = parseISO(data.date);
-      const baseCompetency = txData.competencyMonth ? parseISO(`${txData.competencyMonth}-01`) : baseDate;
-
-      for (let i = currentInstallment + 1; i <= txData.installmentTotal; i++) {
-        const nextDate = addMonths(baseDate, i - currentInstallment);
-        const nextCompetency = addMonths(baseCompetency, i - currentInstallment);
-        const isLast = i === txData.installmentTotal;
-
-        installmentsToInsert.push({
-          ...txData,
-          description: `${txData.description} (${i}/${txData.installmentTotal})`,
-          userId,
-          amount: isLast ? lastParcelAmount : baseParcelAmount,
-          date: format(nextDate, "yyyy-MM-dd"),
-          competencyMonth: format(nextCompetency, "yyyy-MM"),
-          installmentCurrent: i,
-          parentTransactionId: parentTx.id,
-        });
-      }
-
-      if (installmentsToInsert.length > 0) {
-        await db.insert(transactions).values(installmentsToInsert);
-      }
-
-      revalidatePath("/transactions");
-      revalidatePath("/");
-      revalidatePath("/planning");
-      return { success: true, parentId: parentTx.id };
     } else {
       await db.insert(transactions).values({ ...txData, userId });
 
@@ -424,21 +517,59 @@ export async function payVirtualTransaction(txData: {
     if (!session?.user?.id) throw new Error("Unauthorized");
     const userId = session.user.id;
 
-    await db.insert(transactions).values({
-      userId,
-      type: txData.type,
-      accountId: txData.accountId,
-      creditCardId: txData.creditCardId,
-      categoryId: txData.categoryId,
-      subcategoryId: txData.subcategoryId,
-      amount: txData.amount,
-      description: txData.description,
-      date: txData.date,
-      competencyMonth: txData.competencyMonth,
-      status: "paid",
-      paidAt: new Date(),
-      fixedTransactionId: txData.fixedTransactionId || null,
-    });
+    if (txData.type === "transfer" && txData.fixedTransactionId) {
+      const ft = await db.query.fixedTransactions.findFirst({
+        where: and(eq(fixedTransactions.id, txData.fixedTransactionId), eq(fixedTransactions.userId, userId))
+      });
+      if (ft && ft.destinationAccountId) {
+        const [originTx] = await db.insert(transactions).values({
+          userId,
+          type: "transfer",
+          accountId: ft.accountId,
+          categoryId: ft.categoryId,
+          subcategoryId: ft.subcategoryId,
+          amount: ft.amount,
+          description: `${ft.description} (Saída)`,
+          date: txData.date,
+          competencyMonth: txData.competencyMonth,
+          status: "paid",
+          paidAt: new Date(),
+          fixedTransactionId: ft.id,
+        }).returning();
+
+        await db.insert(transactions).values({
+          userId,
+          type: "transfer",
+          accountId: ft.destinationAccountId,
+          categoryId: ft.categoryId,
+          subcategoryId: ft.subcategoryId,
+          amount: ft.amount,
+          description: `${ft.description} (Entrada)`,
+          date: txData.date,
+          competencyMonth: txData.competencyMonth,
+          status: "paid",
+          paidAt: new Date(),
+          fixedTransactionId: ft.id,
+          parentTransactionId: originTx.id,
+        });
+      }
+    } else {
+      await db.insert(transactions).values({
+        userId,
+        type: txData.type,
+        accountId: txData.accountId,
+        creditCardId: txData.creditCardId,
+        categoryId: txData.categoryId,
+        subcategoryId: txData.subcategoryId,
+        amount: txData.amount,
+        description: txData.description,
+        date: txData.date,
+        competencyMonth: txData.competencyMonth,
+        status: "paid",
+        paidAt: new Date(),
+        fixedTransactionId: txData.fixedTransactionId || null,
+      });
+    }
 
     revalidatePath("/transactions");
     revalidatePath("/");
@@ -505,7 +636,7 @@ export async function deleteTransaction(id: number, mode: "single" | "future" = 
       }
 
       if (mode === "future") {
-        const parentId = transactionItem.parentTransactionId || transactionItem.id;
+        const parentId = transactionItem.installmentParentId || transactionItem.parentTransactionId || transactionItem.id;
         const targetDate = transactionItem.date;
 
         const txsToDelete = await tx
@@ -514,6 +645,7 @@ export async function deleteTransaction(id: number, mode: "single" | "future" = 
           .where(
             and(
               or(
+                eq(transactions.installmentParentId, parentId),
                 eq(transactions.parentTransactionId, parentId),
                 eq(transactions.id, parentId),
                 transactionItem.fixedTransactionId
@@ -527,6 +659,10 @@ export async function deleteTransaction(id: number, mode: "single" | "future" = 
 
         const idsToDelete = txsToDelete.map((t) => t.id);
         for (const targetId of idsToDelete) {
+          const linkedDests = await tx.select().from(transactions).where(eq(transactions.parentTransactionId, targetId));
+          for (const ld of linkedDests) {
+            await tx.delete(transactions).where(eq(transactions.id, ld.id));
+          }
           await tx.delete(transactions).where(eq(transactions.id, targetId));
         }
       } else {
@@ -580,6 +716,9 @@ export async function updateTransaction(
         .from(transactions)
         .where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
       if (!oldTx) {
+        if (id < 0) {
+          throw new Error("Não é possível editar uma transação virtual futura. Confirme-a (marque como paga) primeiro para poder editá-la.");
+        }
         throw new Error("Transação não encontrada");
       }
 
@@ -592,33 +731,31 @@ export async function updateTransaction(
       const { destinationAccountId, ...data } = inputData;
 
       if (oldTx.type === "transfer") {
-        const otherTx = oldTx.parentTransactionId
+        const isDestinationTx = !!oldTx.parentTransactionId;
+        const otherTx = isDestinationTx
           ? await tx.query.transactions.findFirst({
-              where: and(eq(transactions.id, oldTx.parentTransactionId), eq(transactions.userId, userId)),
+              where: and(eq(transactions.id, oldTx.parentTransactionId!), eq(transactions.userId, userId)),
             })
           : await tx.query.transactions.findFirst({
               where: and(eq(transactions.parentTransactionId, oldTx.id), eq(transactions.userId, userId)),
             });
 
-        await tx.update(transactions).set(data).where(eq(transactions.id, id));
+        const originAccountId = data.accountId;
+        const destAccountId = destinationAccountId;
+        delete data.accountId; // Handle accountId separately
 
-        if (otherTx) {
-          const otherUpdateData: Partial<NewTransaction> = {};
-          if (data.amount !== undefined) otherUpdateData.amount = data.amount;
-          if (data.date !== undefined) otherUpdateData.date = data.date;
-          if (data.competencyMonth !== undefined) otherUpdateData.competencyMonth = data.competencyMonth;
-          if (data.status !== undefined) otherUpdateData.status = data.status;
-          if (data.description !== undefined) {
-            const suffix = otherTx.parentTransactionId ? " (Entrada)" : " (Saída)";
-            const cleanDesc = data.description.replace(/\s*\(Saída\)|\s*\(Entrada\)/g, "");
-            otherUpdateData.description = `${cleanDesc}${suffix}`;
-          }
-          if (destinationAccountId !== undefined) {
-            otherUpdateData.accountId = destinationAccountId;
-          }
-          if (Object.keys(otherUpdateData).length > 0) {
-            await tx.update(transactions).set(otherUpdateData).where(eq(transactions.id, otherTx.id));
-          }
+        // Update origin
+        const originId = isDestinationTx ? otherTx?.id : id;
+        if (originId) {
+          const originDesc = data.description ? `${data.description.replace(/\s*\(Saída\)|\s*\(Entrada\)/g, "")} (Saída)` : undefined;
+          await tx.update(transactions).set({ ...data, accountId: originAccountId, description: originDesc || data.description }).where(eq(transactions.id, originId));
+        }
+
+        // Update destination
+        const destId = isDestinationTx ? id : otherTx?.id;
+        if (destId) {
+          const destDesc = data.description ? `${data.description.replace(/\s*\(Saída\)|\s*\(Entrada\)/g, "")} (Entrada)` : undefined;
+          await tx.update(transactions).set({ ...data, accountId: destAccountId, description: destDesc || data.description }).where(eq(transactions.id, destId));
         }
       } else {
         await tx.update(transactions).set(data).where(eq(transactions.id, id));
@@ -632,9 +769,9 @@ export async function updateTransaction(
     revalidatePath("/planning");
     revalidatePath("/credit-cards");
     return result;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error updating transaction:", error);
-    return { success: false, error: "Failed to update transaction" };
+    return { success: false, error: error?.message || "Failed to update transaction" };
   }
 }
 

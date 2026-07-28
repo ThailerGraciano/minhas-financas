@@ -271,7 +271,8 @@ export async function getInstallmentsChartData() {
 
   installments.forEach(t => {
     if (!dataByMonth[t.competencyMonth]) return; 
-    const key = t.description;
+    // Remove any trailing " (x/y)" from the description to group installments properly
+    const key = t.description.replace(/\s*\(\d+\/\d+\)$/, '').trim();
     keysSet.add(key);
 
     const amount = Number(t.amount);
@@ -315,9 +316,10 @@ export async function getIncomeVsExpenseData(competencyMonth: string, showOnlyPa
   let totalExpense = 0;
 
   let totalPaidIncome = 0;
+  let totalPaidExpense = 0;
   let totalCurrentBalance = 0;
 
-  const accountMap = new Map<number, { accountName: string; income: number; expense: number; currentBalance: number; paidIncome: number }>();
+  const accountMap = new Map<number, { accountName: string; income: number; expense: number; currentBalance: number; paidIncome: number; paidExpense: number }>();
 
   allAccounts.forEach(acc => {
     totalCurrentBalance += Number(acc.currentBalance);
@@ -327,6 +329,7 @@ export async function getIncomeVsExpenseData(competencyMonth: string, showOnlyPa
       expense: 0, 
       currentBalance: Number(acc.currentBalance),
       paidIncome: 0,
+      paidExpense: 0,
     });
   });
 
@@ -335,10 +338,17 @@ export async function getIncomeVsExpenseData(competencyMonth: string, showOnlyPa
     : allTransactions;
 
   allTransactions.forEach(t => {
-    if (t.type === 'income' && t.status === 'paid') {
-      if (t.accountId && accountMap.has(t.accountId)) {
-        accountMap.get(t.accountId)!.paidIncome += Number(t.amount);
-        totalPaidIncome += Number(t.amount);
+    if (t.status === 'paid') {
+      if (t.type === 'income') {
+        if (t.accountId && accountMap.has(t.accountId)) {
+          accountMap.get(t.accountId)!.paidIncome += Number(t.amount);
+          totalPaidIncome += Number(t.amount);
+        }
+      } else if (t.type === 'expense' || t.type === 'credit_card_expense') {
+        if (t.accountId && accountMap.has(t.accountId)) {
+          accountMap.get(t.accountId)!.paidExpense += Number(t.amount);
+          totalPaidExpense += Number(t.amount);
+        }
       }
     }
   });
@@ -353,7 +363,7 @@ export async function getIncomeVsExpenseData(competencyMonth: string, showOnlyPa
 
     if (t.accountId && t.account) {
       if (!accountMap.has(t.accountId)) {
-        accountMap.set(t.accountId, { accountName: t.account.name, income: 0, expense: 0, currentBalance: 0, paidIncome: 0 });
+        accountMap.set(t.accountId, { accountName: t.account.name, income: 0, expense: 0, currentBalance: 0, paidIncome: 0, paidExpense: 0 });
       }
       const acc = accountMap.get(t.accountId)!;
       if (isIncome) acc.income += amount;
@@ -361,14 +371,14 @@ export async function getIncomeVsExpenseData(competencyMonth: string, showOnlyPa
     }
   });
 
-  const globalBaseBalance = totalCurrentBalance - totalPaidIncome;
+  const globalBaseBalance = totalCurrentBalance - totalPaidIncome + totalPaidExpense;
   const globalData = { name: 'Geral', income: totalIncome, expense: totalExpense, baseBalance: globalBaseBalance };
   
   const byAccountData = Array.from(accountMap.values()).map(acc => ({
     accountName: acc.accountName,
     income: acc.income,
     expense: acc.expense,
-    baseBalance: acc.currentBalance - acc.paidIncome,
+    baseBalance: acc.currentBalance - acc.paidIncome + acc.paidExpense,
   }));
 
   const accountVsGlobalData = byAccountData.map(acc => ({

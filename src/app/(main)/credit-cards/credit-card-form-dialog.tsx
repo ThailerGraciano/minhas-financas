@@ -7,7 +7,7 @@ import { CurrencyInput } from '@/components/ui/currency-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
 
 type CreditCardType = {
   id: number;
@@ -101,6 +101,7 @@ export function CreditCardFormDialog({ initialData, children }: Props) {
           </div>
           <DialogFooter>
             <Button type="submit" disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isPending ? 'Salvando...' : 'Salvar Cartão'}
             </Button>
           </DialogFooter>

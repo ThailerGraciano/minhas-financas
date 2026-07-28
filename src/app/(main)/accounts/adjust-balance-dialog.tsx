@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { SlidersHorizontal, AlertTriangle, Info } from 'lucide-react';
+import { SlidersHorizontal, AlertTriangle, Info, Loader2 } from 'lucide-react';
 import { adjustAccountBalance } from '@/app/actions/accounts';
 import { Button } from '@/components/ui/button';
 import { CurrencyInput } from '@/components/ui/currency-input';
@@ -167,6 +167,7 @@ export function AdjustBalanceDialog({
               Cancelar
             </Button>
             <Button type="submit" disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isPending ? 'Ajustando...' : 'Confirmar Ajuste'}
             </Button>
           </DialogFooter>

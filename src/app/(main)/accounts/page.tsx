@@ -1,6 +1,4 @@
-import { getAccountsBalancesByCompetency } from '@/app/actions/accounts';
-import { getSettings } from '@/app/actions/settings';
-import { getDefaultCompetencyMonth } from '@/lib/date-utils';
+import { getAccounts } from '@/app/actions/accounts';
 import { AccountsClientPage } from './accounts-client-page';
 
 export const metadata = {
@@ -8,17 +6,18 @@ export const metadata = {
 };
 
 export default async function AccountsPage() {
-  const settingsData = await getSettings();
-  const currentMonth = getDefaultCompetencyMonth(settingsData.closingDay);
-  
-  const initialAccounts = await getAccountsBalancesByCompetency(currentMonth);
+  const initialAccounts = await getAccounts();
+
+  const mappedAccounts = initialAccounts.map((acc) => ({
+    id: acc.id,
+    name: acc.name,
+    type: acc.type,
+    currentBalance: acc.currentBalance,
+  }));
 
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <AccountsClientPage 
-        closingDay={settingsData.closingDay}
-        initialAccounts={initialAccounts}
-      />
+      <AccountsClientPage initialAccounts={mappedAccounts} />
     </div>
   );
 }

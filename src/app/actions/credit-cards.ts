@@ -93,19 +93,21 @@ export async function getInvoiceSummary(creditCardId: string | number, competenc
     orderBy: (t, { desc }) => [desc(t.date)],
   });
 
-  const summary = cardTransactions.reduce(
-    (acc, transaction) => {
-      const amount = Number(transaction.amount);
-      acc.total_amount += amount;
-      if (transaction.status === 'paid') {
-        acc.paid_amount += amount;
-      } else if (transaction.status === 'pending') {
-        acc.pending_amount += amount;
-      }
-      return acc;
-    },
-    { total_amount: 0, paid_amount: 0, pending_amount: 0 }
-  );
+  let total_amount = 0;
+  let pending_amount = 0;
+
+  for (const t of cardTransactions) {
+    const amount = Number(t.amount);
+    if (amount > 0) {
+      total_amount += amount;
+    }
+    if (t.status === 'pending') {
+      pending_amount += amount;
+    }
+  }
+
+  const paid_amount = total_amount - pending_amount;
+  const summary = { total_amount, paid_amount, pending_amount };
 
   return {
     ...summary,
@@ -381,18 +383,19 @@ export async function getCreditCardsWithSummary(competencyMonth: string) {
         );
 
       let invoice_total = 0;
-      let invoice_paid = 0;
       let invoice_pending = 0;
 
       for (const t of cardTxs) {
         const amount = Number(t.amount);
-        invoice_total += amount;
-        if (t.status === 'paid') {
-          invoice_paid += amount;
-        } else if (t.status === 'pending') {
+        if (amount > 0) {
+          invoice_total += amount;
+        }
+        if (t.status === 'pending') {
           invoice_pending += amount;
         }
       }
+
+      const invoice_paid = invoice_total - invoice_pending;
 
       return {
         ...card,

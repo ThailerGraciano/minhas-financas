@@ -692,23 +692,29 @@ export async function deleteTransaction(id: number, mode: "single" | "future" = 
         const parentId = transactionItem.installmentParentId || transactionItem.parentTransactionId || transactionItem.id;
         const targetDate = transactionItem.date;
 
+        const conditions = [
+          eq(transactions.installmentParentId, parentId),
+          eq(transactions.parentTransactionId, parentId),
+          eq(transactions.id, parentId),
+        ];
+
+        if (transactionItem.fixedTransactionId) {
+          conditions.push(eq(transactions.fixedTransactionId, transactionItem.fixedTransactionId));
+        }
+
         const txsToDelete = await tx
           .select()
           .from(transactions)
           .where(
             and(
-              or(
-                eq(transactions.installmentParentId, parentId),
-                eq(transactions.parentTransactionId, parentId),
-                eq(transactions.id, parentId),
-                transactionItem.fixedTransactionId
-                  ? eq(transactions.fixedTransactionId, transactionItem.fixedTransactionId)
-                  : undefined,
-              ),
+              or(...conditions),
               gte(transactions.date, targetDate),
               eq(transactions.userId, userId),
             ),
           );
+
+        // Sort descending by ID to avoid foreign key constraints (children deleted before parents)
+        txsToDelete.sort((a, b) => b.id - a.id);
 
         const idsToDelete = txsToDelete.map((t) => t.id);
         for (const targetId of idsToDelete) {

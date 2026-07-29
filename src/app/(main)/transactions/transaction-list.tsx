@@ -2,13 +2,14 @@
 
 import {
   deleteTransaction,
-  markTransactionAsPaid,
   payVirtualTransaction,
   toggleTransactionStatus,
 } from "@/app/actions/transactions";
+import { payFullInvoice } from "@/app/actions/credit-cards";
+import { getAccounts } from "@/app/actions/accounts";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowDownCircle, ArrowRightLeft, ArrowUpCircle, CheckCircle2, Circle, CreditCard } from "lucide-react";
+import { ArrowDownCircle, ArrowRightLeft, ArrowUpCircle, CheckCircle2, Circle, CreditCard, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Label } from "@/components/ui/label";
@@ -61,6 +62,11 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
   const [isDeleting, setIsDeleting] = useState(false);
   const [sortBy, setSortBy] = useState("date_desc");
   const [showOnlyPending, setShowOnlyPending] = useState(false);
+  const [invoiceToPay, setInvoiceToPay] = useState<TransactionWithRelations | null>(null);
+  const [invoiceAccounts, setInvoiceAccounts] = useState<{ id: number; name: string; currentBalance: string | null }[]>([]);
+  const [invoiceSelectedAccount, setInvoiceSelectedAccount] = useState<string>('');
+  const [isPayingInvoice, setIsPayingInvoice] = useState(false);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
 
   const handleDelete = async (mode: "single" | "future" = "single") => {
     if (!transactionToDelete) return;
@@ -71,6 +77,18 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
   };
 
   const handleMarkAsPaid = async (tx: TransactionWithRelations) => {
+    // Grouped credit card invoices — open inline pay dialog
+    if (tx.isGroup && tx.creditCardId) {
+      setInvoiceToPay(tx);
+      setInvoiceSelectedAccount('');
+      setIsLoadingAccounts(true);
+      getAccounts().then((accs) => {
+        setInvoiceAccounts(accs);
+        setIsLoadingAccounts(false);
+      });
+      return;
+    }
+
     setLoadingId(tx.id);
     if (tx.id < 0) {
       // Virtual transactions are implicitly "pending". Toggling means we mark them as paid.
@@ -171,6 +189,8 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
               installmentCurrent: null,
               installmentTotal: null,
               parentTransactionId: null,
+              creditCardId: tx.creditCardId,
+              competencyMonth: tx.competencyMonth,
               creditCard: tx.creditCard,
               category: { id: 0, name: "Fatura" },
             });
@@ -391,6 +411,65 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
               </AlertDialogFooter>
             </>
           )}
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Pay Grouped Invoice Dialog */}
+      <AlertDialog open={!!invoiceToPay} onOpenChange={(open) => { if (!open) { setInvoiceToPay(null); setInvoiceSelectedAccount(''); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Pagar Fatura</AlertDialogTitle>
+            <AlertDialogDescription>
+              Confirme o pagamento da fatura <strong className="text-foreground">{invoiceToPay?.description}</strong>.
+              O valor de <strong className="text-foreground">{formatCurrency(invoiceToPay?.amount ?? 0)}</strong> será debitado da conta selecionada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="invoice-account">Conta Bancária de Origem</Label>
+              {isLoadingAccounts ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Carregando contas...
+                </div>
+              ) : (
+                <Select value={invoiceSelectedAccount} onValueChange={setInvoiceSelectedAccount}>
+                  <SelectTrigger id="invoice-account">
+                    <SelectValue placeholder="Selecione uma conta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {invoiceAccounts.map((acc) => (
+                      <SelectItem key={acc.id} value={acc.id.toString()}>
+                        {acc.name} ({formatCurrency(Number(acc.currentBalance))})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPayingInvoice}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!invoiceToPay?.creditCardId || !invoiceSelectedAccount || !invoiceToPay?.competencyMonth) return;
+                setIsPayingInvoice(true);
+                const result = await payFullInvoice(invoiceToPay.creditCardId, invoiceToPay.competencyMonth, invoiceSelectedAccount);
+                setIsPayingInvoice(false);
+                if (result.success) {
+                  setInvoiceToPay(null);
+                  setInvoiceSelectedAccount('');
+                } else {
+                  alert(result.error || 'Erro ao pagar fatura');
+                }
+              }}
+              disabled={!invoiceSelectedAccount || isPayingInvoice || isLoadingAccounts}
+            >
+              {isPayingInvoice && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirmar Pagamento
+            </AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

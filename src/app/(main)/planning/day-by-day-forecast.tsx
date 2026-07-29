@@ -8,12 +8,22 @@ import { CalendarDays, ArrowDownCircle, ArrowUpCircle, TrendingUp, TrendingDown 
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+type ForecastTransaction = {
+  id: number | string;
+  type: string;
+  description: string;
+  amount: string | number;
+  account?: { name: string } | null;
+  creditCard?: { name: string } | null;
+  category?: { name: string } | null;
+};
+
 type DayProjection = {
   date: string;
   total_expenses: number;
   total_incomes: number;
   projected_balance: number;
-  transactions_of_the_day: any[];
+  transactions_of_the_day: ForecastTransaction[];
 };
 
 export function DayByDayForecast({ projection }: { projection: DayProjection[] }) {
@@ -55,34 +65,34 @@ export function DayByDayForecast({ projection }: { projection: DayProjection[] }
                 <div
                   key={day.date}
                   onClick={() => setSelectedDay(day)}
-                  className="group p-3 border rounded-xl bg-card hover:bg-muted/40 transition-all flex items-center gap-4 text-sm cursor-pointer hover:border-primary/40 hover:shadow-sm"
+                  className="group p-2 md:p-3 border rounded-xl bg-card hover:bg-muted/40 transition-all flex items-center gap-2 md:gap-4 text-sm cursor-pointer hover:border-primary/40 hover:shadow-sm"
                 >
                   {/* Esquerda: Data Destaque */}
-                  <div className="flex flex-col items-center justify-center bg-muted/50 rounded-lg p-2 w-16 h-16 flex-shrink-0 group-hover:bg-primary/10 transition-colors">
-                    <span className="text-xl font-bold text-foreground">{format(parseISO(day.date), "dd")}</span>
-                    <span className="text-xs text-muted-foreground uppercase">{format(parseISO(day.date), "MMM", { locale: ptBR })}</span>
+                  <div className="flex flex-col items-center justify-center bg-muted/50 rounded-lg p-1.5 md:p-2 w-12 h-12 md:w-16 md:h-16 flex-shrink-0 group-hover:bg-primary/10 transition-colors">
+                    <span className="text-lg md:text-xl font-bold text-foreground">{format(parseISO(day.date), "dd")}</span>
+                    <span className="text-[10px] md:text-xs text-muted-foreground uppercase">{format(parseISO(day.date), "MMM", { locale: ptBR })}</span>
                   </div>
 
                   {/* Centro: Movimentações */}
-                  <div className="flex flex-1 flex-col justify-center gap-1.5">
-                    <div className="flex items-center gap-1.5">
-                      <TrendingDown className={`w-4 h-4 ${hasExpenses ? 'text-red-500' : 'text-muted-foreground/40'}`} />
-                      <span className={`font-medium ${hasExpenses ? 'text-red-500' : 'text-muted-foreground'}`}>
+                  <div className="flex flex-1 flex-col justify-center gap-1 min-w-0">
+                    <div className="flex items-center gap-1 md:gap-1.5 truncate">
+                      <TrendingDown className={`w-3 h-3 md:w-4 md:h-4 shrink-0 ${hasExpenses ? 'text-red-500' : 'text-muted-foreground/40'}`} />
+                      <span className={`font-medium text-xs md:text-sm truncate ${hasExpenses ? 'text-red-500' : 'text-muted-foreground'}`}>
                         {formatCurrency(day.total_expenses)}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <TrendingUp className={`w-4 h-4 ${hasIncomes ? 'text-green-600' : 'text-muted-foreground/40'}`} />
-                      <span className={`font-medium ${hasIncomes ? 'text-green-600' : 'text-muted-foreground'}`}>
+                    <div className="flex items-center gap-1 md:gap-1.5 truncate">
+                      <TrendingUp className={`w-3 h-3 md:w-4 md:h-4 shrink-0 ${hasIncomes ? 'text-green-600' : 'text-muted-foreground/40'}`} />
+                      <span className={`font-medium text-xs md:text-sm truncate ${hasIncomes ? 'text-green-600' : 'text-muted-foreground'}`}>
                         {formatCurrency(day.total_incomes)}
                       </span>
                     </div>
                   </div>
 
                   {/* Direita: Saldo */}
-                  <div className="flex flex-col items-end justify-center pr-2">
-                    <span className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground mb-1">Saldo Previsto</span>
-                    <span className={`text-lg font-bold ${isNegativeBalance ? "text-red-500" : "text-primary"}`}>
+                  <div className="flex flex-col items-end justify-center shrink-0">
+                    <span className="text-[9px] md:text-[10px] uppercase font-semibold tracking-wider text-muted-foreground mb-0.5 md:mb-1">Saldo Previsto</span>
+                    <span className={`text-sm md:text-lg font-bold truncate max-w-[90px] sm:max-w-none ${isNegativeBalance ? "text-red-500" : "text-primary"}`}>
                       {formatCurrency(day.projected_balance)}
                     </span>
                   </div>
@@ -145,31 +155,34 @@ export function DayByDayForecast({ projection }: { projection: DayProjection[] }
                     Nenhuma movimentação neste dia.
                   </div>
                 ) : (
-                  <Table>
+                  <Table className="table-fixed w-full">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Descrição</TableHead>
-                        <TableHead>Categoria</TableHead>
-                        <TableHead className="text-right">Valor</TableHead>
+                        <TableHead className="w-[50%] px-2">Descrição</TableHead>
+                        <TableHead className="w-[20%] px-1">
+                          <span className="md:hidden">Cat.</span>
+                          <span className="hidden md:inline">Categoria</span>
+                        </TableHead>
+                        <TableHead className="w-[30%] text-right px-2">Valor</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedDay.transactions_of_the_day.map((tx: any) => {
+                      {selectedDay.transactions_of_the_day.map((tx) => {
                         const isIncome = tx.type === 'income' || (tx.type === 'transfer' && tx.description.includes('(Entrada)'));
                         return (
                           <TableRow key={tx.id}>
-                            <TableCell>
-                              <div className="flex flex-col">
-                                <span className="font-medium text-sm line-clamp-1">{tx.description}</span>
-                                <span className="text-xs text-muted-foreground">
+                            <TableCell className="overflow-hidden px-2 py-3">
+                              <div className="flex flex-col min-w-0">
+                                <span className="font-medium text-xs md:text-sm truncate block">{tx.description}</span>
+                                <span className="text-[10px] md:text-xs text-muted-foreground truncate block">
                                   {tx.account?.name || tx.creditCard?.name || 'Geral'}
                                 </span>
                               </div>
                             </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
+                            <TableCell className="text-[10px] md:text-xs text-muted-foreground truncate px-1 py-3">
                               {tx.category?.name || '-'}
                             </TableCell>
-                            <TableCell className={`text-right font-bold whitespace-nowrap ${isIncome ? 'text-green-600' : 'text-red-500'}`}>
+                            <TableCell className={`text-right font-bold truncate px-2 py-3 text-xs md:text-sm ${isIncome ? 'text-green-600' : 'text-red-500'}`}>
                               {isIncome ? '+' : '-'}{formatCurrency(Number(tx.amount))}
                             </TableCell>
                           </TableRow>

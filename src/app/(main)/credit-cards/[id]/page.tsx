@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { notFound } from 'next/navigation';
 import { PayInvoiceDialog } from './pay-invoice-dialog';
 import { PrepayInvoiceDialog } from './prepay-invoice-dialog';
+import { AdjustInvoiceDialog } from './adjust-invoice-dialog';
 import { InvoiceTransactionList } from './invoice-transaction-list';
 import { getDefaultCompetencyMonth } from '@/lib/date-utils';
 
@@ -69,6 +70,11 @@ export default async function CreditCardInvoicePage(props: {
         </div>
         
         <div className="flex flex-col sm:flex-row gap-2">
+          <AdjustInvoiceDialog
+            creditCardId={id}
+            competencyMonth={currentMonth}
+            totalAmount={summary.total_amount}
+          />
           <PrepayInvoiceDialog 
             creditCardId={id}
             competencyMonth={currentMonth}
@@ -123,18 +129,18 @@ export default async function CreditCardInvoicePage(props: {
             <CardTitle className="text-sm font-medium">Status da Fatura</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Valor Total</p>
-                <p className="text-xl font-bold">{formatCurrency(summary.total_amount)}</p>
+            <div className="grid grid-cols-3 gap-2 md:gap-4">
+              <div className="min-w-0">
+                <p className="text-[10px] md:text-xs text-muted-foreground mb-1 truncate">Valor Total</p>
+                <p className="text-sm md:text-xl font-bold truncate">{formatCurrency(summary.total_amount)}</p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Valor Pago</p>
-                <p className="text-xl font-bold text-green-500">{formatCurrency(summary.paid_amount)}</p>
+              <div className="min-w-0">
+                <p className="text-[10px] md:text-xs text-muted-foreground mb-1 truncate">Valor Pago</p>
+                <p className="text-sm md:text-xl font-bold text-green-500 truncate">{formatCurrency(summary.paid_amount)}</p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Restante a Pagar</p>
-                <p className="text-xl font-bold text-red-500">{formatCurrency(summary.pending_amount)}</p>
+              <div className="min-w-0">
+                <p className="text-[10px] md:text-xs text-muted-foreground mb-1 truncate" title="Restante a Pagar">Restante</p>
+                <p className="text-sm md:text-xl font-bold text-red-500 truncate">{formatCurrency(summary.pending_amount)}</p>
               </div>
             </div>
             <div className="space-y-2">

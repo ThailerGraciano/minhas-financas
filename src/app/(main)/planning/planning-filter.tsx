@@ -17,11 +17,11 @@ export function PlanningFilter({ accounts }: PlanningFilterProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const currentAccountId = searchParams.get('accountId') || 'all';
+  const currentAccountId = searchParams.get('accountId') || 'checking_accounts';
 
   const handleAccountChange = (value: string) => {
     const params = new URLSearchParams(searchParams);
-    if (value && value !== 'all') {
+    if (value && value !== 'checking_accounts') {
       params.set('accountId', value);
     } else {
       params.delete('accountId');
@@ -38,6 +38,7 @@ export function PlanningFilter({ accounts }: PlanningFilterProps) {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Todas as Contas</SelectItem>
+          <SelectItem value="checking_accounts" className="font-semibold text-primary">Contas Correntes (Agrupado)</SelectItem>
           {accounts.map(acc => (
             <SelectItem key={acc.id} value={acc.id.toString()}>{acc.name}</SelectItem>
           ))}

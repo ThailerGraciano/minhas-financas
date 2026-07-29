@@ -11,7 +11,13 @@ export default async function PlanningPage(props: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const searchParams = await props.searchParams;
-  const accountId = searchParams?.accountId as string | undefined;
+  let accountId = searchParams?.accountId as string | undefined;
+  
+  if (!accountId) {
+    accountId = 'checking_accounts';
+  } else if (accountId === 'all') {
+    accountId = undefined;
+  }
 
   const accounts = await getAccounts();
   const { projection, overdueTransactions } = await getProjectedCashFlow(accountId);
@@ -38,7 +44,7 @@ export default async function PlanningPage(props: {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg font-medium flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-muted-foreground" />
-            Curva de Saldo (Próximos 30 dias)
+            Curva de Saldo (Período Atual)
           </CardTitle>
         </CardHeader>
         <CardContent>

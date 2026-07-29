@@ -409,6 +409,152 @@ export async function getCreditCardsWithSummary(competencyMonth: string) {
   return cardsWithSummary;
 }
 
+export async function adjustInvoice(
+  creditCardId: string | number,
+  competencyMonth: string,
+  realAmount: number
+): Promise<{ success: boolean; error?: string; adjustmentType?: 'increase' | 'decrease' | 'none'; difference?: number }> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+  const parsedCardId = Number(creditCardId);
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      // 1. Calculate current invoice total (same logic as getInvoiceSummary)
+      const cardTransactions = await tx.select()
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.creditCardId, parsedCardId),
+            eq(transactions.competencyMonth, competencyMonth),
+            eq(transactions.type, 'credit_card_expense'),
+            eq(transactions.userId, userId)
+          )
+        );
+
+      let currentTotal = 0;
+      for (const t of cardTransactions) {
+        const amount = Number(t.amount);
+        if (amount > 0) {
+          currentTotal += amount;
+        }
+      }
+
+      const diff = realAmount - currentTotal;
+
+      if (Math.abs(diff) < 0.01) {
+        return { success: true, adjustmentType: 'none' as const, difference: 0 };
+      }
+
+      // 2. Find or create appropriate category
+      if (diff > 0) {
+        // Real > Calculated: missing expense, create adjustment
+        let category = await tx.query.categories.findFirst({
+          where: (categories, { eq, and }) => and(eq(categories.name, 'Ajuste de Fatura'), eq(categories.userId, userId))
+        });
+        let subcategoryId = null;
+
+        if (!category) {
+          const [newCategory] = await tx.insert(categories)
+            .values({ userId, name: 'Ajuste de Fatura', type: 'expense', icon: 'Settings' })
+            .returning();
+
+          const [newSubcategory] = await tx.insert(subcategories)
+            .values({ userId, name: 'Geral', categoryId: newCategory.id })
+            .returning();
+
+          category = newCategory;
+          subcategoryId = newSubcategory.id;
+        } else {
+          const subcategory = await tx.query.subcategories.findFirst({
+            where: (subcategories, { eq, and }) => and(eq(subcategories.categoryId, category!.id), eq(subcategories.userId, userId))
+          });
+          subcategoryId = subcategory?.id || null;
+
+          if (!subcategoryId) {
+            const [newSubcategory] = await tx.insert(subcategories)
+              .values({ userId, name: 'Geral', categoryId: category.id })
+              .returning();
+            subcategoryId = newSubcategory.id;
+          }
+        }
+
+        await tx.insert(transactions).values({
+          userId,
+          type: 'credit_card_expense',
+          creditCardId: parsedCardId,
+          categoryId: category.id,
+          subcategoryId: subcategoryId,
+          amount: diff.toFixed(2),
+          description: `Ajuste de Fatura - ${competencyMonth}`,
+          date: format(new Date(), 'yyyy-MM-dd'),
+          competencyMonth: competencyMonth,
+          status: 'pending',
+        });
+
+        return { success: true, adjustmentType: 'increase' as const, difference: diff };
+      } else {
+        // Real < Calculated: overstated, create negative credit
+        let category = await tx.query.categories.findFirst({
+          where: (categories, { eq, and }) => and(eq(categories.name, 'Pagamento de Fatura'), eq(categories.userId, userId))
+        });
+        let subcategoryId = null;
+
+        if (!category) {
+          const [newCategory] = await tx.insert(categories)
+            .values({ userId, name: 'Pagamento de Fatura', type: 'expense', icon: 'CreditCard' })
+            .returning();
+
+          const [newSubcategory] = await tx.insert(subcategories)
+            .values({ userId, name: 'Geral', categoryId: newCategory.id })
+            .returning();
+
+          category = newCategory;
+          subcategoryId = newSubcategory.id;
+        } else {
+          const subcategory = await tx.query.subcategories.findFirst({
+            where: (subcategories, { eq, and }) => and(eq(subcategories.categoryId, category!.id), eq(subcategories.userId, userId))
+          });
+          subcategoryId = subcategory?.id || null;
+
+          if (!subcategoryId) {
+            const [newSubcategory] = await tx.insert(subcategories)
+              .values({ userId, name: 'Geral', categoryId: category.id })
+              .returning();
+            subcategoryId = newSubcategory.id;
+          }
+        }
+
+        await tx.insert(transactions).values({
+          userId,
+          type: 'credit_card_expense',
+          creditCardId: parsedCardId,
+          categoryId: category.id,
+          subcategoryId: subcategoryId,
+          amount: diff.toFixed(2), // negative value
+          description: `Adiantamento de Fatura - ${competencyMonth}`,
+          date: format(new Date(), 'yyyy-MM-dd'),
+          competencyMonth: competencyMonth,
+          status: 'pending',
+        });
+
+        return { success: true, adjustmentType: 'decrease' as const, difference: diff };
+      }
+    });
+
+    revalidatePath('/credit-cards');
+    revalidatePath(`/credit-cards/${parsedCardId}`);
+    revalidatePath('/dashboard');
+    revalidatePath('/transactions');
+    revalidatePath('/planning');
+    return result;
+  } catch (error) {
+    console.error('Error adjusting invoice:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Falha ao ajustar fatura' };
+  }
+}
+
 export async function getCreditCardsCategorySummary(competencyMonth: string) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");

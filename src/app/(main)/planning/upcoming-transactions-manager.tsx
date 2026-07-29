@@ -73,9 +73,9 @@ export function UpcomingTransactionsManager({
             <Table>
               <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead className="px-2 md:px-4 text-xs md:text-sm">Data</TableHead>
+                  <TableHead className="px-2 md:px-4 text-xs md:text-sm">Descrição</TableHead>
+                  <TableHead className="text-right px-2 md:px-4 text-xs md:text-sm">Valor</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -85,23 +85,24 @@ export function UpcomingTransactionsManager({
                     onClick={() => setIsDialogOpen(true)}
                     className="cursor-pointer bg-red-500/5 hover:bg-red-500/10 dark:bg-red-900/10 dark:hover:bg-red-900/20 transition-colors group"
                   >
-                    <TableCell className="py-5">
-                      <div className="bg-red-500/10 text-red-500 px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 font-bold text-xs">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        Vencidas
+                    <TableCell className="py-3 md:py-5 px-2 md:px-4">
+                      <div className="bg-red-500/10 text-red-500 px-2 md:px-3 py-1 md:py-1.5 rounded-full inline-flex items-center gap-1 md:gap-1.5 font-bold text-[10px] md:text-xs">
+                        <AlertTriangle className="w-3 h-3 md:w-3.5 md:h-3.5 shrink-0" />
+                        <span className="hidden sm:inline">Vencidas</span>
+                        <span className="sm:hidden">Atraso</span>
                       </div>
                     </TableCell>
-                    <TableCell className="py-5">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-red-500 dark:text-red-400">
-                          {overdueTransactions.length} {overdueTransactions.length === 1 ? 'lançamento em atraso' : 'lançamentos em atraso'}
+                    <TableCell className="py-3 md:py-5 px-2 md:px-4 min-w-0">
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-semibold text-red-500 dark:text-red-400 text-xs md:text-sm truncate max-w-[120px] sm:max-w-none">
+                          {overdueTransactions.length} {overdueTransactions.length === 1 ? 'atrasado' : 'atrasados'}
                         </span>
-                        <span className="text-xs text-muted-foreground line-clamp-1">
+                        <span className="text-[10px] md:text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-[200px] md:max-w-none">
                           {overdueTransactions.map((tx) => tx.description).join(', ')}
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className={`text-right font-bold whitespace-nowrap py-4 ${netOverdueAmount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+                    <TableCell className={`text-right font-bold whitespace-nowrap py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm ${netOverdueAmount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
                       {netOverdueAmount >= 0 ? '+' : '-'}{formatCurrency(Math.abs(netOverdueAmount))}
                     </TableCell>
                   </TableRow>
@@ -112,20 +113,20 @@ export function UpcomingTransactionsManager({
                   const isIncome = tx.type === 'income' || (tx.type === 'transfer' && tx.description.includes('(Entrada)'));
                   return (
                     <TableRow key={tx.id} className="hover:bg-muted/30">
-                      <TableCell className="font-medium whitespace-nowrap py-4">
+                      <TableCell className="font-medium whitespace-nowrap py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm">
                         {formatDay(tx.date)}
                       </TableCell>
-                      <TableCell className="py-4">
-                        <div className="flex flex-col">
-                          <span className="font-medium line-clamp-1" title={tx.description}>
+                      <TableCell className="py-3 md:py-4 px-2 md:px-4 min-w-0">
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-medium truncate max-w-[120px] sm:max-w-none text-xs md:text-sm" title={tx.description}>
                             {tx.description}
                           </span>
-                          <span className="text-xs text-muted-foreground truncate">
+                          <span className="text-[10px] md:text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-none">
                             {tx.account?.name || tx.creditCard?.name || 'Geral'} • {tx.category?.name}
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className={`text-right font-bold whitespace-nowrap py-4 ${isIncome ? 'text-green-600' : 'text-red-500'}`}>
+                      <TableCell className={`text-right font-bold whitespace-nowrap py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm ${isIncome ? 'text-green-600' : 'text-red-500'}`}>
                         {isIncome ? '+' : '-'}{formatCurrency(Number(tx.amount))}
                       </TableCell>
                     </TableRow>

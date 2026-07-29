@@ -73,20 +73,20 @@ export function CreditCardsSummary({ cards, selectedMonth }: CreditCardsSummaryP
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mt-2">
-            <div className="bg-green-500/5 rounded-2xl p-4 border border-green-500/10">
-              <div className="flex items-center gap-2 mb-1">
-                <TrendingDown className="w-4 h-4 text-green-500" />
-                <p className="text-sm text-muted-foreground">Pago</p>
+          <div className="grid grid-cols-2 gap-2 md:gap-4 mt-2">
+            <div className="bg-green-500/5 rounded-2xl p-2 md:p-4 border border-green-500/10 min-w-0">
+              <div className="flex items-center gap-1 md:gap-2 mb-1">
+                <TrendingDown className="w-3 h-3 md:w-4 md:h-4 shrink-0 text-green-500" />
+                <p className="text-[10px] md:text-sm text-muted-foreground truncate">Pago</p>
               </div>
-              <p className="text-xl font-bold text-green-500">{formatCurrency(totalPaid)}</p>
+              <p className="text-sm md:text-xl font-bold text-green-500 truncate">{formatCurrency(totalPaid)}</p>
             </div>
-            <div className="bg-red-500/5 rounded-2xl p-4 border border-red-500/10">
-              <div className="flex items-center gap-2 mb-1">
-                <TrendingUp className="w-4 h-4 text-red-500" />
-                <p className="text-sm text-muted-foreground">Pendente</p>
+            <div className="bg-red-500/5 rounded-2xl p-2 md:p-4 border border-red-500/10 min-w-0">
+              <div className="flex items-center gap-1 md:gap-2 mb-1">
+                <TrendingUp className="w-3 h-3 md:w-4 md:h-4 shrink-0 text-red-500" />
+                <p className="text-[10px] md:text-sm text-muted-foreground truncate">Pendente</p>
               </div>
-              <p className="text-xl font-bold text-red-500">{formatCurrency(totalPending)}</p>
+              <p className="text-sm md:text-xl font-bold text-red-500 truncate">{formatCurrency(totalPending)}</p>
             </div>
           </div>
         </CardContent>

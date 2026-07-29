@@ -41,7 +41,7 @@ export function PlanningChart({ data }: PlanningChartProps) {
 
   return (
     <ChartContainer config={chartConfig} className="min-h-[250px] w-full mt-4">
-      <LineChart accessibilityLayer data={formattedData} margin={{ top: 10, left: 10, right: 10, bottom: 0 }}>
+      <LineChart accessibilityLayer data={formattedData} margin={{ top: 10, left: -10, right: 10, bottom: 0 }}>
         <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-muted" />
         <XAxis
           dataKey="formattedDate"
@@ -54,11 +54,14 @@ export function PlanningChart({ data }: PlanningChartProps) {
         <YAxis 
           tickLine={false} 
           axisLine={false} 
-          tickMargin={8}
+          tickMargin={4}
           domain={yDomain}
-          tickFormatter={(value) => `R$ ${value}`}
+          tickFormatter={(value) => {
+            if (value === 0) return "R$ 0";
+            return `R$ ${Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(value)}`;
+          }}
           className="text-xs"
-          width={80}
+          width={55}
         />
         <ChartTooltip
           cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '4 4' }}

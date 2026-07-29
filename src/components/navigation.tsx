@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Settings, CreditCard, PieChart, Landmark, Receipt, TrendingUp, Download, ShoppingCart, LogOut } from 'lucide-react';
+import { useState } from 'react';
+import { Home, Settings, CreditCard, PieChart, Landmark, Receipt, TrendingUp, Download, ShoppingCart, LogOut, Menu } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import { cn } from '@/lib/utils';
 import { ModeToggle } from '@/components/mode-toggle';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 const navItems = [
   { name: 'Dashboard', href: '/', icon: Home },
@@ -20,6 +22,7 @@ const navItems = [
 
 export function Navigation() {
   const pathname = usePathname();
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <>
@@ -75,12 +78,68 @@ export function Navigation() {
       </header>
 
       {/* Mobile Top Header */}
-      <header className="md:hidden flex h-14 items-center justify-between bg-background px-4 sticky top-0 z-40">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
-            MF
+      <header className="md:hidden flex h-14 items-center justify-between bg-background px-4 sticky top-0 z-40 border-b">
+        <div className="flex items-center gap-3">
+          <Sheet open={isOpen} onOpenChange={setIsOpen}>
+            <SheetTrigger asChild>
+              <button className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-muted text-foreground transition-colors">
+                <Menu className="w-5 h-5" />
+              </button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-[280px] p-0">
+              <SheetHeader className="p-4 border-b text-left">
+                <SheetTitle className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold">
+                    MF
+                  </div>
+                  <span className="text-xl font-bold tracking-tight">Finanças</span>
+                </SheetTitle>
+              </SheetHeader>
+              <nav className="flex flex-col gap-1 p-4">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      onClick={() => setIsOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200",
+                        isActive
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      )}
+                    >
+                      <Icon className="w-5 h-5" />
+                      {item.name}
+                    </Link>
+                  );
+                })}
+                <div className="my-2 border-t border-border" />
+                <Link
+                  href="/settings"
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200",
+                    pathname.startsWith("/settings")
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <Settings className="w-5 h-5" />
+                  Configurações
+                </Link>
+              </nav>
+            </SheetContent>
+          </Sheet>
+
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
+              MF
+            </div>
+            <span className="text-lg font-bold tracking-tight">Finanças</span>
           </div>
-          <span className="text-lg font-bold tracking-tight">Finanças</span>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -93,32 +152,6 @@ export function Navigation() {
         </div>
       </header>
 
-      {/* Mobile Bottom Nav - Show only top 5 items for mobile to fit nicely */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t bg-card pb-safe">
-        <div className="flex justify-around items-center h-16 px-2">
-          {navItems.slice(0, 5).map((item) => {
-            const Icon = item.icon;
-            const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  "flex flex-col items-center justify-center flex-1 min-w-0 h-full space-y-1 text-[10px] font-medium transition-all",
-                  isActive 
-                    ? "text-primary scale-110" 
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <div className={cn("p-1.5 rounded-full transition-colors shrink-0", isActive ? "bg-primary/10" : "")}>
-                  <Icon className="h-5 w-5" />
-                </div>
-                <span className="truncate w-full text-center px-0.5">{item.name}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
     </>
   );
 }

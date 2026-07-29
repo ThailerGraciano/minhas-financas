@@ -100,13 +100,13 @@ export function MarketCategoryChart({ data }: MarketCategoryChartProps) {
           </PieChart>
         </ChartContainer>
 
-        <div className="mt-6">
-          <div className="rounded-xl border bg-card">
-            <table className="w-full text-sm">
+        <div className="mt-6 pb-20 md:pb-0">
+          <div className="rounded-xl border bg-card overflow-hidden">
+            <table className="w-full text-sm table-fixed">
               <thead>
                 <tr className="border-b bg-muted/50 text-left text-muted-foreground">
-                  <th className="px-4 py-3 font-medium rounded-tl-xl">Categoria</th>
-                  <th className="px-4 py-3 font-medium text-right rounded-tr-xl">Valor</th>
+                  <th className="w-[60%] px-3 md:px-4 py-3 font-medium">Categoria</th>
+                  <th className="w-[40%] px-3 md:px-4 py-3 font-medium text-right">Valor</th>
                 </tr>
               </thead>
               <tbody>
@@ -120,7 +120,7 @@ export function MarketCategoryChart({ data }: MarketCategoryChartProps) {
                         className={`border-b last:border-0 hover:bg-muted/50 transition-colors ${hasSubcategories ? 'cursor-pointer' : ''}`}
                         onClick={() => hasSubcategories && toggleCategory(item.category)}
                       >
-                        <td className="px-4 py-3 flex items-center gap-2">
+                        <td className="px-3 md:px-4 py-3 flex items-center gap-2 overflow-hidden">
                           {hasSubcategories ? (
                             isExpanded ? (
                               <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -134,17 +134,17 @@ export function MarketCategoryChart({ data }: MarketCategoryChartProps) {
                             className="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm"
                             style={{ backgroundColor: item.fill }}
                           />
-                          <span className="font-medium truncate">{item.category}</span>
+                          <span className="font-medium truncate block">{item.category}</span>
                         </td>
-                        <td className="px-4 py-3 text-right font-medium">{formatCurrency(item.value)}</td>
+                        <td className="px-3 md:px-4 py-3 text-right font-medium truncate">{formatCurrency(item.value)}</td>
                       </tr>
                       {isExpanded && item.subcategories && (
                         item.subcategories.map((sub, subIndex) => (
                           <tr key={`sub-${index}-${subIndex}`} className="border-b last:border-0 bg-muted/20">
-                            <td className="px-4 py-2 pl-12 flex items-center gap-2 text-muted-foreground">
-                              <span className="text-sm truncate">{sub.name}</span>
+                            <td className="px-3 md:px-4 py-2 pl-10 md:pl-12 flex items-center gap-2 text-muted-foreground overflow-hidden">
+                              <span className="text-sm truncate block">{sub.name}</span>
                             </td>
-                            <td className="px-4 py-2 text-right text-sm text-muted-foreground">
+                            <td className="px-3 md:px-4 py-2 text-right text-sm text-muted-foreground truncate">
                               {formatCurrency(sub.value)}
                             </td>
                           </tr>

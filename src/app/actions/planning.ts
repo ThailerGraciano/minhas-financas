@@ -1,10 +1,11 @@
 'use server';
 
 import { db } from '@/db';
-import { transactions, accounts } from '@/db/schema';
-import { eq, and, asc, or } from 'drizzle-orm';
-import { format, addDays } from 'date-fns';
+import { transactions, accounts, settings } from '@/db/schema';
+import { eq, and, asc, or, inArray } from 'drizzle-orm';
+import { format, addDays, differenceInDays, parseISO, lastDayOfMonth } from 'date-fns';
 import { auth } from '@/auth';
+import { getDefaultCompetencyMonth } from '@/lib/date-utils';
 
 export async function getProjectedCashFlow(accountId?: string) {
   const session = await auth();
@@ -13,16 +14,32 @@ export async function getProjectedCashFlow(accountId?: string) {
 
   // 1. Initial balance
   let allAccounts;
-  if (accountId) {
+  if (accountId === 'checking_accounts') {
+    allAccounts = await db.select().from(accounts).where(and(eq(accounts.type, 'checking'), eq(accounts.userId, userId)));
+  } else if (accountId) {
     allAccounts = await db.select().from(accounts).where(and(eq(accounts.id, Number(accountId)), eq(accounts.userId, userId)));
   } else {
     allAccounts = await db.select().from(accounts).where(eq(accounts.userId, userId));
   }
   let currentBalance = allAccounts.reduce((acc, curr) => acc + Number(curr.currentBalance), 0);
 
+  // Fetch settings for closingDay
+  const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
+  const closingDay = appSettings?.closingDay || 25;
+
+  // Calculate the target end date for the projection (end of the current competency month)
+  const compMonth = getDefaultCompetencyMonth(closingDay);
+  const [year, month] = compMonth.split('-');
+  const lastDay = lastDayOfMonth(new Date(Number(year), Number(month) - 1, 1)).getDate();
+  const safeClosingDay = Math.min(closingDay, lastDay);
+  const targetEndDateStr = `${compMonth}-${String(safeClosingDay).padStart(2, '0')}`;
+  const targetEndDate = parseISO(targetEndDateStr);
+
   // 2. Pending transactions
   const baseDate = new Date();
   const todayDate = format(baseDate, 'yyyy-MM-dd');
+  const todayParsed = parseISO(todayDate);
+  const diffDays = Math.max(0, differenceInDays(targetEndDate, todayParsed));
   
   const conditions = [
     eq(transactions.status, 'pending'),
@@ -30,17 +47,29 @@ export async function getProjectedCashFlow(accountId?: string) {
   ];
   
   let isCheckingAccount = false;
-  if (allAccounts.length === 1 && allAccounts[0].type === 'checking') {
+  if (accountId === 'checking_accounts' || (allAccounts.length === 1 && allAccounts[0].type === 'checking')) {
     isCheckingAccount = true;
   }
   
   if (accountId) {
-    if (isCheckingAccount) {
+    if (accountId === 'checking_accounts') {
+      const checkingIds = allAccounts.map(a => a.id);
+      if (checkingIds.length > 0) {
+        conditions.push(
+          or(
+            inArray(transactions.accountId, checkingIds),
+            eq(transactions.type, 'credit_card_expense')
+          )!
+        );
+      } else {
+        conditions.push(eq(transactions.id, -1)); // Force no results
+      }
+    } else if (isCheckingAccount) {
       conditions.push(
         or(
           eq(transactions.accountId, Number(accountId)),
           eq(transactions.type, 'credit_card_expense')
-        )
+        )!
       );
     } else {
       conditions.push(eq(transactions.accountId, Number(accountId)));
@@ -110,11 +139,11 @@ export async function getProjectedCashFlow(accountId?: string) {
     grouped.get(tx.date)!.push(tx);
   }
 
-  // 4. Generate 30 continuous days
+  // 4. Generate days up to the end of the competency month
   const projection = [];
   
-  for (let i = 0; i <= 30; i++) {
-    const targetDate = format(addDays(baseDate, i), 'yyyy-MM-dd');
+  for (let i = 0; i <= diffDays; i++) {
+    const targetDate = format(addDays(todayParsed, i), 'yyyy-MM-dd');
     const dailyTxs = grouped.get(targetDate) || [];
     
     let total_expenses = 0;

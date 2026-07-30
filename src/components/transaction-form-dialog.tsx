@@ -71,9 +71,9 @@ export function TransactionFormDialog({
   // Calcula o mês da fatura padrão com base no closing_day do cartão
   const getDefaultInvoiceMonth = (closingDay: number): string => {
     const today = new Date();
-    // Se hoje é ANTES ou NO dia de fechamento, a compra cai na fatura do mês atual
-    // Se hoje é DEPOIS do fechamento, cai na fatura do próximo mês
-    if (today.getDate() > closingDay) {
+    // Se hoje é maior ou igual ao dia de fechamento, a fatura atual está fechada
+    // e a compra cai na fatura do próximo mês
+    if (today.getDate() >= closingDay) {
       const next = addMonths(today, 1);
       return format(next, "yyyy-MM");
     }
@@ -150,6 +150,21 @@ export function TransactionFormDialog({
         // Usa a competência da fatura selecionada
         if (selectedInvoiceMonth) {
           baseData.competencyMonth = selectedInvoiceMonth;
+
+          const card = formData?.creditCards.find((c: CreditCard) => c.id === Number(selectedCreditCardId));
+          if (card) {
+            const [year, month] = selectedInvoiceMonth.split("-").map(Number);
+            const closingDate = new Date(year, month - 1, card.closingDay);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            if (today >= closingDate) {
+              if (!window.confirm("Esta fatura já está fechada. Deseja realmente incluir uma despesa nela?")) {
+                setIsPending(false);
+                return;
+              }
+            }
+          }
         }
       } else {
         baseData.accountId = Number(form.get("accountId"));

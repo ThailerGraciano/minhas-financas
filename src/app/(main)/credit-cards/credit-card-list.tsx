@@ -29,6 +29,7 @@ export type CreditCardType = {
   invoice_total?: number;
   invoice_paid?: number;
   invoice_pending?: number;
+  targetInvoiceMonth?: string;
 };
 
 export function CreditCardList({ cards, selectedMonth }: { cards: CreditCardType[], selectedMonth?: string }) {
@@ -61,9 +62,6 @@ export function CreditCardList({ cards, selectedMonth }: { cards: CreditCardType
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value));
   };
 
-  const monthLabel = selectedMonth ? format(new Date(`${selectedMonth}-01T00:00:00`), 'MMMM yyyy', { locale: ptBR }) : '';
-  const capitalizedMonth = monthLabel ? monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1) : '';
-
   return (
     <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mt-4">
       {cards.map((card) => (
@@ -90,7 +88,10 @@ export function CreditCardList({ cards, selectedMonth }: { cards: CreditCardType
               <>
                 <div className="text-3xl md:text-4xl font-bold">{formatCurrency(card.invoice_total.toString())}</div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {capitalizedMonth ? `Fatura de ${capitalizedMonth}` : 'Fatura Atual'}
+                  {card.targetInvoiceMonth 
+                    ? `Fatura de ${format(new Date(`${card.targetInvoiceMonth}-01T00:00:00`), 'MMMM', { locale: ptBR }).replace(/^\w/, c => c.toUpperCase())}`
+                    : 'Fatura Atual'
+                  }
                 </p>
               </>
             ) : (
@@ -138,7 +139,7 @@ export function CreditCardList({ cards, selectedMonth }: { cards: CreditCardType
               </Button>
             </CreditCardFormDialog>
             <Button variant="default" className="w-full flex-1 rounded-full shadow-md" size="sm" asChild>
-              <Link href={`/credit-cards/${card.id}${selectedMonth ? `?month=${selectedMonth}` : ''}`}>
+              <Link href={`/credit-cards/${card.id}${card.targetInvoiceMonth ? `?month=${card.targetInvoiceMonth}` : (selectedMonth ? `?month=${selectedMonth}` : '')}`}>
                 <FileText className="w-4 h-4 mr-2" />
                 Faturas
               </Link>

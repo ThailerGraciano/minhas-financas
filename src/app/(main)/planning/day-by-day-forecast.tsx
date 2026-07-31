@@ -16,6 +16,7 @@ type ForecastTransaction = {
   account?: { name: string } | null;
   creditCard?: { name: string } | null;
   category?: { name: string } | null;
+  parentTransactionId?: number | null;
 };
 
 type DayProjection = {
@@ -168,12 +169,16 @@ export function DayByDayForecast({ projection }: { projection: DayProjection[] }
                     </TableHeader>
                     <TableBody>
                       {selectedDay.transactions_of_the_day.map((tx) => {
-                        const isIncome = tx.type === 'income' || (tx.type === 'transfer' && tx.description.includes('(Entrada)'));
+                        const isIncome = tx.type === 'income' || (tx.type === 'transfer' && !!tx.parentTransactionId);
+                        const isTransfer = tx.type === 'transfer';
                         return (
                           <TableRow key={tx.id}>
                             <TableCell className="overflow-hidden px-2 py-3">
                               <div className="flex flex-col min-w-0">
-                                <span className="font-medium text-xs md:text-sm truncate block">{tx.description}</span>
+                                <span className="font-medium text-xs md:text-sm truncate block">
+                                  {isTransfer && <span className="inline-block bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 text-[9px] uppercase px-1 rounded mr-1">Transf</span>}
+                                  {tx.description}
+                                </span>
                                 <span className="text-[10px] md:text-xs text-muted-foreground truncate block">
                                   {tx.account?.name || tx.creditCard?.name || 'Geral'}
                                 </span>

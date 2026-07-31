@@ -11,6 +11,7 @@ import { MarketReceiptsList } from '@/components/market-receipts-list';
 import { MarketCategoryHistoryChart } from '@/components/market-category-history-chart';
 import { MarketCategoryItemsChart } from '@/components/market-category-items-chart';
 import { MarketTopCategoryItemsChart } from '@/components/market-top-category-items-chart';
+import { MarketAllItemsList } from '@/components/market-all-items-list';
 
 type MarketFullData = Awaited<ReturnType<typeof getMarketFullData>>;
 
@@ -61,6 +62,8 @@ export function MarketClientPage({ closingDay, initialData }: { closingDay: numb
             <TopMarketItemsChart data={data.dashboardData.topExpensiveItems} />
             <MarketTopCategoryItemsChart data={data.dashboardData.topItemsByCategory} />
           </div>
+
+          <MarketAllItemsList items={data.dashboardData.allItems} />
 
           <MarketReceiptsList receipts={data.receipts} />
 

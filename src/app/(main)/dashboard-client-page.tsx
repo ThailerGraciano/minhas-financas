@@ -5,6 +5,8 @@ import { getDashboardFullData } from '@/app/actions/dashboard-full';
 import { AccountBalancesSummary } from '@/components/account-balances-summary';
 import { BalanceEvolutionChart, COLOR_PAST, COLOR_FUTURE } from '@/components/balance-evolution-chart';
 import { InstallmentsStackedChart } from '@/components/installments-stacked-chart';
+import { ExpensesForecastChart } from '@/components/expenses-forecast-chart';
+import { CategoryForecastChart } from '@/components/category-forecast-chart';
 import { GlobalIncomeExpenseChart } from '@/components/global-income-expense-chart';
 import { AccountIncomeExpenseChart } from '@/components/account-income-expense-chart';
 import { AccountVsGlobalExpenseChart } from '@/components/account-vs-global-expense-chart';
@@ -72,6 +74,38 @@ export function DashboardClientPage({ closingDay, initialData }: { closingDay: n
             </div>
             <div>
               <InstallmentsStackedChart data={dashboard.installmentsData.data} keys={dashboard.installmentsData.keys} />
+            </div>
+          </div>
+
+          {/* Previsão de Gastos */}
+          <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
+            <div className="flex flex-row items-center gap-2 mb-4">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              <div>
+                <h2 className="text-xl font-bold">Previsão de Gastos</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Projeção de despesas variávies, fixas e parceladas para os próximos 6 meses
+                </p>
+              </div>
+            </div>
+            <div>
+              <ExpensesForecastChart data={dashboard.forecastData} />
+            </div>
+          </div>
+
+          {/* Previsão por Categoria */}
+          <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
+            <div className="flex flex-row items-center gap-2 mb-4">
+              <Grid3X3 className="h-5 w-5 text-primary" />
+              <div>
+                <h2 className="text-xl font-bold">Previsão por Categoria</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Projeção de despesas categorizadas para os próximos 6 meses
+                </p>
+              </div>
+            </div>
+            <div>
+              <CategoryForecastChart data={dashboard.categoryForecastData.data} keys={dashboard.categoryForecastData.keys} />
             </div>
           </div>
 

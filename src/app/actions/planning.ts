@@ -151,9 +151,9 @@ export async function getProjectedCashFlow(accountId?: string) {
     
     for (const tx of dailyTxs) {
       const amount = Number(tx.amount);
-      if (tx.type === 'income') {
+      if (tx.type === 'income' || (tx.type === 'transfer' && tx.parentTransactionId)) {
         total_incomes += amount;
-      } else if (tx.type === 'expense' || tx.type === 'credit_card_expense') {
+      } else if (tx.type === 'expense' || tx.type === 'credit_card_expense' || (tx.type === 'transfer' && !tx.parentTransactionId)) {
         total_expenses += amount;
       }
     }

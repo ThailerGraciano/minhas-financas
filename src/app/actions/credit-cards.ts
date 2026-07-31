@@ -402,6 +402,7 @@ export async function getCreditCardsWithSummary(competencyMonth: string) {
         invoice_total,
         invoice_paid,
         invoice_pending,
+        targetInvoiceMonth,
       };
     })
   );

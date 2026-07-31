@@ -286,6 +286,7 @@ export async function getMarketDashboardData(competencyMonth: string) {
       totalDiscount: 0,
       spendingByCategory: [],
       topExpensiveItems: [],
+      allItems: [],
       itemsByCategory: [],
       topItemsByCategory: [],
     };
@@ -319,7 +320,7 @@ export async function getMarketDashboardData(competencyMonth: string) {
     count,
   })).sort((a, b) => b.count - a.count);
 
-  const itemMap = new Map<string, { description: string, netPrice: number, quantity: number, unitMeasure: string }>();
+  const itemMap = new Map<string, { description: string, netPrice: number, quantity: number, unitMeasure: string, category: string }>();
   items.forEach(item => {
     const key = `${item.description}|${item.unitMeasure}`;
     if (!itemMap.has(key)) {
@@ -327,7 +328,8 @@ export async function getMarketDashboardData(competencyMonth: string) {
         description: item.description,
         netPrice: Number(item.netPrice),
         quantity: Number(item.quantity),
-        unitMeasure: item.unitMeasure
+        unitMeasure: item.unitMeasure,
+        category: item.category || 'Outros'
       });
     } else {
       const existing = itemMap.get(key)!;
@@ -336,9 +338,10 @@ export async function getMarketDashboardData(competencyMonth: string) {
     }
   });
 
-  const topExpensiveItems = Array.from(itemMap.values())
-    .sort((a, b) => b.netPrice - a.netPrice)
-    .slice(0, 5);
+  const allItems = Array.from(itemMap.values())
+    .sort((a, b) => b.netPrice - a.netPrice);
+
+  const topExpensiveItems = allItems.slice(0, 5);
 
   const categoryItemsMap = new Map<string, { description: string, netPrice: number, quantity: number, unitMeasure: string }[]>();
   items.forEach(item => {
@@ -374,6 +377,7 @@ export async function getMarketDashboardData(competencyMonth: string) {
     totalDiscount,
     spendingByCategory,
     topExpensiveItems,
+    allItems,
     itemsByCategory,
     topItemsByCategory,
   };

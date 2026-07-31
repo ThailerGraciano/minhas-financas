@@ -455,3 +455,268 @@ export async function getExpenseTreemapData(competencyMonth: string) {
 
   return root;
 }
+
+export async function getExpensesForecastData() {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
+  const currentMonthDate = new Date();
+  const currentMonth = format(currentMonthDate, 'yyyy-MM');
+  
+  const startMonthDate = subMonths(currentMonthDate, 5);
+  const startMonth = format(startMonthDate, 'yyyy-MM');
+  
+  const endMonthDate = addMonths(currentMonthDate, 6);
+  const endMonth = format(endMonthDate, 'yyyy-MM');
+
+  const allTxs = await db
+    .select({
+      amount: transactions.amount,
+      competencyMonth: transactions.competencyMonth,
+      type: transactions.type,
+      installmentTotal: transactions.installmentTotal,
+      fixedTransactionId: transactions.fixedTransactionId,
+      isFixed: transactions.isFixed,
+    })
+    .from(transactions)
+    .where(
+      and(
+        inArray(transactions.type, ['expense', 'credit_card_expense']),
+        gte(transactions.competencyMonth, startMonth),
+        lte(transactions.competencyMonth, endMonth),
+        eq(transactions.userId, userId)
+      )
+    );
+
+  const activeFixed = await db
+    .select({
+      id: fixedTransactions.id,
+      amount: fixedTransactions.amount,
+      startDate: fixedTransactions.startDate,
+    })
+    .from(fixedTransactions)
+    .where(and(
+      eq(fixedTransactions.active, true),
+      inArray(fixedTransactions.type, ['expense', 'credit_card_expense']),
+      eq(fixedTransactions.userId, userId)
+    ));
+
+  const monthKeys: string[] = [];
+  for (let i = -5; i <= 6; i++) {
+    monthKeys.push(format(i === 0 ? currentMonthDate : (i > 0 ? addMonths(currentMonthDate, i) : subMonths(currentMonthDate, Math.abs(i))), 'yyyy-MM'));
+  }
+
+  const monthlyData: Record<string, { Parcelas: number; Fixas: number; Variáveis: number; isFuture: boolean }> = {};
+  
+  monthKeys.forEach(m => {
+    monthlyData[m] = { Parcelas: 0, Fixas: 0, Variáveis: 0, isFuture: m > currentMonth };
+  });
+
+  const materializedFixedIdsByMonth: Record<string, Set<string>> = {};
+  monthKeys.forEach(m => { materializedFixedIdsByMonth[m] = new Set(); });
+
+  allTxs.forEach(t => {
+    if (!monthlyData[t.competencyMonth]) return;
+
+    const amt = Number(t.amount);
+    const isInstallment = t.installmentTotal && t.installmentTotal > 1;
+    const isFixed = t.fixedTransactionId || t.isFixed;
+
+    if (isInstallment) {
+      monthlyData[t.competencyMonth].Parcelas += amt;
+    } else if (isFixed) {
+      monthlyData[t.competencyMonth].Fixas += amt;
+      if (t.fixedTransactionId) {
+        materializedFixedIdsByMonth[t.competencyMonth].add(t.fixedTransactionId);
+      }
+    } else {
+      monthlyData[t.competencyMonth].Variáveis += amt;
+    }
+  });
+
+  monthKeys.forEach(m => {
+    if (m >= currentMonth) {
+      activeFixed.forEach(ft => {
+        if (!materializedFixedIdsByMonth[m].has(ft.id)) {
+          const ftMonthStr = ft.startDate.substring(0, 7);
+          if (ftMonthStr <= m) {
+            monthlyData[m].Fixas += Number(ft.amount);
+          }
+        }
+      });
+    }
+  });
+
+  for (let i = 0; i < monthKeys.length; i++) {
+    const m = monthKeys[i];
+    if (m > currentMonth) {
+      let sumVar = 0;
+      let count = 0;
+      for (let j = 1; j <= 4; j++) {
+        if (i - j >= 0) {
+          sumVar += monthlyData[monthKeys[i - j]].Variáveis;
+          count++;
+        }
+      }
+      const avg = count > 0 ? sumVar / count : 0;
+      monthlyData[m].Variáveis = avg;
+    }
+  }
+
+  const chartData = monthKeys.map(m => {
+    const date = new Date(`${m}-01T00:00:00`);
+    const formattedMonth = format(date, 'MMM/yyyy', { locale: ptBR });
+    return {
+      month: formattedMonth.charAt(0).toUpperCase() + formattedMonth.slice(1),
+      rawMonth: m,
+      isFuture: m > currentMonth,
+      Parcelas: monthlyData[m].Parcelas,
+      Fixas: monthlyData[m].Fixas,
+      Variáveis: monthlyData[m].Variáveis,
+    };
+  });
+
+  return chartData;
+}
+
+export async function getCategoryForecastData() {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
+  const currentMonthDate = new Date();
+  const currentMonth = format(currentMonthDate, 'yyyy-MM');
+  
+  const startMonthDate = subMonths(currentMonthDate, 5);
+  const startMonth = format(startMonthDate, 'yyyy-MM');
+  
+  const endMonthDate = addMonths(currentMonthDate, 6);
+  const endMonth = format(endMonthDate, 'yyyy-MM');
+
+  const allTxs = await db.query.transactions.findMany({
+    where: and(
+      inArray(transactions.type, ['expense', 'credit_card_expense']),
+      gte(transactions.competencyMonth, startMonth),
+      lte(transactions.competencyMonth, endMonth),
+      eq(transactions.userId, userId)
+    ),
+    with: {
+      category: true,
+    }
+  });
+
+  const activeFixed = await db.query.fixedTransactions.findMany({
+    where: and(
+      eq(fixedTransactions.active, true),
+      inArray(fixedTransactions.type, ['expense', 'credit_card_expense']),
+      eq(fixedTransactions.userId, userId)
+    ),
+    with: {
+      category: true,
+    }
+  });
+
+  const monthKeys: string[] = [];
+  for (let i = -5; i <= 6; i++) {
+    monthKeys.push(format(i === 0 ? currentMonthDate : (i > 0 ? addMonths(currentMonthDate, i) : subMonths(currentMonthDate, Math.abs(i))), 'yyyy-MM'));
+  }
+
+  const variableExpensesByCategory: Record<string, Record<string, number>> = {};
+  const monthlyData: Record<string, Record<string, any>> = {};
+  
+  monthKeys.forEach(m => {
+    monthlyData[m] = { rawMonth: m, isFuture: m > currentMonth };
+  });
+
+  const materializedFixedIdsByMonth: Record<string, Set<string>> = {};
+  monthKeys.forEach(m => { materializedFixedIdsByMonth[m] = new Set(); });
+
+  const categoryKeys = new Set<string>();
+  const getCatName = (cat: any) => cat?.name || 'Sem Categoria';
+
+  allTxs.forEach(t => {
+    if (!monthlyData[t.competencyMonth]) return;
+    
+    const catName = getCatName(t.category);
+    categoryKeys.add(catName);
+
+    const amt = Number(t.amount);
+    const isInstallment = t.installmentTotal && t.installmentTotal > 1;
+    const isFixed = t.fixedTransactionId || t.isFixed;
+
+    if (!monthlyData[t.competencyMonth][catName]) {
+      monthlyData[t.competencyMonth][catName] = 0;
+    }
+
+    if (isInstallment || isFixed) {
+      monthlyData[t.competencyMonth][catName] += amt;
+      if (t.fixedTransactionId) {
+        materializedFixedIdsByMonth[t.competencyMonth].add(t.fixedTransactionId);
+      }
+    } else {
+      monthlyData[t.competencyMonth][catName] += amt;
+      
+      if (!variableExpensesByCategory[catName]) variableExpensesByCategory[catName] = {};
+      if (!variableExpensesByCategory[catName][t.competencyMonth]) variableExpensesByCategory[catName][t.competencyMonth] = 0;
+      variableExpensesByCategory[catName][t.competencyMonth] += amt;
+    }
+  });
+
+  monthKeys.forEach(m => {
+    if (m >= currentMonth) {
+      activeFixed.forEach(ft => {
+        if (!materializedFixedIdsByMonth[m].has(ft.id)) {
+          const ftMonthStr = ft.startDate.substring(0, 7);
+          if (ftMonthStr <= m) {
+            const catName = getCatName(ft.category);
+            categoryKeys.add(catName);
+            if (!monthlyData[m][catName]) monthlyData[m][catName] = 0;
+            monthlyData[m][catName] += Number(ft.amount);
+          }
+        }
+      });
+    }
+  });
+
+  categoryKeys.forEach(catName => {
+    for (let i = 0; i < monthKeys.length; i++) {
+      const m = monthKeys[i];
+      if (m > currentMonth) {
+        let sumVar = 0;
+        let count = 0;
+        for (let j = 1; j <= 4; j++) {
+          if (i - j >= 0) {
+            const pastM = monthKeys[i - j];
+            const val = variableExpensesByCategory[catName]?.[pastM] || 0;
+            sumVar += val;
+            count++;
+          }
+        }
+        const avg = count > 0 ? sumVar / count : 0;
+        
+        if (avg > 0) {
+          if (!monthlyData[m][catName]) monthlyData[m][catName] = 0;
+          monthlyData[m][catName] += avg;
+          
+          if (!variableExpensesByCategory[catName]) variableExpensesByCategory[catName] = {};
+          variableExpensesByCategory[catName][m] = avg; 
+        }
+      }
+    }
+  });
+
+  const chartData = monthKeys.map(m => {
+    const date = new Date(`${m}-01T00:00:00`);
+    const formattedMonth = format(date, 'MMM/yyyy', { locale: ptBR });
+    return {
+      month: formattedMonth.charAt(0).toUpperCase() + formattedMonth.slice(1),
+      ...monthlyData[m],
+    };
+  });
+
+  return {
+    data: chartData,
+    keys: Array.from(categoryKeys),
+  };
+}

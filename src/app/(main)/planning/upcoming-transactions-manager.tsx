@@ -17,6 +17,7 @@ interface Transaction {
   account: { id: number; name: string } | null;
   creditCard?: { id: number; name: string } | null;
   category: { id: number; name: string } | null;
+  parentTransactionId?: number | null;
 }
 
 interface UpcomingTransactionsManagerProps {
@@ -110,7 +111,8 @@ export function UpcomingTransactionsManager({
 
                 {/* Upcoming/Future Rows */}
                 {upcomingTransactions.map((tx) => {
-                  const isIncome = tx.type === 'income' || (tx.type === 'transfer' && tx.description.includes('(Entrada)'));
+                  const isIncome = tx.type === 'income' || (tx.type === 'transfer' && !!tx.parentTransactionId);
+                  const isTransfer = tx.type === 'transfer';
                   return (
                     <TableRow key={tx.id} className="hover:bg-muted/30">
                       <TableCell className="font-medium whitespace-nowrap py-3 md:py-4 px-2 md:px-4 text-xs md:text-sm">
@@ -119,6 +121,7 @@ export function UpcomingTransactionsManager({
                       <TableCell className="py-3 md:py-4 px-2 md:px-4 min-w-0">
                         <div className="flex flex-col min-w-0">
                           <span className="font-medium truncate max-w-[120px] sm:max-w-none text-xs md:text-sm" title={tx.description}>
+                            {isTransfer && <span className="inline-block bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 text-[9px] uppercase px-1 rounded mr-1">Transf</span>}
                             {tx.description}
                           </span>
                           <span className="text-[10px] md:text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-none">
@@ -179,7 +182,8 @@ export function UpcomingTransactionsManager({
               </TableHeader>
               <TableBody>
                 {overdueTransactions.map((tx) => {
-                  const isIncome = tx.type === 'income' || (tx.type === 'transfer' && tx.description.includes('(Entrada)'));
+                  const isIncome = tx.type === 'income' || (tx.type === 'transfer' && !!tx.parentTransactionId);
+                  const isTransfer = tx.type === 'transfer';
                   return (
                     <TableRow key={tx.id} className="hover:bg-muted/40">
                       <TableCell className="font-medium whitespace-nowrap text-xs text-red-500">
@@ -187,7 +191,10 @@ export function UpcomingTransactionsManager({
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
-                          <span className="font-medium text-sm line-clamp-1">{tx.description}</span>
+                          <span className="font-medium text-sm line-clamp-1">
+                            {isTransfer && <span className="inline-block bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 text-[9px] uppercase px-1 rounded mr-1">Transf</span>}
+                            {tx.description}
+                          </span>
                           <span className="text-xs text-muted-foreground">
                             {tx.account?.name || tx.creditCard?.name || 'Geral'} • {tx.category?.name}
                           </span>

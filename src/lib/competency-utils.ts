@@ -11,11 +11,8 @@ import { parseISO, subMonths, format } from 'date-fns';
  * Como cardDueDay > globalClosingDay, a fatura paga no ciclo global de Agosto é a fatura de Julho ('2026-07').
  */
 export function getTargetInvoiceMonth(globalMonth: string, globalClosingDay: number, cardDueDay: number): string {
-  const offset = cardDueDay > globalClosingDay ? 1 : 0;
-  // Parse globalMonth (e.g., '2026-08') com dia 01
-  const baseDate = parseISO(`${globalMonth}-01`);
-  // Subtrai 'offset' meses e formata novamente
-  return format(subMonths(baseDate, offset), 'yyyy-MM');
+  // A fatura é nomeada rigorosamente pelo seu mês de visualização, sem deslocamento orçamentário.
+  return globalMonth;
 }
 
 /**

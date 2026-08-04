@@ -130,6 +130,16 @@ export async function getProjectedCashFlow(accountId?: string) {
   const overdueTransactions = processedTxs.filter(tx => tx.date < todayDate);
   const futurePendingTxs = processedTxs.filter(tx => tx.date >= todayDate);
 
+  // Aplica o efeito das transações atrasadas no saldo inicial da projeção
+  for (const tx of overdueTransactions) {
+    const amount = Number(tx.amount);
+    if (tx.type === 'income' || (tx.type === 'transfer' && tx.parentTransactionId)) {
+      currentBalance += amount;
+    } else if (tx.type === 'expense' || tx.type === 'credit_card_expense' || (tx.type === 'transfer' && !tx.parentTransactionId)) {
+      currentBalance -= amount;
+    }
+  }
+
   // 3. Group by date map (only for future/today transactions)
   const grouped = new Map<string, typeof futurePendingTxs>();
   for (const tx of futurePendingTxs) {

@@ -659,7 +659,7 @@ export function TransactionFormDialog({
                     <div className="grid gap-3 animate-in fade-in">
                       <Label className="text-muted-foreground ml-1">Selecione a Conta</Label>
                       <Select value={accountId} onValueChange={setAccountId}>
-                        <SelectTrigger className="h-14 rounded-xl text-lg">
+                        <SelectTrigger className="h-14 w-full rounded-xl text-lg">
                           <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -676,7 +676,7 @@ export function TransactionFormDialog({
                       <div className="grid gap-3">
                         <Label className="text-muted-foreground ml-1">Cartão de Crédito</Label>
                         <Select value={selectedCreditCardId} onValueChange={handleCreditCardChange}>
-                          <SelectTrigger className="h-14 rounded-xl text-lg">
+                          <SelectTrigger className="h-14 w-full rounded-xl text-lg">
                             <SelectValue placeholder="Selecione..." />
                           </SelectTrigger>
                           <SelectContent>
@@ -711,7 +711,7 @@ export function TransactionFormDialog({
                   <div className="grid gap-3">
                     <Label className="text-muted-foreground ml-1">Depositar na Conta</Label>
                     <Select value={accountIdIncome} onValueChange={setAccountIdIncome}>
-                      <SelectTrigger className="h-14 rounded-xl text-lg bg-muted/40">
+                      <SelectTrigger className="h-14 w-full rounded-xl text-lg bg-muted/40">
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent>

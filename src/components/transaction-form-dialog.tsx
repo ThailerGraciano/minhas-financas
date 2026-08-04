@@ -273,8 +273,8 @@ export function TransactionFormDialog({
       amount: amount?.toString(),
       date: transactionDate,
       competencyMonth,
-      categoryId: selectedCategoryId ? Number(selectedCategoryId) : null,
-      subcategoryId: selectedSubcategoryId ? Number(selectedSubcategoryId) : null,
+      categoryId: selectedCategoryId ? Number(selectedCategoryId) : undefined,
+      subcategoryId: selectedSubcategoryId ? Number(selectedSubcategoryId) : undefined,
       status: isPaid && isPastOrToday ? "paid" : "pending",
     };
 

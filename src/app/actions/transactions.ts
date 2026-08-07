@@ -162,7 +162,7 @@ export async function getTransactions(month?: string, accountId?: number) {
 
       const tempId = -Math.floor(Math.random() * 1000000) - 1;
 
-      const origin = {
+      const origin: typeof realTransactions[0] = {
         id: tempId,
         userId: userId,
         type: ft.type,
@@ -183,21 +183,21 @@ export async function getTransactions(month?: string, accountId?: number) {
         installmentParentId: null,
         observations: null,
         paidAt: null,
+        importHash: null,
         account: ft.account,
         category: ft.category,
         creditCard: ft.creditCard,
-        destinationAccountId: ft.type === "transfer" ? ft.destinationAccountId : null,
-      } as any;
+      };
 
       if (ft.type === "transfer" && ft.destinationAccountId) {
-        const dest = {
+        const dest: typeof realTransactions[0] = {
           ...origin,
           id: tempId - 1,
           accountId: ft.destinationAccountId,
           description: `${ft.description} (Entrada)`,
           parentTransactionId: origin.id,
           account: ft.destinationAccount,
-        } as any;
+        };
         return [origin, dest];
       }
 

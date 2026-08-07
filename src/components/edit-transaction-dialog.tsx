@@ -10,6 +10,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { addMonths, format } from "date-fns";
@@ -33,6 +34,9 @@ interface TransactionProp {
   creditCardId?: number | string | null;
   destinationAccountId?: number | string | null;
   competencyMonth?: string;
+  fixedTransactionId?: string | null;
+  installmentTotal?: number | null;
+  installmentCurrent?: number | null;
 }
 
 interface EditTransactionDialogProps {
@@ -49,6 +53,8 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("");
   const [amount, setAmount] = useState<number>(0);
+  const [originalAmount, setOriginalAmount] = useState<number>(0);
+  const [updateFuture, setUpdateFuture] = useState(false);
   
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [selectedDestinationAccountId, setSelectedDestinationAccountId] = useState("");
@@ -69,6 +75,8 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
       setSelectedCategoryId(transaction.categoryId ? String(transaction.categoryId) : "");
       setSelectedSubcategoryId(transaction.subcategoryId ? String(transaction.subcategoryId) : "");
       setAmount(Number(transaction.amount));
+      setOriginalAmount(Number(transaction.amount));
+      setUpdateFuture(false);
       setSelectedAccountId("");
       setSelectedDestinationAccountId("");
 
@@ -175,6 +183,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
       creditCardId,
       type,
       destinationAccountId: selectedDestinationAccountId && transaction.type === 'transfer' ? Number(selectedDestinationAccountId) : undefined,
+      updateFuture,
     };
 
     const res = await updateTransaction(Number(transaction.id), updateData);
@@ -287,6 +296,22 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
                 <DatePicker id="date" name="date" defaultValue={transaction.date.substring(0, 10)} required />
               </div>
             </div>
+
+            {(fullTransaction?.installmentTotal || fullTransaction?.fixedTransactionId) && amount !== originalAmount ? (
+              <div className="flex flex-row items-center justify-between rounded-lg border p-4 bg-background animate-in fade-in slide-in-from-bottom-2">
+                <div className="space-y-0.5">
+                  <Label className="text-sm cursor-pointer" onClick={() => setUpdateFuture(!updateFuture)}>
+                    Alterar o valor das próximas também?
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {fullTransaction.fixedTransactionId 
+                      ? "O novo valor será aplicado a todas as ocorrências futuras." 
+                      : "O novo valor será aplicado a todas as parcelas seguintes."}
+                  </p>
+                </div>
+                <Switch checked={updateFuture} onCheckedChange={setUpdateFuture} />
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">

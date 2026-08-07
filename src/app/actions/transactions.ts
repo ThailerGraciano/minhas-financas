@@ -767,7 +767,7 @@ export async function deleteTransaction(id: number, mode: "single" | "future" = 
 
 export async function updateTransaction(
   id: number,
-  inputData: Partial<CreateTransactionInput> & { destinationAccountId?: number },
+  inputData: Partial<CreateTransactionInput> & { destinationAccountId?: number; updateFuture?: boolean },
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const session = await auth();
@@ -795,7 +795,7 @@ export async function updateTransaction(
         inputData.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
       }
 
-      const { destinationAccountId, ...data } = inputData;
+      const { destinationAccountId, updateFuture, ...data } = inputData;
 
       if (oldTx.type === "transfer") {
         const isDestinationTx = !!oldTx.parentTransactionId;
@@ -840,6 +840,58 @@ export async function updateTransaction(
         await applyBalanceDelta(tx, oldTx.accountId, oldTx.amount, oldTx.type, oldTx.status || "pending", oldTx.parentTransactionId, true);
         const [updatedTx] = await tx.update(transactions).set(data).where(eq(transactions.id, id)).returning();
         await applyBalanceDelta(tx, updatedTx.accountId, updatedTx.amount, updatedTx.type, updatedTx.status || "pending", updatedTx.parentTransactionId, false);
+      }
+
+      if (updateFuture && (oldTx.fixedTransactionId || oldTx.installmentTotal)) {
+        const parentId = oldTx.installmentParentId || oldTx.parentTransactionId || oldTx.id;
+        const targetDate = oldTx.date;
+
+        const conditions = [
+          eq(transactions.installmentParentId, parentId),
+          eq(transactions.parentTransactionId, parentId),
+          eq(transactions.id, parentId),
+        ];
+
+        if (oldTx.fixedTransactionId) {
+          conditions.push(eq(transactions.fixedTransactionId, oldTx.fixedTransactionId));
+        }
+
+        const allRelated = await tx
+          .select()
+          .from(transactions)
+          .where(
+            and(
+              or(...conditions),
+              gte(transactions.date, targetDate),
+              eq(transactions.userId, userId),
+            ),
+          );
+
+        const updatedIds = [oldTx.id];
+        if (oldTx.type === "transfer" && oldTx.parentTransactionId) {
+           updatedIds.push(oldTx.parentTransactionId);
+        } else if (oldTx.type === "transfer") {
+           const child = allRelated.find(t => t.parentTransactionId === oldTx.id);
+           if (child) updatedIds.push(child.id);
+        }
+
+        const futuresToUpdate = allRelated.filter(t => !updatedIds.includes(t.id));
+
+        for (const targetTx of futuresToUpdate) {
+            await applyBalanceDelta(tx, targetTx.accountId, targetTx.amount, targetTx.type, targetTx.status || "pending", targetTx.parentTransactionId, true);
+            
+            const [updatedTx] = await tx.update(transactions).set({
+              amount: data.amount !== undefined ? data.amount : targetTx.amount,
+            }).where(eq(transactions.id, targetTx.id)).returning();
+            
+            await applyBalanceDelta(tx, updatedTx.accountId, updatedTx.amount, updatedTx.type, updatedTx.status || "pending", updatedTx.parentTransactionId, false);
+        }
+
+        if (oldTx.fixedTransactionId && data.amount !== undefined) {
+           await tx.update(fixedTransactions).set({
+             amount: data.amount
+           }).where(eq(fixedTransactions.id, oldTx.fixedTransactionId));
+        }
       }
 
       return { success: true };

@@ -17,6 +17,8 @@ type CreateTransactionInput = Omit<NewTransaction, "userId"> & {
   current_installment?: number;
 };
 
+type DBTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 function getCompetencyMonth(date: Date, closingDay: number): string {
   const day = getDate(date);
   if (day > closingDay) {
@@ -26,7 +28,7 @@ function getCompetencyMonth(date: Date, closingDay: number): string {
 }
 
 async function applyBalanceDelta(
-  tx: any,
+  tx: DBTx,
   accountId: number | null | undefined,
   amount: number | string,
   type: string,
@@ -902,9 +904,10 @@ export async function updateTransaction(
     revalidatePath("/planning");
     revalidatePath("/credit-cards");
     return result;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error updating transaction:", error);
-    return { success: false, error: error?.message || "Failed to update transaction" };
+    const errorMessage = error instanceof Error ? error.message : "Failed to update transaction";
+    return { success: false, error: errorMessage };
   }
 }
 

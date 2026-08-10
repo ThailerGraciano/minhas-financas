@@ -4,10 +4,11 @@ import React, { useMemo, useState } from 'react';
 import { hierarchy, treemap, HierarchyRectangularNode } from 'd3-hierarchy';
 import { useMeasure } from 'react-use';
 import { ChevronRight } from 'lucide-react';
-import { TreemapNode } from '@/app/actions/dashboard';
+import { TreemapNode, TreemapDataSets } from '@/app/actions/dashboard';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ExpenseTreemapProps {
-  data: TreemapNode;
+  data: TreemapDataSets;
 }
 
 // Function to generate consistent colors based on string hash
@@ -31,17 +32,22 @@ const stringToColorClass = (str: string) => {
 export function ExpenseTreemap({ data }: ExpenseTreemapProps) {
   const [ref, { width, height }] = useMeasure<HTMLDivElement>();
   
-  const [currentRoot, setCurrentRoot] = useState<TreemapNode>(data);
+  const [filterType, setFilterType] = useState<keyof TreemapDataSets>('all');
+  const [currentRoot, setCurrentRoot] = useState<TreemapNode>(data.all);
   const [path, setPath] = useState<{ name: string; data: TreemapNode }[]>([
-    { name: 'Geral', data: data },
+    { name: 'Geral', data: data.all },
   ]);
 
-  // Update root and path if data prop changes (e.g. month changed)
-  React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCurrentRoot(data);
-    setPath([{ name: 'Geral', data: data }]);
-  }, [data]);
+  const [prevData, setPrevData] = useState(data);
+  const [prevFilterType, setPrevFilterType] = useState(filterType);
+
+  if (data !== prevData || filterType !== prevFilterType) {
+    const selectedData = data[filterType];
+    setCurrentRoot(selectedData);
+    setPath([{ name: 'Geral', data: selectedData }]);
+    setPrevData(data);
+    setPrevFilterType(filterType);
+  }
 
   const root = useMemo(() => {
     if (!width || !height || !currentRoot) return null;
@@ -76,21 +82,38 @@ export function ExpenseTreemap({ data }: ExpenseTreemapProps) {
 
   return (
     <div className="flex flex-col w-full space-y-4">
-      {/* Breadcrumbs */}
-      <div className="flex items-center space-x-2 text-sm text-muted-foreground overflow-x-auto pb-2 shrink-0">
-        {path.map((step, index) => (
-          <React.Fragment key={index}>
-            <button
-              onClick={() => handleBreadcrumbClick(index)}
-              className={`hover:text-foreground transition-colors whitespace-nowrap ${
-                index === path.length - 1 ? 'font-semibold text-foreground' : ''
-              }`}
-            >
-              {step.name}
-            </button>
-            {index < path.length - 1 && <ChevronRight className="w-4 h-4 shrink-0" />}
-          </React.Fragment>
-        ))}
+      <div className="flex items-center justify-between">
+        {/* Breadcrumbs */}
+        <div className="flex items-center space-x-2 text-sm text-muted-foreground overflow-x-auto pb-2 shrink-0">
+          {path.map((step, index) => (
+            <React.Fragment key={index}>
+              <button
+                onClick={() => handleBreadcrumbClick(index)}
+                className={`hover:text-foreground transition-colors whitespace-nowrap ${
+                  index === path.length - 1 ? 'font-semibold text-foreground' : ''
+                }`}
+              >
+                {step.name}
+              </button>
+              {index < path.length - 1 && <ChevronRight className="w-4 h-4 shrink-0" />}
+            </React.Fragment>
+          ))}
+        </div>
+
+        {/* Filter */}
+        <div className="w-[180px]">
+          <Select value={filterType} onValueChange={(val) => setFilterType(val as keyof TreemapDataSets)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filtro" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="variable">Variáveis</SelectItem>
+              <SelectItem value="installment">Parceladas</SelectItem>
+              <SelectItem value="fixed">Fixas</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Treemap Container */}

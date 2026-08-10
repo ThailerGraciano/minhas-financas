@@ -400,7 +400,14 @@ export type TreemapNode = {
   children?: TreemapNode[];
 };
 
-export async function getExpenseTreemapData(competencyMonth: string) {
+export type TreemapDataSets = {
+  all: TreemapNode;
+  variable: TreemapNode;
+  installment: TreemapNode;
+  fixed: TreemapNode;
+};
+
+export async function getExpenseTreemapData(competencyMonth: string): Promise<TreemapDataSets> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
@@ -421,39 +428,64 @@ export async function getExpenseTreemapData(competencyMonth: string) {
     }
   });
 
-  const root: TreemapNode = { name: 'Despesas', children: [] };
-  const categoryMap = new Map<string, TreemapNode>();
-  const subcategoryMap = new Map<string, TreemapNode>();
+  const roots: TreemapDataSets = {
+    all: { name: 'Despesas', children: [] },
+    variable: { name: 'Despesas Variáveis', children: [] },
+    installment: { name: 'Despesas Parceladas', children: [] },
+    fixed: { name: 'Despesas Fixas', children: [] },
+  };
+
+  const maps = {
+    all: { cat: new Map<string, TreemapNode>(), sub: new Map<string, TreemapNode>() },
+    variable: { cat: new Map<string, TreemapNode>(), sub: new Map<string, TreemapNode>() },
+    installment: { cat: new Map<string, TreemapNode>(), sub: new Map<string, TreemapNode>() },
+    fixed: { cat: new Map<string, TreemapNode>(), sub: new Map<string, TreemapNode>() },
+  };
+
+  const addToTree = (treeType: keyof TreemapDataSets, desc: string, id: string | number, val: number, catName: string, subName: string) => {
+    const root = roots[treeType];
+    const { cat, sub } = maps[treeType];
+    
+    if (!cat.has(catName)) {
+      const newCat: TreemapNode = { name: catName, children: [] };
+      cat.set(catName, newCat);
+      root.children!.push(newCat);
+    }
+    const catNode = cat.get(catName)!;
+    const subcatKey = `${catName}-${subName}`;
+    if (!sub.has(subcatKey)) {
+      const newSub: TreemapNode = { name: subName, children: [] };
+      sub.set(subcatKey, newSub);
+      catNode.children!.push(newSub);
+    }
+    const subNode = sub.get(subcatKey)!;
+    subNode.children!.push({
+      name: desc,
+      value: val,
+      id: String(id),
+    });
+  };
 
   rawTransactions.forEach(t => {
     const catName = t.category?.name || 'Sem Categoria';
     const subName = t.subcategory?.name || 'Geral';
     const val = Number(t.amount);
+
+    const isInstallment = t.installmentTotal && t.installmentTotal > 1;
+    const isFixed = t.fixedTransactionId || t.isFixed;
     
-    if (!categoryMap.has(catName)) {
-      const newCat: TreemapNode = { name: catName, children: [] };
-      categoryMap.set(catName, newCat);
-      root.children!.push(newCat);
+    addToTree('all', t.description, t.id, val, catName, subName);
+
+    if (isInstallment) {
+      addToTree('installment', t.description, t.id, val, catName, subName);
+    } else if (isFixed) {
+      addToTree('fixed', t.description, t.id, val, catName, subName);
+    } else {
+      addToTree('variable', t.description, t.id, val, catName, subName);
     }
-    
-    const catNode = categoryMap.get(catName)!;
-    const subcatKey = `${catName}-${subName}`;
-    
-    if (!subcategoryMap.has(subcatKey)) {
-      const newSub: TreemapNode = { name: subName, children: [] };
-      subcategoryMap.set(subcatKey, newSub);
-      catNode.children!.push(newSub);
-    }
-    
-    const subNode = subcategoryMap.get(subcatKey)!;
-    subNode.children!.push({
-      name: t.description,
-      value: val,
-      id: String(t.id),
-    });
   });
 
-  return root;
+  return roots;
 }
 
 export async function getExpensesForecastData() {
@@ -623,7 +655,7 @@ export async function getCategoryForecastData() {
   }
 
   const variableExpensesByCategory: Record<string, Record<string, number>> = {};
-  const monthlyData: Record<string, Record<string, any>> = {};
+  const monthlyData: Record<string, Record<string, number | string | boolean>> = {};
   
   monthKeys.forEach(m => {
     monthlyData[m] = { rawMonth: m, isFuture: m > currentMonth };
@@ -633,7 +665,7 @@ export async function getCategoryForecastData() {
   monthKeys.forEach(m => { materializedFixedIdsByMonth[m] = new Set(); });
 
   const categoryKeys = new Set<string>();
-  const getCatName = (cat: any) => cat?.name || 'Sem Categoria';
+  const getCatName = (cat: { name: string } | null | undefined) => cat?.name || 'Sem Categoria';
 
   allTxs.forEach(t => {
     if (!monthlyData[t.competencyMonth]) return;
@@ -650,12 +682,12 @@ export async function getCategoryForecastData() {
     }
 
     if (isInstallment || isFixed) {
-      monthlyData[t.competencyMonth][catName] += amt;
+      monthlyData[t.competencyMonth][catName] = (monthlyData[t.competencyMonth][catName] as number) + amt;
       if (t.fixedTransactionId) {
         materializedFixedIdsByMonth[t.competencyMonth].add(t.fixedTransactionId);
       }
     } else {
-      monthlyData[t.competencyMonth][catName] += amt;
+      monthlyData[t.competencyMonth][catName] = (monthlyData[t.competencyMonth][catName] as number) + amt;
       
       if (!variableExpensesByCategory[catName]) variableExpensesByCategory[catName] = {};
       if (!variableExpensesByCategory[catName][t.competencyMonth]) variableExpensesByCategory[catName][t.competencyMonth] = 0;
@@ -672,7 +704,7 @@ export async function getCategoryForecastData() {
             const catName = getCatName(ft.category);
             categoryKeys.add(catName);
             if (!monthlyData[m][catName]) monthlyData[m][catName] = 0;
-            monthlyData[m][catName] += Number(ft.amount);
+            monthlyData[m][catName] = (monthlyData[m][catName] as number) + Number(ft.amount);
           }
         }
       });
@@ -697,7 +729,7 @@ export async function getCategoryForecastData() {
         
         if (avg > 0) {
           if (!monthlyData[m][catName]) monthlyData[m][catName] = 0;
-          monthlyData[m][catName] += avg;
+          monthlyData[m][catName] = (monthlyData[m][catName] as number) + avg;
           
           if (!variableExpensesByCategory[catName]) variableExpensesByCategory[catName] = {};
           variableExpensesByCategory[catName][m] = avg; 

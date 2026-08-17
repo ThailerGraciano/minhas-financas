@@ -68,7 +68,7 @@ const transactionSchema = z
     amount: z.string().refine((val) => Number(val) > 0, "Valor deve ser maior que zero"),
     date: z.string().min(1, "Data é obrigatória"),
     competencyMonth: z.string().min(1),
-    categoryId: z.number().int().positive("Categoria é obrigatória"),
+    categoryId: z.number().int().positive("Categoria é obrigatória").optional(),
     type: z.string().min(1),
     status: z.string().min(1),
     isTotalAmount: z.boolean().optional().default(false),
@@ -82,6 +82,13 @@ const transactionSchema = z
         code: z.ZodIssueCode.custom,
         message: "A parcela inicial não pode ser maior que o total de parcelas.",
         path: ["current_installment"],
+      });
+    }
+    if (data.type !== "transfer" && !data.categoryId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Categoria é obrigatória",
+        path: ["categoryId"],
       });
     }
   });
@@ -240,6 +247,17 @@ export async function createTransaction(
   try {
     const { isFixed, destinationAccountId, isTotalAmount, current_installment, ...txData } = data;
     const isTransfer = txData.type === "transfer" && destinationAccountId;
+
+    if (isTransfer && !txData.categoryId) {
+       const { categories } = await import("@/db/schema");
+       const [cat] = await db.select().from(categories).where(and(eq(categories.userId, userId), eq(categories.type, 'transfer'))).limit(1);
+       if (cat) {
+           txData.categoryId = cat.id;
+       } else {
+           const [newCat] = await db.insert(categories).values({ userId, name: 'Transferência', type: 'transfer', icon: 'arrow-right-left' }).returning();
+           txData.categoryId = newCat.id;
+       }
+    }
 
     if (isFixed) {
       const result = await db.transaction(async (tx) => {

@@ -354,19 +354,19 @@ export function TransactionFormDialog({
 
   const renderSummary = () => {
     return (
-      <div className="bg-muted/30 border rounded-xl p-6 space-y-4 shadow-sm relative overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+      <div className="bg-muted/30 border rounded-xl p-3 sm:p-6 space-y-3 sm:space-y-4 shadow-sm relative overflow-hidden animate-in fade-in slide-in-from-bottom-2">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-primary/50" />
         
-        <div className="flex flex-col items-center justify-center border-b pb-4 mb-4 border-dashed">
-          <ReceiptText className="h-8 w-8 text-primary mb-2 opacity-80" />
-          <h3 className="font-semibold text-lg">Resumo da Transação</h3>
-          <p className="text-sm text-muted-foreground uppercase tracking-widest">{tab === 'expense' ? 'Despesa' : tab === 'income' ? 'Receita' : 'Transferência'}</p>
+        <div className="flex flex-col items-center justify-center border-b pb-3 sm:pb-4 mb-3 sm:mb-4 border-dashed">
+          <ReceiptText className="h-6 w-6 sm:h-8 sm:w-8 text-primary mb-1 sm:mb-2 opacity-80" />
+          <h3 className="font-semibold text-base sm:text-lg">Resumo da Transação</h3>
+          <p className="text-xs sm:text-sm text-muted-foreground uppercase tracking-widest">{tab === 'expense' ? 'Despesa' : tab === 'income' ? 'Receita' : 'Transferência'}</p>
         </div>
 
-        <div className="space-y-3 text-sm">
+        <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
           <div className="flex justify-between items-center bg-background p-2 rounded-md">
             <span className="text-muted-foreground">Valor:</span>
-            <span className="font-medium text-lg text-primary">R$ {amount?.toFixed(2).replace('.', ',')}</span>
+            <span className="font-medium text-base sm:text-lg text-primary">R$ {amount?.toFixed(2).replace('.', ',')}</span>
           </div>
           <div className="flex justify-between items-center bg-background p-2 rounded-md">
             <span className="text-muted-foreground">Data:</span>
@@ -452,7 +452,7 @@ export function TransactionFormDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[95dvh] overflow-y-auto p-3 sm:p-6">
         <DialogHeader>
           <DialogTitle>Nova Transação</DialogTitle>
           <DialogDescription className="sr-only">
@@ -479,7 +479,7 @@ export function TransactionFormDialog({
 
             {renderStepIndicator()}
 
-            <div className="min-h-[280px] flex flex-col justify-center">
+            <div className="min-h-[200px] sm:min-h-[280px] flex flex-col justify-center">
               {step === 1 && (
                 <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
                   <h2 className="text-xl font-medium text-center mb-6">Qual o valor e a data?</h2>
@@ -749,22 +749,22 @@ export function TransactionFormDialog({
               )}
             </div>
 
-            <div className="pt-8 flex justify-between gap-3 mt-4 border-t">
-              <Button type="button" variant="outline" onClick={handlePrevStep} disabled={isFirstStep || isPending} className="w-32">
-                <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
+            <div className="pt-4 sm:pt-8 flex flex-wrap justify-between gap-2 sm:gap-3 mt-3 sm:mt-4 border-t">
+              <Button type="button" variant="outline" onClick={handlePrevStep} disabled={isFirstStep || isPending} className="min-w-[100px] sm:w-32">
+                <ChevronLeft className="mr-1 sm:mr-2 h-4 w-4" /> Voltar
               </Button>
               
               {!isLastStep ? (
-                <Button type="button" onClick={handleNextStep} className="w-32 bg-primary">
-                  Próximo <ChevronRight className="ml-2 h-4 w-4" />
+                <Button type="button" onClick={handleNextStep} className="min-w-[100px] sm:w-32 bg-primary">
+                  Próximo <ChevronRight className="ml-1 sm:ml-2 h-4 w-4" />
                 </Button>
               ) : (
-                <div className="flex gap-2">
-                  <Button type="button" variant="secondary" onClick={() => handleSubmit("save-and-continue")} disabled={isPending}>
-                    {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="mr-2 h-4 w-4" /> Adicionar Outra</>}
+                <div className="flex flex-wrap gap-2 justify-end">
+                  <Button type="button" variant="secondary" onClick={() => handleSubmit("save-and-continue")} disabled={isPending} className="text-xs sm:text-sm px-2 sm:px-4">
+                    {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="mr-1 sm:mr-2 h-4 w-4" /> Adicionar Outra</>}
                   </Button>
-                  <Button type="button" onClick={() => handleSubmit("save-and-close")} disabled={isPending} className="bg-gradient-to-r from-violet-600 to-indigo-600 border-none">
-                    {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <><Check className="mr-2 h-4 w-4" /> Finalizar</>}
+                  <Button type="button" onClick={() => handleSubmit("save-and-close")} disabled={isPending} className="bg-gradient-to-r from-violet-600 to-indigo-600 border-none text-xs sm:text-sm px-2 sm:px-4">
+                    {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <><Check className="mr-1 sm:mr-2 h-4 w-4" /> Finalizar</>}
                   </Button>
                 </div>
               )}

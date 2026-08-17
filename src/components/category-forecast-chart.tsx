@@ -7,8 +7,6 @@ import {
   ChartConfig,
   ChartContainer,
   ChartTooltip,
-  ChartLegend,
-  ChartLegendContent,
 } from "@/components/ui/chart"
 
 const BASE_COLORS = [
@@ -36,7 +34,7 @@ type TooltipPayload = {
   value: number;
   color?: string;
   fill?: string;
-  payload: Record<string, any>;
+  payload: Record<string, string | number | boolean>;
 };
 
 type CustomTooltipProps = {
@@ -89,7 +87,7 @@ export function CategoryForecastChart({
   data,
   keys,
 }: {
-  data: Record<string, any>[];
+  data: Record<string, string | number | boolean>[];
   keys: string[];
 }) {
   const [hoveredKey, setHoveredKey] = React.useState<string | null>(null);
@@ -114,67 +112,94 @@ export function CategoryForecastChart({
   }
 
   return (
-    <ChartContainer config={chartConfig} className="min-h-[350px] w-full">
-      <AreaChart accessibilityLayer data={data} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
-        <defs>
+    <div className="w-full">
+      <ChartContainer config={chartConfig} className="min-h-[300px] w-full">
+        <AreaChart accessibilityLayer data={data} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
+          <defs>
+            {keys.map((key, index) => {
+              const color = chartConfig[key]?.color;
+              return (
+                <linearGradient
+                  key={key}
+                  id={`fill-category-${index}`}
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop offset="5%" stopColor={color} stopOpacity={0.8} />
+                  <stop offset="95%" stopColor={color} stopOpacity={0.1} />
+                </linearGradient>
+              );
+            })}
+          </defs>
+          <CartesianGrid vertical={false} strokeDasharray="3 3" />
+          <XAxis
+            dataKey="month"
+            tickLine={false}
+            tickMargin={10}
+            axisLine={false}
+          />
+          <YAxis 
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(value) => new Intl.NumberFormat("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+                notation: "compact",
+            }).format(value)}
+            width={80}
+          />
+          <ChartTooltip 
+            cursor={{ fill: 'var(--muted)', opacity: 0.1 }}
+            content={<CustomTooltip hoveredKey={hoveredKey} />} 
+          />
+          
           {keys.map((key, index) => {
             const color = chartConfig[key]?.color;
             return (
-              <linearGradient
+              <Area
                 key={key}
-                id={`fill-category-${index}`}
-                x1="0"
-                y1="0"
-                x2="0"
-                y2="1"
-              >
-                <stop offset="5%" stopColor={color} stopOpacity={0.8} />
-                <stop offset="95%" stopColor={color} stopOpacity={0.1} />
-              </linearGradient>
+                type="monotone"
+                dataKey={key}
+                stackId="a"
+                stroke={color}
+                fill={`url(#fill-category-${index})`}
+                opacity={hoveredKey ? (hoveredKey === key ? 1 : 0.2) : 1}
+                onMouseEnter={() => setHoveredKey(key)}
+                onMouseLeave={() => setHoveredKey(null)}
+                style={{ transition: 'opacity 0.2s ease-in-out', cursor: 'pointer' }}
+              />
             );
           })}
-        </defs>
-        <CartesianGrid vertical={false} strokeDasharray="3 3" />
-        <XAxis
-          dataKey="month"
-          tickLine={false}
-          tickMargin={10}
-          axisLine={false}
-        />
-        <YAxis 
-          tickLine={false}
-          axisLine={false}
-          tickFormatter={(value) => new Intl.NumberFormat("pt-BR", {
-              style: "currency",
-              currency: "BRL",
-              notation: "compact",
-          }).format(value)}
-          width={80}
-        />
-        <ChartTooltip 
-          cursor={{ fill: 'var(--muted)', opacity: 0.1 }}
-          content={<CustomTooltip hoveredKey={hoveredKey} />} 
-        />
-        <ChartLegend content={<ChartLegendContent />} />
-        
-        {keys.map((key, index) => {
-          const color = chartConfig[key]?.color;
-          return (
-            <Area
-              key={key}
-              type="monotone"
-              dataKey={key}
-              stackId="a"
-              stroke={color}
-              fill={`url(#fill-category-${index})`}
-              opacity={hoveredKey ? (hoveredKey === key ? 1 : 0.2) : 1}
-              onMouseEnter={() => setHoveredKey(key)}
-              onMouseLeave={() => setHoveredKey(null)}
-              style={{ transition: 'opacity 0.2s ease-in-out', cursor: 'pointer' }}
-            />
-          );
-        })}
-      </AreaChart>
-    </ChartContainer>
+        </AreaChart>
+      </ChartContainer>
+
+      {/* Legenda externa ao gráfico */}
+      <div className="mt-3 max-h-[120px] overflow-y-auto px-2">
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5 justify-center">
+          {keys.map((key, index) => {
+            const color = BASE_COLORS[index % BASE_COLORS.length];
+            const isHovered = hoveredKey === key;
+            const isDimmed = hoveredKey && !isHovered;
+            return (
+              <button
+                key={key}
+                type="button"
+                className={`flex items-center gap-1.5 text-xs transition-opacity duration-200 cursor-pointer hover:opacity-100 ${isDimmed ? 'opacity-30' : 'opacity-100'}`}
+                onMouseEnter={() => setHoveredKey(key)}
+                onMouseLeave={() => setHoveredKey(null)}
+              >
+                <span
+                  className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: color }}
+                />
+                <span className="text-muted-foreground whitespace-nowrap">{key}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   )
 }

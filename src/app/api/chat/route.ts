@@ -1,5 +1,5 @@
 import { google } from '@ai-sdk/google';
-import { streamText, createUIMessageStreamResponse, toUIMessageStream } from 'ai';
+import { streamText, createUIMessageStreamResponse, toUIMessageStream, convertToModelMessages } from 'ai';
 import { auth } from '@/auth';
 import { getDashboardData, getIncomeVsExpenseData } from '@/app/actions/dashboard';
 import { NextResponse } from 'next/server';
@@ -14,6 +14,9 @@ export async function POST(req: Request) {
     }
 
     const { messages } = await req.json();
+
+    // Convert UIMessages (parts format) to ModelMessages (role/content format)
+    const modelMessages = await convertToModelMessages(messages);
 
     // Fetch context data in parallel
     const [dashboardData, incomeVsExpense] = await Promise.all([
@@ -49,7 +52,7 @@ ${dashboardData.cardInvoices.length > 0
     const result = streamText({
       model: google('gemini-1.5-flash'),
       system: systemPrompt,
-      messages,
+      messages: modelMessages,
     });
 
     return createUIMessageStreamResponse({
@@ -62,4 +65,5 @@ ${dashboardData.cardInvoices.length > 0
     return new NextResponse('Internal Error', { status: 500 });
   }
 }
+
 

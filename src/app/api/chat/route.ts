@@ -1,5 +1,5 @@
 import { google } from '@ai-sdk/google';
-import { streamText } from 'ai';
+import { streamText, createUIMessageStreamResponse, toUIMessageStream } from 'ai';
 import { auth } from '@/auth';
 import { getDashboardData, getIncomeVsExpenseData } from '@/app/actions/dashboard';
 import { NextResponse } from 'next/server';
@@ -52,9 +52,14 @@ ${dashboardData.cardInvoices.length > 0
       messages,
     });
 
-    return result.toDataStreamResponse();
+    return createUIMessageStreamResponse({
+      stream: toUIMessageStream({
+        stream: result.stream,
+      }),
+    });
   } catch (error) {
     console.error('AI Error:', error);
     return new NextResponse('Internal Error', { status: 500 });
   }
 }
+

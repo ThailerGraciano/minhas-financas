@@ -1,21 +1,24 @@
 "use client";
 
-import {
-  deleteTransaction,
-  payVirtualTransaction,
-  toggleTransactionStatus,
-} from "@/app/actions/transactions";
-import { payFullInvoice } from "@/app/actions/credit-cards";
 import { getAccounts } from "@/app/actions/accounts";
+import { payFullInvoice } from "@/app/actions/credit-cards";
+import { deleteTransaction, payVirtualTransaction, toggleTransactionStatus } from "@/app/actions/transactions";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowDownCircle, ArrowRightLeft, ArrowUpCircle, CheckCircle2, Circle, CreditCard, Loader2 } from "lucide-react";
+import {
+  ArrowDownCircle,
+  ArrowRightLeft,
+  ArrowUpCircle,
+  CheckCircle2,
+  Circle,
+  CreditCard,
+  Loader2,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-
 
 import { EditTransactionDialog } from "@/components/edit-transaction-dialog";
 import {
@@ -49,7 +52,7 @@ export type TransactionWithRelations = {
   subcategoryId?: number | null;
   isGroup?: boolean;
   account?: { id: number; name: string } | null;
-  creditCard?: { id: number; name: string; dueDay: number } | null;
+  creditCard?: { id: number; name: string; dueDay: number; closingDay: number } | null;
   category?: { id: number; name: string; icon?: string | null } | null;
   subcategory?: { id: number; name: string } | null;
 };
@@ -63,15 +66,26 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
   const [sortBy, setSortBy] = useState("date_desc");
   const [showOnlyPending, setShowOnlyPending] = useState(false);
   const [invoiceToPay, setInvoiceToPay] = useState<TransactionWithRelations | null>(null);
-  const [invoiceAccounts, setInvoiceAccounts] = useState<{ id: number; name: string; currentBalance: string | null }[]>([]);
-  const [invoiceSelectedAccount, setInvoiceSelectedAccount] = useState<string>('');
+  const [invoiceAccounts, setInvoiceAccounts] = useState<{ id: number; name: string; currentBalance: string | null }[]>(
+    [],
+  );
+  const [invoiceSelectedAccount, setInvoiceSelectedAccount] = useState<string>("");
   const [isPayingInvoice, setIsPayingInvoice] = useState(false);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
 
   const handleDelete = async (mode: "single" | "future" = "single") => {
     if (!transactionToDelete) return;
     setIsDeleting(true);
-    await deleteTransaction(transactionToDelete.id, mode);
+
+    const isVirtual = transactionToDelete.id < 0 && !transactionToDelete.isGroup;
+    const fixedId = transactionToDelete.fixedTransactionId ?? undefined;
+
+    const result = await deleteTransaction(transactionToDelete.id, mode, isVirtual, fixedId);
+
+    if (result && !result.success && result.error) {
+      alert(result.error);
+    }
+
     setIsDeleting(false);
     setTransactionToDelete(null);
   };
@@ -80,7 +94,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
     // Grouped credit card invoices — open inline pay dialog
     if (tx.isGroup && tx.creditCardId) {
       setInvoiceToPay(tx);
-      setInvoiceSelectedAccount('');
+      setInvoiceSelectedAccount("");
       setIsLoadingAccounts(true);
       getAccounts().then((accs) => {
         setInvoiceAccounts(accs);
@@ -101,7 +115,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
         amount: String(tx.amount),
         description: tx.description,
         date: tx.date,
-        competencyMonth: tx.competencyMonth ?? '',
+        competencyMonth: tx.competencyMonth ?? "",
         fixedTransactionId: tx.fixedTransactionId ?? null,
       });
     } else {
@@ -162,23 +176,36 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
     let processedTxs = filteredTxs;
 
     if (groupCreditCards) {
-      const grouped = new Map<number, TransactionWithRelations>();
+      const grouped = new Map<string, TransactionWithRelations>();
       const otherTxs: TransactionWithRelations[] = [];
 
       filteredTxs.forEach((tx) => {
-        if (tx.type === "credit_card_expense" && tx.creditCardId) {
-          if (!grouped.has(tx.creditCardId)) {
+        if (tx.type === "credit_card_expense" && tx.creditCardId && tx.competencyMonth) {
+          const groupKey = `${tx.creditCardId}-${tx.competencyMonth}`;
+          if (!grouped.has(groupKey)) {
             let groupDate = tx.date;
-            
-            // Lógica forçada para o dia de vencimento real da fatura
+
             const cardDueDay = tx.creditCard?.dueDay;
-            if (tx.competencyMonth && cardDueDay) {
-              const dueDayStr = String(cardDueDay).padStart(2, "0");
-              groupDate = `${tx.competencyMonth}-${dueDayStr}`;
+            const cardClosingDay = tx.creditCard?.closingDay;
+            if (cardDueDay && cardClosingDay) {
+              const [pYear, pMonth, pDay] = tx.date.split("-").map(Number);
+              const purchaseDate = new Date(pYear, pMonth - 1, pDay);
+
+              const targetDate = new Date(purchaseDate);
+              if (purchaseDate.getDate() >= cardClosingDay) {
+                targetDate.setDate(1); // Set to 1st of current month to prevent rollover
+                targetDate.setMonth(targetDate.getMonth() + 1);
+              }
+              targetDate.setDate(cardDueDay);
+
+              const yStr = targetDate.getFullYear();
+              const mStr = String(targetDate.getMonth() + 1).padStart(2, "0");
+              const dStr = String(targetDate.getDate()).padStart(2, "0");
+              groupDate = `${yStr}-${mStr}-${dStr}`;
             }
 
-            grouped.set(tx.creditCardId, {
-              id: -(tx.creditCardId + 900000),
+            grouped.set(groupKey, {
+              id: -(tx.creditCardId * 10000 + parseInt(tx.competencyMonth.replace("-", ""))), // id virtual determinístico
               isGroup: true,
               type: "expense",
               description: `Fatura: ${tx.creditCard?.name || "Cartão"}`,
@@ -195,7 +222,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
               category: { id: 0, name: "Fatura" },
             });
           }
-          const group = grouped.get(tx.creditCardId)!;
+          const group = grouped.get(groupKey)!;
           group.amount = Number(group.amount) + Number(tx.amount);
           if (tx.status === "pending") group.status = "pending";
         } else {
@@ -307,8 +334,12 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
 
                 <div className="flex items-center gap-2 md:gap-4 shrink-0">
                   <div className="flex flex-col items-end text-right">
-                    <span className={`font-bold text-sm md:text-base ${tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)")) ? "text-green-600" : "text-foreground"}`}>
-                      {tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)")) ? "+" : "-"}
+                    <span
+                      className={`font-bold text-sm md:text-base ${tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)")) ? "text-green-600" : "text-foreground"}`}
+                    >
+                      {tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)"))
+                        ? "+"
+                        : "-"}
                       {formatCurrency(tx.amount)}
                     </span>
                     <span className="text-[11px] md:text-xs text-muted-foreground">
@@ -415,13 +446,22 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
       </AlertDialog>
 
       {/* Pay Grouped Invoice Dialog */}
-      <AlertDialog open={!!invoiceToPay} onOpenChange={(open) => { if (!open) { setInvoiceToPay(null); setInvoiceSelectedAccount(''); } }}>
+      <AlertDialog
+        open={!!invoiceToPay}
+        onOpenChange={(open) => {
+          if (!open) {
+            setInvoiceToPay(null);
+            setInvoiceSelectedAccount("");
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Pagar Fatura</AlertDialogTitle>
             <AlertDialogDescription>
-              Confirme o pagamento da fatura <strong className="text-foreground">{invoiceToPay?.description}</strong>.
-              O valor de <strong className="text-foreground">{formatCurrency(invoiceToPay?.amount ?? 0)}</strong> será debitado da conta selecionada.
+              Confirme o pagamento da fatura <strong className="text-foreground">{invoiceToPay?.description}</strong>. O
+              valor de <strong className="text-foreground">{formatCurrency(invoiceToPay?.amount ?? 0)}</strong> será
+              debitado da conta selecionada.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-4 py-4">
@@ -455,13 +495,17 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                 e.preventDefault();
                 if (!invoiceToPay?.creditCardId || !invoiceSelectedAccount || !invoiceToPay?.competencyMonth) return;
                 setIsPayingInvoice(true);
-                const result = await payFullInvoice(invoiceToPay.creditCardId, invoiceToPay.competencyMonth, invoiceSelectedAccount);
+                const result = await payFullInvoice(
+                  invoiceToPay.creditCardId,
+                  invoiceToPay.competencyMonth,
+                  invoiceSelectedAccount,
+                );
                 setIsPayingInvoice(false);
                 if (result.success) {
                   setInvoiceToPay(null);
-                  setInvoiceSelectedAccount('');
+                  setInvoiceSelectedAccount("");
                 } else {
-                  alert(result.error || 'Erro ao pagar fatura');
+                  alert(result.error || "Erro ao pagar fatura");
                 }
               }}
               disabled={!invoiceSelectedAccount || isPayingInvoice || isLoadingAccounts}

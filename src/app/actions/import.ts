@@ -59,7 +59,7 @@ function parseAmount(amountStr: string): string {
 
 type DbState = {
   accountsMap: Map<string, number>;
-  cardsMap: Map<string, number>;
+  cardsMap: Map<string, { id: number, closingDay: number, dueDay: number }>;
   categoriesMap: Map<string, number>;
   subcategoriesMap: Map<string, number>;
 };
@@ -90,8 +90,9 @@ async function getOrCreateCard(name: string, closingDay: number, dbState: DbStat
     closingDay,
     dueDay: 10,
   }).returning();
-  dbState.cardsMap.set(lowerName, newCard.id);
-  return newCard.id;
+  const cardData = { id: newCard.id, closingDay: newCard.closingDay, dueDay: newCard.dueDay };
+  dbState.cardsMap.set(lowerName, cardData);
+  return cardData;
 }
 
 async function getOrCreateCategory(catName: string, subName: string | undefined, transactionType: string, dbState: DbState, userId: string) {
@@ -171,7 +172,6 @@ async function processExpenses(rows: Record<string, string>[], dbState: DbState,
       const dataVencimento = parseDate(vencimentoStr);
       if (!dataVencimento) throw new Error(`Data de Vencimento inválida ou não encontrada.`);
       
-      const competencyMonth = getCompetencyMonth(dataVencimento, closingDay);
       const dataEfetivacao = parseDate(efetivacaoStr);
       const status = dataEfetivacao ? 'paid' : 'pending';
       const paidAt = dataEfetivacao || null;
@@ -179,9 +179,16 @@ async function processExpenses(rows: Record<string, string>[], dbState: DbState,
 
       let accountId = null;
       let creditCardId = null;
+      let competencyMonth = '';
       
       if (cartaoName) {
-        creditCardId = await getOrCreateCard(cartaoName, closingDay, dbState, userId);
+        const card = await getOrCreateCard(cartaoName, closingDay, dbState, userId);
+        creditCardId = card.id;
+        const { calculateCreditCardDueDate } = await import('@/lib/utils/competency');
+        const dueDate = calculateCreditCardDueDate(dataVencimento, card.closingDay, card.dueDay);
+        competencyMonth = getCompetencyMonth(dueDate, closingDay);
+      } else {
+        competencyMonth = getCompetencyMonth(dataVencimento, closingDay);
       }
 
       if (contaName) {
@@ -433,7 +440,7 @@ export async function importCSV(csvString: string, type: ImportType, filename: s
     const existingAccounts = await db.select().from(accounts).where(eq(accounts.userId, userId));
     const accountsMap = new Map(existingAccounts.map(a => [a.name.toLowerCase(), a.id]));
     const existingCards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
-    const cardsMap = new Map(existingCards.map(c => [c.name.toLowerCase(), c.id]));
+    const cardsMap = new Map(existingCards.map(c => [c.name.toLowerCase(), { id: c.id, closingDay: c.closingDay, dueDay: c.dueDay }]));
     const existingCategories = await db.select().from(categories).where(eq(categories.userId, userId));
     const categoriesMap = new Map(existingCategories.map(c => [c.name.toLowerCase(), c.id]));
     const existingSubcategories = await db.select().from(subcategories).where(eq(subcategories.userId, userId));

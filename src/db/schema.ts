@@ -13,6 +13,7 @@ export const settings = pgTable('settings', {
   id: serial('id').primaryKey(),
   userId: uuid('user_id').references(() => users.id).notNull(),
   closingDay: integer('closing_day').default(1).notNull(),
+  baseKeepAmount: numeric('base_keep_amount', { precision: 12, scale: 2 }).default('0').notNull(),
 });
 
 export const accounts = pgTable('accounts', {
@@ -125,9 +126,18 @@ export const marketReceiptTransactions = pgTable('market_receipt_transactions', 
   transactionId: integer('transaction_id').references(() => transactions.id).notNull(),
 }, (table) => [primaryKey({ columns: [table.receiptId, table.transactionId] })]);
 
+export const allocationRules = pgTable('allocation_rules', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  percentage: numeric('percentage', { precision: 5, scale: 2 }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   settings: many(settings),
+  allocationRules: many(allocationRules),
   accounts: many(accounts),
   categories: many(categories),
   subcategories: many(subcategories),
@@ -140,6 +150,13 @@ export const usersRelations = relations(users, ({ many }) => ({
 export const settingsRelations = relations(settings, ({ one }) => ({
   user: one(users, {
     fields: [settings.userId],
+    references: [users.id],
+  }),
+}));
+
+export const allocationRulesRelations = relations(allocationRules, ({ one }) => ({
+  user: one(users, {
+    fields: [allocationRules.userId],
     references: [users.id],
   }),
 }));

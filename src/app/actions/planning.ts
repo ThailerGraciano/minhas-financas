@@ -1,83 +1,137 @@
-'use server';
+"use server";
 
-import { db } from '@/db';
-import { transactions, accounts, settings } from '@/db/schema';
-import { eq, and, asc, or, inArray } from 'drizzle-orm';
-import { format, addDays, differenceInDays, parseISO, lastDayOfMonth } from 'date-fns';
-import { auth } from '@/auth';
-import { getDefaultCompetencyMonth } from '@/lib/date-utils';
+import { getHistoricalBalance } from "@/app/actions/accounts";
+import { auth } from "@/auth";
+import { db } from "@/db";
+import { accounts, fixedTransactions, settings, transactions } from "@/db/schema";
+import { getDefaultCompetencyMonth } from "@/lib/date-utils";
+import { addDays, differenceInDays, format, lastDayOfMonth, parseISO } from "date-fns";
+import { and, asc, eq, gte, inArray, lte, or, SQL } from "drizzle-orm";
 
-export async function getProjectedCashFlow(accountId?: string) {
+export async function getProjectedCashFlow(accountId?: string, reqCompetencyMonth?: string) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
 
-  // 1. Initial balance
-  let allAccounts;
-  if (accountId === 'checking_accounts') {
-    allAccounts = await db.select().from(accounts).where(and(eq(accounts.type, 'checking'), eq(accounts.userId, userId)));
-  } else if (accountId) {
-    allAccounts = await db.select().from(accounts).where(and(eq(accounts.id, Number(accountId)), eq(accounts.userId, userId)));
-  } else {
-    allAccounts = await db.select().from(accounts).where(eq(accounts.userId, userId));
-  }
-  let currentBalance = allAccounts.reduce((acc, curr) => acc + Number(curr.currentBalance), 0);
-
-  // Fetch settings for closingDay
   const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
   const closingDay = appSettings?.closingDay || 25;
 
-  // Calculate the target end date for the projection (end of the current competency month)
-  const compMonth = getDefaultCompetencyMonth(closingDay);
-  const [year, month] = compMonth.split('-');
-  const lastDay = lastDayOfMonth(new Date(Number(year), Number(month) - 1, 1)).getDate();
-  const safeClosingDay = Math.min(closingDay, lastDay);
-  const targetEndDateStr = `${compMonth}-${String(safeClosingDay).padStart(2, '0')}`;
+  const currentCompMonth = getDefaultCompetencyMonth(closingDay);
+  const competencyMonth = reqCompetencyMonth || currentCompMonth;
+
+  // Calculate startDate and endDate for the requested competency
+  const [yearStr, monthStr] = competencyMonth.split("-");
+  const year = parseInt(yearStr);
+  const monthIndex = parseInt(monthStr) - 1;
+
+  // End date is closingDay of the competency month
+  const lastDayOfCompMonth = lastDayOfMonth(new Date(year, monthIndex, 1)).getDate();
+  const safeEndDay = Math.min(closingDay, lastDayOfCompMonth);
+  const targetEndDateStr = `${competencyMonth}-${String(safeEndDay).padStart(2, "0")}`;
   const targetEndDate = parseISO(targetEndDateStr);
 
-  // 2. Pending transactions
+  // Start date is closingDay + 1 of the PREVIOUS month
+  const prevMonthDate = new Date(year, monthIndex - 1, 1);
+  const lastDayOfPrevMonth = lastDayOfMonth(prevMonthDate).getDate();
+  const safeStartDay = Math.min(closingDay, lastDayOfPrevMonth) + 1;
+
+  const targetStartDateObj = new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth(), safeStartDay);
+  const targetStartDateStr = format(targetStartDateObj, "yyyy-MM-dd");
+  const targetStartDate = parseISO(targetStartDateStr);
+
   const baseDate = new Date();
-  const todayDate = format(baseDate, 'yyyy-MM-dd');
+  const todayDate = format(baseDate, "yyyy-MM-dd");
   const todayParsed = parseISO(todayDate);
-  const diffDays = Math.max(0, differenceInDays(targetEndDate, todayParsed));
-  
-  const conditions = [
-    eq(transactions.status, 'pending'),
-    eq(transactions.userId, userId)
+
+  let allAccounts;
+  if (accountId === "checking_accounts") {
+    allAccounts = await db
+      .select()
+      .from(accounts)
+      .where(and(eq(accounts.type, "checking"), eq(accounts.userId, userId)));
+  } else if (accountId) {
+    allAccounts = await db
+      .select()
+      .from(accounts)
+      .where(and(eq(accounts.id, Number(accountId)), eq(accounts.userId, userId)));
+  } else {
+    allAccounts = await db.select().from(accounts).where(eq(accounts.userId, userId));
+  }
+
+  let currentBalance = 0;
+  let startProjectionDateParsed = todayParsed;
+  let startProjectionDateStr = todayDate;
+
+  // Se a competência solicitada for igual ou anterior à atual, projetamos a partir de hoje
+  // Se for futura, projetamos a partir do start_date
+  const isFutureCompetency = targetStartDateStr > todayDate;
+
+  if (!isFutureCompetency) {
+    currentBalance = allAccounts.reduce((acc, curr) => acc + Number(curr.currentBalance), 0);
+    startProjectionDateParsed = todayParsed;
+    startProjectionDateStr = todayDate;
+  } else {
+    const dayBeforeStart = addDays(targetStartDate, -1);
+    let totalHistBalance = 0;
+    for (const acc of allAccounts) {
+      const histBal = await getHistoricalBalance(acc.id, dayBeforeStart);
+      totalHistBalance += histBal || 0;
+    }
+    currentBalance = totalHistBalance;
+    startProjectionDateParsed = targetStartDate;
+    startProjectionDateStr = targetStartDateStr;
+  }
+
+  // Limitar se o end date for menor que o start date (ex: competência passada, o hoje já passou do end date)
+  const diffDays = Math.max(0, differenceInDays(targetEndDate, startProjectionDateParsed));
+
+  // 2. Busca Ampla: Buscar TODAS as transações normais na janela da competência
+  const broadConditions: (SQL | undefined)[] = [
+    eq(transactions.userId, userId),
+    lte(transactions.date, targetEndDateStr),
   ];
-  
+
+  if (isFutureCompetency) {
+    broadConditions.push(
+      or(gte(transactions.date, targetStartDateStr), eq(transactions.competencyMonth, competencyMonth)),
+    );
+  } else {
+    // Se for atual, pega a janela inteira E as pendentes atrasadas
+    broadConditions.push(
+      or(
+        gte(transactions.date, targetStartDateStr),
+        eq(transactions.status, "pending"),
+        eq(transactions.competencyMonth, competencyMonth),
+      ),
+    );
+  }
+
   let isCheckingAccount = false;
-  if (accountId === 'checking_accounts' || (allAccounts.length === 1 && allAccounts[0].type === 'checking')) {
+  if (accountId === "checking_accounts" || (allAccounts.length === 1 && allAccounts[0].type === "checking")) {
     isCheckingAccount = true;
   }
-  
+
   if (accountId) {
-    if (accountId === 'checking_accounts') {
-      const checkingIds = allAccounts.map(a => a.id);
+    if (accountId === "checking_accounts") {
+      const checkingIds = allAccounts.map((a) => a.id);
       if (checkingIds.length > 0) {
-        conditions.push(
-          or(
-            inArray(transactions.accountId, checkingIds),
-            eq(transactions.type, 'credit_card_expense')
-          )!
+        broadConditions.push(
+          or(inArray(transactions.accountId, checkingIds), eq(transactions.type, "credit_card_expense"))!,
         );
       } else {
-        conditions.push(eq(transactions.id, -1)); // Force no results
+        broadConditions.push(eq(transactions.id, -1)); // Force no results
       }
     } else if (isCheckingAccount) {
-      conditions.push(
-        or(
-          eq(transactions.accountId, Number(accountId)),
-          eq(transactions.type, 'credit_card_expense')
-        )!
+      broadConditions.push(
+        or(eq(transactions.accountId, Number(accountId)), eq(transactions.type, "credit_card_expense"))!,
       );
     } else {
-      conditions.push(eq(transactions.accountId, Number(accountId)));
+      broadConditions.push(eq(transactions.accountId, Number(accountId)));
     }
   }
 
-  const allPendingTxs = await db.query.transactions.findMany({
-    where: and(...conditions),
+  const allTxs = await db.query.transactions.findMany({
+    where: and(...broadConditions),
     with: {
       category: true,
       account: true,
@@ -86,32 +140,148 @@ export async function getProjectedCashFlow(accountId?: string) {
     orderBy: [asc(transactions.date)],
   });
 
+  // 2.1 Deduplicação Correta: Coletar os fixedTransactionIds de TUDO (incluindo 'paid') na competência
+  const materializedFixedIds = new Set<string>();
+  for (const tx of allTxs) {
+    // Consideramos apenas as que estão dentro da janela da competência para deduplicar
+    if (tx.fixedTransactionId && tx.date >= targetStartDateStr && tx.date <= targetEndDateStr) {
+      materializedFixedIds.add(tx.fixedTransactionId);
+    }
+  }
+
+  // 2.2 Geração das Virtuais
+  const activeFixed = await db
+    .select()
+    .from(fixedTransactions)
+    .where(
+      and(
+        eq(fixedTransactions.active, true),
+        eq(fixedTransactions.userId, userId),
+        lte(fixedTransactions.startDate, targetEndDateStr),
+      ),
+    );
+
+  type TransactionItem = (typeof allTxs)[0];
+  const virtualTxs: TransactionItem[] = [];
+  for (const ft of activeFixed) {
+    // Filter by account
+    if (accountId) {
+      if (accountId === "checking_accounts") {
+        const checkingIds = allAccounts.map((a) => a.id);
+        if (ft.type !== "credit_card_expense" && (!ft.accountId || !checkingIds.includes(ft.accountId))) continue;
+      } else if (isCheckingAccount) {
+        if (ft.type !== "credit_card_expense" && ft.accountId !== Number(accountId)) continue;
+      } else {
+        if (ft.accountId !== Number(accountId)) continue;
+      }
+    }
+
+    if (materializedFixedIds.has(ft.id)) continue;
+
+    const ftStartDate = new Date(ft.startDate);
+    const cursor = new Date(targetStartDateStr + "T00:00:00");
+    cursor.setDate(ftStartDate.getDate());
+
+    if (format(cursor, "yyyy-MM-dd") < targetStartDateStr) {
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    while (cursor <= targetEndDate) {
+      const virtDateStr = format(cursor, "yyyy-MM-dd");
+      virtualTxs.push({
+        id: -(Math.floor(Math.random() * 1000000)), // virtual id
+        type: ft.type,
+        amount: ft.amount,
+        date: virtDateStr,
+        description: ft.description + " (Projetada)",
+        accountId: ft.accountId,
+        creditCardId: ft.creditCardId,
+        categoryId: ft.categoryId,
+        subcategoryId: ft.subcategoryId,
+        userId: ft.userId,
+        status: "pending",
+        competencyMonth: format(cursor, "yyyy-MM"),
+        isFixed: false,
+        fixedTransactionId: ft.id,
+        installmentCurrent: null,
+        installmentTotal: null,
+        parentTransactionId: null,
+        installmentParentId: null,
+        observations: null,
+        paidAt: null,
+        importHash: null,
+        category: {
+          id: ft.categoryId,
+          name: "Virtual",
+          userId: ft.userId,
+          type: ft.type,
+          icon: "virtual",
+          isPredictable: false,
+        },
+        account: null,
+        creditCard: null,
+      });
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+  }
+
+  const mergedTxs = [...allTxs, ...virtualTxs].sort((a, b) => a.date.localeCompare(b.date));
+
+  // 2.3 Filtro Final em Memória: Manter apenas pending para projeção e atrasadas
+  // As 'paid' já cumpriram seu papel na deduplicação
+  const finalPendingTxs = mergedTxs.filter((tx) => tx.status === "pending");
+
   // 2.5 Group credit card transactions into invoices
   const processedTxs = [];
-  // Use a string map key: creditCardId-competencyMonth
-  const ccGroups = new Map<string, typeof allPendingTxs[0]>();
+  const ccGroups = new Map<string, (typeof finalPendingTxs)[0]>();
 
-  for (const tx of allPendingTxs) {
-    if (tx.type === 'credit_card_expense' && tx.creditCardId && tx.creditCard && tx.competencyMonth) {
+  for (const tx of finalPendingTxs) {
+    if (tx.type === "credit_card_expense" && tx.creditCardId && tx.competencyMonth) {
       const groupKey = `${tx.creditCardId}-${tx.competencyMonth}`;
       if (!ccGroups.has(groupKey)) {
-        const dueDayStr = String(tx.creditCard.dueDay).padStart(2, '0');
-        const paymentDate = `${tx.competencyMonth}-${dueDayStr}`;
+        let paymentDate = tx.date;
+        const dueDay = tx.creditCard?.dueDay || 10;
+        const closingDay = tx.creditCard?.closingDay || 25;
+
+        const [pYear, pMonth, pDay] = tx.date.split("-").map(Number);
+        const purchaseDate = new Date(pYear, pMonth - 1, pDay);
+
+        const targetDate = new Date(purchaseDate);
+        if (purchaseDate.getDate() >= closingDay) {
+          targetDate.setDate(1); // Set to 1st of current month to prevent rollover
+          targetDate.setMonth(targetDate.getMonth() + 1);
+        }
+        targetDate.setDate(dueDay);
+
+        const yStr = targetDate.getFullYear();
+        const mStr = String(targetDate.getMonth() + 1).padStart(2, "0");
+        const dStr = String(targetDate.getDate()).padStart(2, "0");
+        paymentDate = `${yStr}-${mStr}-${dStr}`;
+
         ccGroups.set(groupKey, {
           ...tx,
-          id: -(tx.creditCardId * 100000 + parseInt(tx.competencyMonth.replace('-', ''))),
-          type: 'credit_card_expense',
-          amount: '0',
+          id: -(tx.creditCardId + 900000 + Math.floor(Math.random() * 10000)),
+          type: "expense",
+          amount: "0",
           date: paymentDate,
-          description: `Fatura: ${tx.creditCard.name}`,
-          category: { 
-            id: 0, 
-            name: 'Fatura', 
-            userId: tx.userId, 
-            type: 'expense', 
-            icon: 'credit-card', 
-            isPredictable: false 
-          }
+          description: `Fatura Projetada: ${tx.creditCard?.name || "Cartão"}`,
+          isFixed: false,
+          fixedTransactionId: null,
+          installmentCurrent: null,
+          installmentTotal: null,
+          parentTransactionId: null,
+          installmentParentId: null,
+          observations: null,
+          paidAt: null,
+          importHash: null,
+          category: {
+            id: 0,
+            name: "Fatura",
+            userId: tx.userId,
+            type: "expense",
+            icon: "credit-card",
+            isPredictable: false,
+          },
         });
       }
       const group = ccGroups.get(groupKey)!;
@@ -121,21 +291,24 @@ export async function getProjectedCashFlow(accountId?: string) {
     }
   }
 
-  // Push all grouped invoices to processedTxs
   for (const group of ccGroups.values()) {
     processedTxs.push(group);
   }
 
-  // Split into overdue (before today) and projected (today and future)
-  const overdueTransactions = processedTxs.filter(tx => tx.date < todayDate);
-  const futurePendingTxs = processedTxs.filter(tx => tx.date >= todayDate);
+  // Split into overdue (before start projection date) and projected (start projection date and future)
+  const overdueTransactions = processedTxs.filter((tx) => tx.date < startProjectionDateStr);
+  const futurePendingTxs = processedTxs.filter((tx) => tx.date >= startProjectionDateStr);
 
-  // Aplica o efeito das transações atrasadas no saldo inicial da projeção
+  // Apply effect of overdue transactions to initial balance
   for (const tx of overdueTransactions) {
     const amount = Number(tx.amount);
-    if (tx.type === 'income' || (tx.type === 'transfer' && tx.parentTransactionId)) {
+    if (tx.type === "income" || (tx.type === "transfer" && tx.parentTransactionId)) {
       currentBalance += amount;
-    } else if (tx.type === 'expense' || tx.type === 'credit_card_expense' || (tx.type === 'transfer' && !tx.parentTransactionId)) {
+    } else if (
+      tx.type === "expense" ||
+      tx.type === "credit_card_expense" ||
+      (tx.type === "transfer" && !tx.parentTransactionId)
+    ) {
       currentBalance -= amount;
     }
   }
@@ -151,25 +324,29 @@ export async function getProjectedCashFlow(accountId?: string) {
 
   // 4. Generate days up to the end of the competency month
   const projection = [];
-  
+
   for (let i = 0; i <= diffDays; i++) {
-    const targetDate = format(addDays(todayParsed, i), 'yyyy-MM-dd');
+    const targetDate = format(addDays(startProjectionDateParsed, i), "yyyy-MM-dd");
     const dailyTxs = grouped.get(targetDate) || [];
-    
+
     let total_expenses = 0;
     let total_incomes = 0;
-    
+
     for (const tx of dailyTxs) {
       const amount = Number(tx.amount);
-      if (tx.type === 'income' || (tx.type === 'transfer' && tx.parentTransactionId)) {
+      if (tx.type === "income" || (tx.type === "transfer" && tx.parentTransactionId)) {
         total_incomes += amount;
-      } else if (tx.type === 'expense' || tx.type === 'credit_card_expense' || (tx.type === 'transfer' && !tx.parentTransactionId)) {
+      } else if (
+        tx.type === "expense" ||
+        tx.type === "credit_card_expense" ||
+        (tx.type === "transfer" && !tx.parentTransactionId)
+      ) {
         total_expenses += amount;
       }
     }
-    
+
     currentBalance = currentBalance + total_incomes - total_expenses;
-    
+
     projection.push({
       date: targetDate,
       total_expenses,

@@ -236,7 +236,16 @@ export async function createTransaction(
   const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
   const closingDay = appSettings?.closingDay || 25;
   const parsedDate = parseISO(data.date);
-  if (!data.creditCardId) {
+  if (data.type === 'credit_card_expense' && data.creditCardId) {
+    const [card] = await db.select().from(creditCards).where(eq(creditCards.id, data.creditCardId)).limit(1);
+    if (card) {
+      const { calculateCreditCardDueDate } = await import('@/lib/utils/competency');
+      const dueDate = calculateCreditCardDueDate(parsedDate, card.closingDay, card.dueDay);
+      data.competencyMonth = getCompetencyMonth(dueDate, closingDay);
+    } else {
+      data.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
+    }
+  } else {
     data.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
   }
 
@@ -693,7 +702,7 @@ export async function getCreditCardInvoiceMonths(creditCardId: number) {
   return [...new Set(txs.map((t) => t.competencyMonth))];
 }
 
-export async function deleteTransaction(id: number, mode: "single" | "future" = "single") {
+export async function deleteTransaction(id: number, mode: "single" | "future" = "single", isFixedVirtual: boolean = false, fixedTransactionId?: string) {
   try {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
@@ -704,8 +713,29 @@ export async function deleteTransaction(id: number, mode: "single" | "future" = 
         .select()
         .from(transactions)
         .where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
+      
       if (!transactionItem) {
+        if (isFixedVirtual && fixedTransactionId) {
+          if (mode === "future") {
+            await tx.update(fixedTransactions).set({ active: false }).where(eq(fixedTransactions.id, fixedTransactionId));
+            await tx.delete(transactions).where(and(eq(transactions.fixedTransactionId, fixedTransactionId), eq(transactions.status, 'pending')));
+            return { success: true };
+          } else {
+            return { success: false, error: "Não é possível excluir um único mês de uma projeção sem antes efetivá-la." };
+          }
+        }
         return { success: true };
+      }
+
+      const targetFixedId = transactionItem.fixedTransactionId || fixedTransactionId;
+      if (targetFixedId) {
+        if (mode === "future") {
+          await tx.update(fixedTransactions).set({ active: false }).where(eq(fixedTransactions.id, targetFixedId));
+          await tx.delete(transactions).where(and(eq(transactions.fixedTransactionId, targetFixedId), eq(transactions.status, 'pending')));
+          return { success: true };
+        } else if (isFixedVirtual) {
+          return { success: false, error: "Não é possível excluir um único mês de uma projeção sem antes efetivá-la." };
+        }
       }
 
       if (mode === "future") {
@@ -717,10 +747,6 @@ export async function deleteTransaction(id: number, mode: "single" | "future" = 
           eq(transactions.parentTransactionId, parentId),
           eq(transactions.id, parentId),
         ];
-
-        if (transactionItem.fixedTransactionId) {
-          conditions.push(eq(transactions.fixedTransactionId, transactionItem.fixedTransactionId));
-        }
 
         const txsToDelete = await tx
           .select()
@@ -960,4 +986,38 @@ export async function getTransactionDetailsForEdit(id: number) {
   }
 
   return tx;
+}
+
+export async function fixCreditCardCompetencies() {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
+  const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
+  const closingDay = appSettings?.closingDay || 25;
+
+  const ccTxs = await db.select().from(transactions).where(and(eq(transactions.userId, userId), eq(transactions.type, 'credit_card_expense')));
+  const cards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
+  const cardMap = new Map(cards.map(c => [c.id, c]));
+
+  const { calculateCreditCardDueDate } = await import('@/lib/utils/competency');
+  
+  let updatedCount = 0;
+
+  for (const tx of ccTxs) {
+    if (!tx.creditCardId) continue;
+    const card = cardMap.get(tx.creditCardId);
+    if (!card) continue;
+    
+    const parsedDate = parseISO(tx.date);
+    const dueDate = calculateCreditCardDueDate(parsedDate, card.closingDay, card.dueDay);
+    const correctCompetency = getCompetencyMonth(dueDate, closingDay);
+
+    if (tx.competencyMonth !== correctCompetency) {
+      await db.update(transactions).set({ competencyMonth: correctCompetency }).where(eq(transactions.id, tx.id));
+      updatedCount++;
+    }
+  }
+
+  return { success: true, count: updatedCount };
 }

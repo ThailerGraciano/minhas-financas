@@ -45,7 +45,16 @@ export function InvoiceTransactionList({ transactions }: { transactions: Transac
   const handleDelete = async (mode: "single" | "future" = "single") => {
     if (!transactionToDelete) return;
     setIsDeleting(true);
-    await deleteTransaction(transactionToDelete.id, mode);
+    
+    const isVirtual = transactionToDelete.id < 0;
+    const fixedId = transactionToDelete.fixedTransactionId ?? undefined;
+    
+    const result = await deleteTransaction(transactionToDelete.id, mode, isVirtual, fixedId);
+    
+    if (result && !result.success && result.error) {
+      alert(result.error);
+    }
+    
     setIsDeleting(false);
     setTransactionToDelete(null);
   };

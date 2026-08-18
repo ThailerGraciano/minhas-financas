@@ -1,23 +1,15 @@
-import { db } from './src/db';
-import { transactions, fixedTransactions, settings } from './src/db/schema';
-import { sql } from 'drizzle-orm';
+import 'dotenv/config';
+import postgres from 'postgres';
 
-async function check() {
-  console.log("Checking transactions...");
-  const txs = await db.select().from(transactions).where(sql`description ILIKE '%Salário%' OR description ILIKE '%Futura%'`);
-  console.log("Real transactions:");
-  console.dir(txs, { depth: null });
+const sql = postgres(process.env.DATABASE_URL);
 
-  console.log("Checking fixed transactions...");
-  const ftxs = await db.select().from(fixedTransactions).where(sql`description ILIKE '%Salário%' OR description ILIKE '%Futura%'`);
-  console.log("Fixed transactions:");
-  console.dir(ftxs, { depth: null });
-
-  console.log("Checking user settings...");
-  const sets = await db.select().from(settings);
-  console.dir(sets, { depth: null });
-
+async function run() {
+  const res = await sql`SELECT id, type, date, "competencyMonth", "creditCardId" FROM transactions WHERE type='credit_card_expense' LIMIT 20`;
+  console.log("Found", res.length, "transactions");
+  for (const row of res) {
+    console.log(row.id, row.date, row.competencyMonth, row.creditCardId);
+  }
   process.exit(0);
 }
 
-check().catch(console.error);
+run().catch(console.error);

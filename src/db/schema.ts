@@ -135,6 +135,17 @@ export const allocationRules = pgTable('allocation_rules', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const batchLogs = pgTable('batch_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  batchId: uuid('batch_id').notNull(),
+  transactionId: integer('transaction_id'),
+  actionType: varchar('action_type', { length: 20 }).notNull(), // 'update' | 'delete'
+  beforeData: jsonb('before_data').notNull(),
+  afterData: jsonb('after_data'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   settings: many(settings),
@@ -146,6 +157,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   fixedTransactions: many(fixedTransactions),
   transactions: many(transactions),
   marketReceipts: many(marketReceipts),
+  batchLogs: many(batchLogs),
 }));
 
 export const settingsRelations = relations(settings, ({ one }) => ({
@@ -158,6 +170,13 @@ export const settingsRelations = relations(settings, ({ one }) => ({
 export const allocationRulesRelations = relations(allocationRules, ({ one }) => ({
   user: one(users, {
     fields: [allocationRules.userId],
+    references: [users.id],
+  }),
+}));
+
+export const batchLogsRelations = relations(batchLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [batchLogs.userId],
     references: [users.id],
   }),
 }));

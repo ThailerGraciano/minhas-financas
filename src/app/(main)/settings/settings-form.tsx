@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { updateClosingDay } from '@/app/actions/settings';
-import { fixAllCompetencies } from '@/app/actions/transactions';
+import { fixAllCompetencies, backfillInvoiceMonths } from '@/app/actions/transactions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 export function SettingsForm({ initialClosingDay }: { initialClosingDay: number }) {
   const [isPending, setIsPending] = useState(false);
   const [isFixing, setIsFixing] = useState(false);
+  const [isBackfilling, setIsBackfilling] = useState(false);
   const [message, setMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -47,6 +48,19 @@ export function SettingsForm({ initialClosingDay }: { initialClosingDay: number 
       toast.error("Erro ao corrigir faturas.");
     }
     setIsFixing(false);
+  };
+
+  const handleBackfillInvoice = async () => {
+    setIsBackfilling(true);
+    try {
+      const res = await backfillInvoiceMonths();
+      if (res.success) {
+        toast.success(`${res.count} transações antigas de cartão foram preenchidas com invoice_month.`);
+      }
+    } catch (e) {
+      toast.error("Erro ao preencher meses de fatura.");
+    }
+    setIsBackfilling(false);
   };
 
   return (
@@ -103,6 +117,15 @@ export function SettingsForm({ initialClosingDay }: { initialClosingDay: number 
           >
             {isFixing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Corrigir Todas as Competências
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={handleBackfillInvoice} 
+            disabled={isBackfilling}
+            className="w-full border-orange-500/50 text-orange-600 hover:bg-orange-500/10 hover:text-orange-700 mt-2"
+          >
+            {isBackfilling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Restaurar Faturas Antigas
           </Button>
         </CardContent>
       </Card>

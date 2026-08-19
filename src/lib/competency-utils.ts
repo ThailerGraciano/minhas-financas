@@ -1,6 +1,7 @@
-import { SQL, and, eq, ne, or } from 'drizzle-orm';
+import { SQL, and, eq, ne, or, isNull } from 'drizzle-orm';
 import { transactions } from '@/db/schema';
-import { parseISO, subMonths, format } from 'date-fns';
+import { parseISO, subMonths, format, addMonths } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 /**
  * Retorna o "Mês de Fatura" alvo dado o "Mês de Competência Global" (e.g. Agosto),
@@ -48,7 +49,13 @@ export function buildGlobalCompetencyCondition(
     ccConditions.push(
       and(
         eq(transactions.creditCardId, card.id),
-        eq(transactions.invoiceMonth, targetInvoiceMonth)
+        or(
+          eq(transactions.invoiceMonth, targetInvoiceMonth),
+          and(
+            isNull(transactions.invoiceMonth),
+            eq(transactions.competencyMonth, targetInvoiceMonth)
+          )
+        )
       )!
     );
   }
@@ -88,7 +95,13 @@ export function buildCreditCardCompetencyCondition(
     ccConditions.push(
       and(
         eq(transactions.creditCardId, card.id),
-        eq(transactions.invoiceMonth, currentMonth)
+        or(
+          eq(transactions.invoiceMonth, currentMonth),
+          and(
+            isNull(transactions.invoiceMonth),
+            eq(transactions.competencyMonth, currentMonth)
+          )
+        )
       )!
     );
   }
@@ -98,4 +111,21 @@ export function buildCreditCardCompetencyCondition(
     eq(transactions.type, 'credit_card_expense'),
     or(...ccConditions)
   )!;
+}
+
+/**
+ * Gera uma lista de opções de meses de fatura ao redor de uma data base
+ * (útil para Selects de fatura em formulários e grids).
+ */
+export function generateInvoiceOptions(baseDateStr?: string): { value: string; label: string }[] {
+  const baseDate = baseDateStr ? parseISO(baseDateStr) : new Date();
+  
+  const options = [];
+  for (let i = -6; i <= 12; i++) {
+    const d = addMonths(baseDate, i);
+    const value = format(d, "yyyy-MM");
+    const label = format(d, "MMMM/yyyy", { locale: ptBR });
+    options.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) });
+  }
+  return options;
 }

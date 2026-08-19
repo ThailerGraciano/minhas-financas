@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { Home, Settings, CreditCard, PieChart, Landmark, Receipt, TrendingUp, Download, ShoppingCart, LogOut, Menu } from 'lucide-react';
+import { Home, Settings, CreditCard, PieChart, Landmark, Receipt, TrendingUp, Download, ShoppingCart, LogOut, Menu, TableProperties } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import { cn } from '@/lib/utils';
 import { ModeToggle } from '@/components/mode-toggle';
@@ -14,6 +14,7 @@ const navItems = [
   { name: 'Contas', href: '/accounts', icon: Landmark },
   { name: 'Cartões', href: '/credit-cards', icon: CreditCard },
   { name: 'Transações', href: '/transactions', icon: Receipt },
+  { name: 'Power Grid', href: '/power-grid', icon: TableProperties },
   { name: 'Mercado', href: '/market', icon: ShoppingCart },
   { name: 'Planejamento', href: '/planning', icon: TrendingUp },
   { name: 'Importar', href: '/import', icon: Download },

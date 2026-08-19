@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { fixedTransactions, settings, transactions, creditCards, accounts } from "@/db/schema";
 import { addMonths, endOfMonth, format, getDate, parseISO, subMonths } from "date-fns";
-import { and, eq, gte, lte, or, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { buildGlobalCompetencyCondition } from "@/lib/competency-utils";
@@ -686,7 +686,13 @@ export async function getCreditCardInvoices(creditCardId: number, month?: string
       and(
         eq(t.creditCardId, creditCardId),
         eq(t.type, "credit_card_expense"),
-        eq(t.invoiceMonth, currentMonth),
+        or(
+          eq(t.invoiceMonth, currentMonth),
+          and(
+            isNull(t.invoiceMonth),
+            eq(t.competencyMonth, currentMonth)
+          )
+        ),
         eq(t.userId, userId),
       ),
     with: {
@@ -705,11 +711,11 @@ export async function getCreditCardInvoiceMonths(creditCardId: number) {
   const txs = await db.query.transactions.findMany({
     where: (t, { eq, and }) =>
       and(eq(t.creditCardId, creditCardId), eq(t.type, "credit_card_expense"), eq(t.userId, userId)),
-    columns: { invoiceMonth: true },
-    orderBy: (t, { desc }) => [desc(t.invoiceMonth)],
+    columns: { invoiceMonth: true, competencyMonth: true },
   });
 
-  return [...new Set(txs.map((t) => t.invoiceMonth).filter((m): m is string => Boolean(m)))];
+  const uniqueMonths = [...new Set(txs.map((t) => t.invoiceMonth || t.competencyMonth).filter((m): m is string => Boolean(m)))];
+  return uniqueMonths.sort().reverse();
 }
 
 export async function deleteTransaction(
@@ -1105,6 +1111,51 @@ export async function fixAllCompetencies() {
 
     if (tx.competencyMonth !== correctCompetency) {
       await db.update(transactions).set({ competencyMonth: correctCompetency }).where(eq(transactions.id, tx.id));
+      updatedCount++;
+    }
+  }
+
+  return { success: true, count: updatedCount };
+}
+
+export async function backfillInvoiceMonths() {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
+  const txsToUpdate = await db.query.transactions.findMany({
+    where: and(
+      eq(transactions.type, 'credit_card_expense'),
+      isNull(transactions.invoiceMonth),
+      eq(transactions.userId, userId)
+    ),
+  });
+
+  if (txsToUpdate.length === 0) {
+    return { success: true, count: 0 };
+  }
+
+  const cards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
+  const cardMap = new Map(cards.map(c => [c.id, c]));
+  const { calculateCreditCardDueDate } = await import('@/lib/utils/competency');
+
+  let updatedCount = 0;
+
+  for (const tx of txsToUpdate) {
+    let newInvoiceMonth = tx.competencyMonth;
+
+    if (!newInvoiceMonth && tx.creditCardId) {
+      const card = cardMap.get(tx.creditCardId);
+      if (card) {
+        const dueDate = calculateCreditCardDueDate(parseISO(tx.date), card.closingDay, card.dueDay);
+        newInvoiceMonth = format(dueDate, "yyyy-MM");
+      }
+    }
+
+    if (newInvoiceMonth) {
+      await db.update(transactions)
+        .set({ invoiceMonth: newInvoiceMonth })
+        .where(eq(transactions.id, tx.id));
       updatedCount++;
     }
   }

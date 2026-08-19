@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { fixAllCompetencies } from './src/app/actions/transactions';
+import { backfillInvoiceMonths } from './src/app/actions/transactions';
 import { auth } from '@/auth';
 
 // Mock auth for CLI execution
@@ -10,7 +10,7 @@ jest.mock('@/auth', () => ({
 async function run() {
   console.log('Running fix...');
   try {
-    const result = await fixAllCompetencies();
+    const result = await backfillInvoiceMonths();
     console.log('Result:', result);
   } catch (err) {
     console.error('Error:', err);

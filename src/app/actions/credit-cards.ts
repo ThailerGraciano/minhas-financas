@@ -2,7 +2,7 @@
 
 import { db } from '@/db';
 import { creditCards, transactions, accounts, categories, subcategories } from '@/db/schema';
-import { eq, and, ne } from 'drizzle-orm';
+import { eq, and, ne, or, isNull } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { format } from 'date-fns';
 import { auth } from '@/auth';
@@ -80,9 +80,12 @@ export async function getInvoiceSummary(creditCardId: string | number, competenc
   const userId = session.user.id;
   const parsedId = Number(creditCardId);
   const cardTransactions = await db.query.transactions.findMany({
-    where: (t, { eq, ne, and }) => and(
+    where: (t, { eq, ne, and, or, isNull }) => and(
       eq(t.creditCardId, parsedId),
-      eq(t.invoiceMonth, competencyMonth),
+      or(
+        eq(t.invoiceMonth, competencyMonth),
+        and(isNull(t.invoiceMonth), eq(t.competencyMonth, competencyMonth))
+      ),
       eq(t.type, 'credit_card_expense'),
       ne(t.status, 'ignored'),
       eq(t.userId, userId)
@@ -135,7 +138,10 @@ export async function payFullInvoice(
         .where(
           and(
             eq(transactions.creditCardId, parsedCardId),
-            eq(transactions.invoiceMonth, competencyMonth),
+            or(
+              eq(transactions.invoiceMonth, competencyMonth),
+              and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth))
+            ),
             eq(transactions.type, 'credit_card_expense'),
             eq(transactions.userId, userId)
           )
@@ -158,7 +164,10 @@ export async function payFullInvoice(
         .where(
           and(
             eq(transactions.creditCardId, parsedCardId),
-            eq(transactions.invoiceMonth, competencyMonth),
+            or(
+              eq(transactions.invoiceMonth, competencyMonth),
+              and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth))
+            ),
             eq(transactions.type, 'credit_card_expense'),
             eq(transactions.status, 'pending'),
             eq(transactions.userId, userId)
@@ -254,7 +263,10 @@ export async function prepayInvoice(
         .where(
           and(
             eq(transactions.creditCardId, parsedCardId),
-            eq(transactions.invoiceMonth, competencyMonth),
+            or(
+              eq(transactions.invoiceMonth, competencyMonth),
+              and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth))
+            ),
             eq(transactions.type, 'credit_card_expense'),
             eq(transactions.userId, userId)
           )
@@ -377,7 +389,10 @@ export async function getCreditCardsWithSummary(competencyMonth: string) {
         .where(
           and(
             eq(transactions.creditCardId, card.id),
-            eq(transactions.invoiceMonth, competencyMonth),
+            or(
+              eq(transactions.invoiceMonth, competencyMonth),
+              and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth))
+            ),
             eq(transactions.type, 'credit_card_expense'),
             ne(transactions.status, 'ignored'),
             eq(transactions.userId, userId)
@@ -430,7 +445,10 @@ export async function adjustInvoice(
         .where(
           and(
             eq(transactions.creditCardId, parsedCardId),
-            eq(transactions.invoiceMonth, competencyMonth),
+            or(
+              eq(transactions.invoiceMonth, competencyMonth),
+              and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth))
+            ),
             eq(transactions.type, 'credit_card_expense'),
             ne(transactions.status, 'ignored'),
             eq(transactions.userId, userId)

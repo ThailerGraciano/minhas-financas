@@ -5,7 +5,7 @@ const cardDueDay = 28;
 const [pYear, pMonth, pDay] = txDate.split('-').map(Number);
 const purchaseDate = new Date(pYear, pMonth - 1, pDay);
 
-let targetDate = new Date(purchaseDate);
+const targetDate = new Date(purchaseDate);
 if (purchaseDate.getDate() >= cardClosingDay) {
   targetDate.setMonth(targetDate.getMonth() + 1);
 }

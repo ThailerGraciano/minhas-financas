@@ -74,9 +74,22 @@ const transactionSchema = z
     isTotalAmount: z.boolean().optional().default(false),
     installmentTotal: z.coerce.number().optional(),
     current_installment: z.coerce.number().min(1).default(1),
+    invoiceMonth: z.string().nullable().optional(),
   })
   .passthrough()
   .superRefine((data, ctx) => {
+    if (data.type === 'credit_card_expense') {
+      if (!data.invoiceMonth || !/^\d{4}-\d{2}$/.test(data.invoiceMonth)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Selecione a fatura do cartão",
+          path: ["invoiceMonth"],
+        });
+      }
+    } else {
+      data.invoiceMonth = null;
+    }
+
     if (data.installmentTotal && data.current_installment > data.installmentTotal) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -183,6 +196,7 @@ export async function getTransactions(month?: string, accountId?: number) {
         description: ft.type === "transfer" ? `${ft.description} (Saída)` : ft.description,
         date: dateStr,
         competencyMonth: currentMonth,
+        invoiceMonth: ft.type === "credit_card_expense" ? currentMonth : null,
         status: "pending",
         isFixed: false,
         fixedTransactionId: ft.id,
@@ -213,7 +227,7 @@ export async function getTransactions(month?: string, accountId?: number) {
       return [origin];
     });
 
-  const allTransactions = [...realTransactions, ...virtualTransactions];
+  const allTransactions = [...realTransactions, ...virtualTransactions].filter(t => t.status !== 'ignored');
 
   allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -236,17 +250,13 @@ export async function createTransaction(
   const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
   const closingDay = appSettings?.closingDay || 25;
   const parsedDate = parseISO(data.date);
-  if (data.type === 'credit_card_expense' && data.creditCardId) {
-    const [card] = await db.select().from(creditCards).where(eq(creditCards.id, data.creditCardId)).limit(1);
-    if (card) {
-      const { calculateCreditCardDueDate } = await import('@/lib/utils/competency');
-      const dueDate = calculateCreditCardDueDate(parsedDate, card.closingDay, card.dueDay);
-      data.competencyMonth = getCompetencyMonth(dueDate, closingDay);
-    } else {
-      data.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
-    }
-  } else {
+  
+  if (!data.competencyMonth) {
     data.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
+  }
+
+  if (data.type !== 'credit_card_expense') {
+    data.invoiceMonth = null;
   }
 
   if (subcategoryRequiredTypes.includes(data.type) && (!data.subcategoryId || data.subcategoryId <= 0)) {
@@ -676,7 +686,7 @@ export async function getCreditCardInvoices(creditCardId: number, month?: string
       and(
         eq(t.creditCardId, creditCardId),
         eq(t.type, "credit_card_expense"),
-        eq(t.competencyMonth, currentMonth),
+        eq(t.invoiceMonth, currentMonth),
         eq(t.userId, userId),
       ),
     with: {
@@ -695,14 +705,21 @@ export async function getCreditCardInvoiceMonths(creditCardId: number) {
   const txs = await db.query.transactions.findMany({
     where: (t, { eq, and }) =>
       and(eq(t.creditCardId, creditCardId), eq(t.type, "credit_card_expense"), eq(t.userId, userId)),
-    columns: { competencyMonth: true },
-    orderBy: (t, { desc }) => [desc(t.competencyMonth)],
+    columns: { invoiceMonth: true },
+    orderBy: (t, { desc }) => [desc(t.invoiceMonth)],
   });
 
-  return [...new Set(txs.map((t) => t.competencyMonth))];
+  return [...new Set(txs.map((t) => t.invoiceMonth).filter((m): m is string => Boolean(m)))];
 }
 
-export async function deleteTransaction(id: number, mode: "single" | "future" = "single", isFixedVirtual: boolean = false, fixedTransactionId?: string) {
+export async function deleteTransaction(
+  id: number, 
+  mode: "single" | "future" = "single", 
+  isFixedVirtual: boolean = false, 
+  fixedTransactionId?: string,
+  virtualDate?: string,
+  virtualCompetencyMonth?: string
+) {
   try {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
@@ -720,8 +737,62 @@ export async function deleteTransaction(id: number, mode: "single" | "future" = 
             await tx.update(fixedTransactions).set({ active: false }).where(eq(fixedTransactions.id, fixedTransactionId));
             await tx.delete(transactions).where(and(eq(transactions.fixedTransactionId, fixedTransactionId), eq(transactions.status, 'pending')));
             return { success: true };
-          } else {
-            return { success: false, error: "Não é possível excluir um único mês de uma projeção sem antes efetivá-la." };
+          } else if (mode === "single" && virtualDate && virtualCompetencyMonth) {
+            // Se for single, pegamos os dados originais da fixed_transaction
+            const [ft] = await tx.select().from(fixedTransactions).where(eq(fixedTransactions.id, fixedTransactionId));
+            if (ft) {
+              if (ft.type === 'transfer' && ft.destinationAccountId) {
+                // Insere Saída
+                const [outTx] = await tx.insert(transactions).values({
+                  userId: ft.userId,
+                  type: ft.type,
+                  accountId: ft.accountId,
+                  creditCardId: ft.creditCardId,
+                  categoryId: ft.categoryId,
+                  subcategoryId: ft.subcategoryId,
+                  amount: ft.amount,
+                  description: `${ft.description} (Saída)`,
+                  date: virtualDate,
+                  competencyMonth: virtualCompetencyMonth,
+                  status: 'ignored',
+                  fixedTransactionId: ft.id,
+                }).returning();
+
+                // Insere Entrada
+                await tx.insert(transactions).values({
+                  userId: ft.userId,
+                  type: ft.type,
+                  accountId: ft.destinationAccountId,
+                  creditCardId: null,
+                  categoryId: ft.categoryId,
+                  subcategoryId: ft.subcategoryId,
+                  amount: ft.amount,
+                  description: `${ft.description} (Entrada)`,
+                  date: virtualDate,
+                  competencyMonth: virtualCompetencyMonth,
+                  status: 'ignored',
+                  fixedTransactionId: ft.id,
+                  parentTransactionId: outTx.id,
+                });
+              } else {
+                await tx.insert(transactions).values({
+                  userId: ft.userId,
+                  type: ft.type,
+                  accountId: ft.accountId,
+                  creditCardId: ft.creditCardId,
+                  categoryId: ft.categoryId,
+                  subcategoryId: ft.subcategoryId,
+                  amount: ft.amount,
+                  description: ft.description,
+                  date: virtualDate,
+                  competencyMonth: virtualCompetencyMonth,
+                  status: 'ignored',
+                  fixedTransactionId: ft.id,
+                });
+              }
+              return { success: true };
+            }
+            return { success: false, error: "Transação fixa não encontrada." };
           }
         }
         return { success: true };
@@ -785,11 +856,22 @@ export async function deleteTransaction(id: number, mode: "single" | "future" = 
                 where: and(eq(transactions.parentTransactionId, transactionItem.id), eq(transactions.userId, userId)),
               });
 
-          await applyBalanceDelta(tx, transactionItem.accountId, transactionItem.amount, transactionItem.type, transactionItem.status || "pending", transactionItem.parentTransactionId, true);
-          await tx.delete(transactions).where(eq(transactions.id, transactionItem.id));
           if (otherTx) {
-            await applyBalanceDelta(tx, otherTx.accountId, otherTx.amount, otherTx.type, otherTx.status || "pending", otherTx.parentTransactionId, true);
-            await tx.delete(transactions).where(eq(transactions.id, otherTx.id));
+            const isChild = !!transactionItem.parentTransactionId;
+            if (isChild) {
+              await applyBalanceDelta(tx, transactionItem.accountId, transactionItem.amount, transactionItem.type, transactionItem.status || "pending", transactionItem.parentTransactionId, true);
+              await tx.delete(transactions).where(eq(transactions.id, transactionItem.id));
+              await applyBalanceDelta(tx, otherTx.accountId, otherTx.amount, otherTx.type, otherTx.status || "pending", otherTx.parentTransactionId, true);
+              await tx.delete(transactions).where(eq(transactions.id, otherTx.id));
+            } else {
+              await applyBalanceDelta(tx, otherTx.accountId, otherTx.amount, otherTx.type, otherTx.status || "pending", otherTx.parentTransactionId, true);
+              await tx.delete(transactions).where(eq(transactions.id, otherTx.id));
+              await applyBalanceDelta(tx, transactionItem.accountId, transactionItem.amount, transactionItem.type, transactionItem.status || "pending", transactionItem.parentTransactionId, true);
+              await tx.delete(transactions).where(eq(transactions.id, transactionItem.id));
+            }
+          } else {
+            await applyBalanceDelta(tx, transactionItem.accountId, transactionItem.amount, transactionItem.type, transactionItem.status || "pending", transactionItem.parentTransactionId, true);
+            await tx.delete(transactions).where(eq(transactions.id, transactionItem.id));
           }
         } else {
           await applyBalanceDelta(tx, transactionItem.accountId, transactionItem.amount, transactionItem.type, transactionItem.status || "pending", transactionItem.parentTransactionId, true);
@@ -835,10 +917,14 @@ export async function updateTransaction(
         throw new Error("Transação não encontrada");
       }
 
-      const isCreditCard = inputData.creditCardId !== undefined ? inputData.creditCardId : oldTx.creditCardId;
-      if (inputData.date && !isCreditCard) {
+      const type = inputData.type || oldTx.type;
+      if (inputData.date) {
         const parsedDate = parseISO(inputData.date);
         inputData.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
+      }
+
+      if (type !== 'credit_card_expense') {
+        inputData.invoiceMonth = null;
       }
 
       const { destinationAccountId, updateFuture, ...data } = inputData;
@@ -988,7 +1074,7 @@ export async function getTransactionDetailsForEdit(id: number) {
   return tx;
 }
 
-export async function fixCreditCardCompetencies() {
+export async function fixAllCompetencies() {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
@@ -996,7 +1082,7 @@ export async function fixCreditCardCompetencies() {
   const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
   const closingDay = appSettings?.closingDay || 25;
 
-  const ccTxs = await db.select().from(transactions).where(and(eq(transactions.userId, userId), eq(transactions.type, 'credit_card_expense')));
+  const allTxs = await db.select().from(transactions).where(eq(transactions.userId, userId));
   const cards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
   const cardMap = new Map(cards.map(c => [c.id, c]));
 
@@ -1004,14 +1090,18 @@ export async function fixCreditCardCompetencies() {
   
   let updatedCount = 0;
 
-  for (const tx of ccTxs) {
-    if (!tx.creditCardId) continue;
-    const card = cardMap.get(tx.creditCardId);
-    if (!card) continue;
-    
+  for (const tx of allTxs) {
     const parsedDate = parseISO(tx.date);
-    const dueDate = calculateCreditCardDueDate(parsedDate, card.closingDay, card.dueDay);
-    const correctCompetency = getCompetencyMonth(dueDate, closingDay);
+    let correctCompetency: string;
+
+    if (tx.type === 'credit_card_expense' && tx.creditCardId) {
+      const card = cardMap.get(tx.creditCardId);
+      if (!card) continue;
+      const dueDate = calculateCreditCardDueDate(parsedDate, card.closingDay, card.dueDay);
+      correctCompetency = format(dueDate, "yyyy-MM");
+    } else {
+      correctCompetency = getCompetencyMonth(parsedDate, closingDay);
+    }
 
     if (tx.competencyMonth !== correctCompetency) {
       await db.update(transactions).set({ competencyMonth: correctCompetency }).where(eq(transactions.id, tx.id));

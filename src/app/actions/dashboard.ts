@@ -2,7 +2,7 @@
 
 import { db } from '@/db';
 import { accounts, creditCards, transactions, fixedTransactions, settings } from '@/db/schema';
-import { and, eq, gte, inArray, isNotNull, lte, gt } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, lte, gt, ne } from 'drizzle-orm';
 import { addDays, addMonths, endOfMonth, format, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { auth } from '@/auth';
@@ -29,7 +29,7 @@ export async function getDashboardData(month?: string) {
   const monthTransactions = await db
     .select()
     .from(transactions)
-    .where(condition);
+    .where(and(condition, ne(transactions.status, 'ignored')));
 
   let totalIncome = 0;
   let totalExpense = 0;
@@ -253,6 +253,7 @@ export async function getInstallmentsChartData() {
         isNotNull(transactions.installmentTotal),
         gt(transactions.installmentTotal, 1),
         gte(transactions.competencyMonth, currentMonth),
+        ne(transactions.status, 'ignored'),
         eq(transactions.userId, userId)
       )
     );
@@ -420,6 +421,7 @@ export async function getExpenseTreemapData(competencyMonth: string): Promise<Tr
   const rawTransactions = await db.query.transactions.findMany({
     where: and(
       inArray(transactions.type, ['expense', 'credit_card_expense']),
+      ne(transactions.status, 'ignored'),
       condition
     ),
     with: {
@@ -517,6 +519,7 @@ export async function getExpensesForecastData() {
         inArray(transactions.type, ['expense', 'credit_card_expense']),
         gte(transactions.competencyMonth, startMonth),
         lte(transactions.competencyMonth, endMonth),
+        ne(transactions.status, 'ignored'),
         eq(transactions.userId, userId)
       )
     );
@@ -631,6 +634,7 @@ export async function getCategoryForecastData() {
       inArray(transactions.type, ['expense', 'credit_card_expense']),
       gte(transactions.competencyMonth, startMonth),
       lte(transactions.competencyMonth, endMonth),
+      ne(transactions.status, 'ignored'),
       eq(transactions.userId, userId)
     ),
     with: {

@@ -3,7 +3,7 @@
 import { getHistoricalBalance } from "@/app/actions/accounts";
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { accounts, fixedTransactions, settings, transactions } from "@/db/schema";
+import { accounts, creditCards, fixedTransactions, settings, transactions } from "@/db/schema";
 import { getDefaultCompetencyMonth } from "@/lib/date-utils";
 import { addDays, differenceInDays, format, lastDayOfMonth, parseISO } from "date-fns";
 import { and, asc, eq, gte, inArray, lte, or, SQL } from "drizzle-orm";
@@ -109,6 +109,9 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
   let isCheckingAccount = false;
   if (accountId === "checking_accounts" || (allAccounts.length === 1 && allAccounts[0].type === "checking")) {
     isCheckingAccount = true;
+  } else if (accountId && accountId !== "all") {
+    const acc = allAccounts.find((a) => a.id === Number(accountId));
+    if (acc?.type === "checking") isCheckingAccount = true;
   }
 
   if (accountId) {
@@ -129,6 +132,11 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
       broadConditions.push(eq(transactions.accountId, Number(accountId)));
     }
   }
+
+  const userCards = await db.query.creditCards.findMany({
+    where: eq(creditCards.userId, session.user.id),
+    columns: { id: true, dueDay: true, closingDay: true, name: true },
+  });
 
   const allTxs = await db.query.transactions.findMany({
     where: and(...broadConditions),
@@ -189,7 +197,7 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
     while (cursor <= targetEndDate) {
       const virtDateStr = format(cursor, "yyyy-MM-dd");
       virtualTxs.push({
-        id: -(Math.floor(Math.random() * 1000000)), // virtual id
+        id: -Math.floor(Math.random() * 1000000), // virtual id
         type: ft.type,
         amount: ft.amount,
         date: virtDateStr,
@@ -201,6 +209,7 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
         userId: ft.userId,
         status: "pending",
         competencyMonth: format(cursor, "yyyy-MM"),
+        invoiceMonth: ft.type === "credit_card_expense" ? format(cursor, "yyyy-MM") : null,
         isFixed: false,
         fixedTransactionId: ft.id,
         installmentCurrent: null,
@@ -239,24 +248,9 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
     if (tx.type === "credit_card_expense" && tx.creditCardId && tx.competencyMonth) {
       const groupKey = `${tx.creditCardId}-${tx.competencyMonth}`;
       if (!ccGroups.has(groupKey)) {
-        let paymentDate = tx.date;
-        const dueDay = tx.creditCard?.dueDay || 10;
-        const closingDay = tx.creditCard?.closingDay || 25;
-
-        const [pYear, pMonth, pDay] = tx.date.split("-").map(Number);
-        const purchaseDate = new Date(pYear, pMonth - 1, pDay);
-
-        const targetDate = new Date(purchaseDate);
-        if (purchaseDate.getDate() >= closingDay) {
-          targetDate.setDate(1); // Set to 1st of current month to prevent rollover
-          targetDate.setMonth(targetDate.getMonth() + 1);
-        }
-        targetDate.setDate(dueDay);
-
-        const yStr = targetDate.getFullYear();
-        const mStr = String(targetDate.getMonth() + 1).padStart(2, "0");
-        const dStr = String(targetDate.getDate()).padStart(2, "0");
-        paymentDate = `${yStr}-${mStr}-${dStr}`;
+        const card = userCards.find((c) => c.id === tx.creditCardId);
+        const dueDay = card?.dueDay || 10;
+        const paymentDate = `${tx.competencyMonth}-${String(dueDay).padStart(2, "0")}`;
 
         ccGroups.set(groupKey, {
           ...tx,
@@ -264,7 +258,8 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
           type: "expense",
           amount: "0",
           date: paymentDate,
-          description: `Fatura Projetada: ${tx.creditCard?.name || "Cartão"}`,
+          description: `Fatura Projetada: ${tx.creditCard?.name || card?.name || "Cartão"}`,
+          invoiceMonth: tx.competencyMonth,
           isFixed: false,
           fixedTransactionId: null,
           installmentCurrent: null,

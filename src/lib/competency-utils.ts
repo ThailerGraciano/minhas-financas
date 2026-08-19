@@ -11,7 +11,12 @@ import { parseISO, subMonths, format } from 'date-fns';
  * Como cardDueDay > globalClosingDay, a fatura paga no ciclo global de Agosto é a fatura de Julho ('2026-07').
  */
 export function getTargetInvoiceMonth(globalMonth: string, globalClosingDay: number, cardDueDay: number): string {
-  // A fatura é nomeada rigorosamente pelo seu mês de visualização, sem deslocamento orçamentário.
+  // Se o vencimento do cartão for DEPOIS do fechamento global, a fatura cai no ciclo global SEGUINTE.
+  // Portanto, para saber qual fatura pertence a este ciclo global, precisamos pegar a fatura do mês ANTERIOR.
+  if (cardDueDay > globalClosingDay) {
+    const date = parseISO(`${globalMonth}-01`);
+    return format(subMonths(date, 1), 'yyyy-MM');
+  }
   return globalMonth;
 }
 
@@ -43,7 +48,7 @@ export function buildGlobalCompetencyCondition(
     ccConditions.push(
       and(
         eq(transactions.creditCardId, card.id),
-        eq(transactions.competencyMonth, targetInvoiceMonth)
+        eq(transactions.invoiceMonth, targetInvoiceMonth)
       )!
     );
   }
@@ -80,11 +85,10 @@ export function buildCreditCardCompetencyCondition(
   const ccConditions: SQL[] = [];
 
   for (const card of userCards) {
-    const targetInvoiceMonth = getTargetInvoiceMonth(currentMonth, globalClosingDay, card.dueDay);
     ccConditions.push(
       and(
         eq(transactions.creditCardId, card.id),
-        eq(transactions.competencyMonth, targetInvoiceMonth)
+        eq(transactions.invoiceMonth, currentMonth)
       )!
     );
   }

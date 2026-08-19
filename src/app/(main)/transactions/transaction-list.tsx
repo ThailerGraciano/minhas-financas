@@ -80,7 +80,14 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
     const isVirtual = transactionToDelete.id < 0 && !transactionToDelete.isGroup;
     const fixedId = transactionToDelete.fixedTransactionId ?? undefined;
 
-    const result = await deleteTransaction(transactionToDelete.id, mode, isVirtual, fixedId);
+    const result = await deleteTransaction(
+      transactionToDelete.id, 
+      mode, 
+      isVirtual, 
+      fixedId,
+      isVirtual ? transactionToDelete.date : undefined,
+      isVirtual ? transactionToDelete.competencyMonth : undefined
+    );
 
     if (result && !result.success && result.error) {
       alert(result.error);
@@ -186,22 +193,8 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
             let groupDate = tx.date;
 
             const cardDueDay = tx.creditCard?.dueDay;
-            const cardClosingDay = tx.creditCard?.closingDay;
-            if (cardDueDay && cardClosingDay) {
-              const [pYear, pMonth, pDay] = tx.date.split("-").map(Number);
-              const purchaseDate = new Date(pYear, pMonth - 1, pDay);
-
-              const targetDate = new Date(purchaseDate);
-              if (purchaseDate.getDate() >= cardClosingDay) {
-                targetDate.setDate(1); // Set to 1st of current month to prevent rollover
-                targetDate.setMonth(targetDate.getMonth() + 1);
-              }
-              targetDate.setDate(cardDueDay);
-
-              const yStr = targetDate.getFullYear();
-              const mStr = String(targetDate.getMonth() + 1).padStart(2, "0");
-              const dStr = String(targetDate.getDate()).padStart(2, "0");
-              groupDate = `${yStr}-${mStr}-${dStr}`;
+            if (cardDueDay) {
+              groupDate = `${tx.competencyMonth}-${String(cardDueDay).padStart(2, "0")}`;
             }
 
             grouped.set(groupKey, {

@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { transactions } from "@/db/schema";
-import { addMonths, format } from "date-fns";
+import { addMonths, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Plus, Loader2, ChevronRight, ChevronLeft, ReceiptText, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -104,13 +104,13 @@ export function TransactionFormDialog({
     setFormError("");
   };
 
-  const getDefaultInvoiceMonth = (closingDay: number): string => {
-    const today = new Date();
-    if (today.getDate() >= closingDay) {
-      const next = addMonths(today, 1);
+  const getDefaultInvoiceMonth = (closingDay: number, dateStr: string): string => {
+    const baseDate = parseISO(dateStr);
+    if (baseDate.getDate() >= closingDay) {
+      const next = addMonths(baseDate, 1);
       return format(next, "yyyy-MM");
     }
-    return format(today, "yyyy-MM");
+    return format(baseDate, "yyyy-MM");
   };
 
   const invoiceOptions = useMemo(() => {
@@ -118,7 +118,7 @@ export function TransactionFormDialog({
     const card = formData.creditCards.find((c: CreditCard) => c.id === Number(selectedCreditCardId));
     if (!card) return [];
 
-    const defaultMonth = getDefaultInvoiceMonth(card.closingDay);
+    const defaultMonth = getDefaultInvoiceMonth(card.closingDay, transactionDate);
     const [year, month] = defaultMonth.split("-").map(Number);
     const baseDate = new Date(year, month - 1, 1);
 
@@ -131,19 +131,21 @@ export function TransactionFormDialog({
       options.push({ value, label: capitalizedLabel });
     }
     return options;
-  }, [selectedCreditCardId, formData?.creditCards]);
+  }, [selectedCreditCardId, formData?.creditCards, transactionDate]);
 
   const handleCreditCardChange = (value: string) => {
     setSelectedCreditCardId(value);
-    if (!value || !formData?.creditCards) {
-      setSelectedInvoiceMonth("");
-      return;
-    }
-    const card = formData.creditCards.find((c: CreditCard) => c.id === Number(value));
-    if (card) {
-      setSelectedInvoiceMonth(getDefaultInvoiceMonth(card.closingDay));
-    }
   };
+
+  useEffect(() => {
+    if (selectedCreditCardId && formData?.creditCards) {
+      const card = formData.creditCards.find((c: CreditCard) => c.id === Number(selectedCreditCardId));
+      if (card) {
+        // eslint-disable-next-line
+        setSelectedInvoiceMonth(getDefaultInvoiceMonth(card.closingDay, transactionDate));
+      }
+    }
+  }, [selectedCreditCardId, transactionDate, formData?.creditCards]);
 
   const filteredCategories = useMemo(() => {
     if (!formData?.categories) return [];

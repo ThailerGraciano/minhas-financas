@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { addMonths, format } from "date-fns";
+import { addMonths, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Loader2 } from "lucide-react";
 
@@ -109,13 +109,13 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
     return cat?.subcategories || [];
   }, [formData, selectedCategoryId]);
 
-  const getDefaultInvoiceMonth = (closingDay: number) => {
-    const today = new Date();
-    if (today.getDate() > closingDay) {
-      const next = addMonths(today, 1);
+  const getDefaultInvoiceMonth = (closingDay: number, dateStr: string) => {
+    const baseDate = parseISO(dateStr);
+    if (baseDate.getDate() > closingDay) {
+      const next = addMonths(baseDate, 1);
       return format(next, "yyyy-MM");
     }
-    return format(today, "yyyy-MM");
+    return format(baseDate, "yyyy-MM");
   };
 
   const invoiceOptions = useMemo(() => {
@@ -129,7 +129,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
       const [year, month] = transaction.competencyMonth.split("-").map(Number);
       baseDate = new Date(year, month - 1, 1);
     } else {
-      const defaultMonth = getDefaultInvoiceMonth(card.closingDay);
+      const defaultMonth = getDefaultInvoiceMonth(card.closingDay, transaction?.date ? transaction.date.substring(0, 10) : new Date().toISOString());
       const [year, month] = defaultMonth.split("-").map(Number);
       baseDate = new Date(year, month - 1, 1);
     }
@@ -143,7 +143,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
       options.push({ value, label: capitalizedLabel });
     }
     return options;
-  }, [selectedAccountId, formData?.creditCards, transaction?.type, transaction?.competencyMonth]);
+  }, [selectedAccountId, formData?.creditCards, transaction?.type, transaction?.competencyMonth, transaction?.date]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

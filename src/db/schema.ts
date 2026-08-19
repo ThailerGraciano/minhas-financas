@@ -77,7 +77,7 @@ export const transactions = pgTable('transactions', {
   description: varchar('description', { length: 255 }).notNull(),
   date: date('date').notNull(),
   competencyMonth: varchar('competency_month', { length: 7 }).notNull(), // YYYY-MM
-  status: varchar('status', { length: 50 }).notNull(), // pending, paid
+  status: varchar('status', { length: 50 }).notNull(), // pending, paid, ignored
   isFixed: boolean('is_fixed').default(false).notNull(), // deprecated
   fixedTransactionId: uuid('fixed_transaction_id').references(() => fixedTransactions.id),
   installmentCurrent: integer('installment_current'),
@@ -87,6 +87,7 @@ export const transactions = pgTable('transactions', {
   observations: varchar('observations', { length: 500 }),
   paidAt: timestamp('paid_at'),
   importHash: varchar('import_hash', { length: 255 }).unique(),
+  invoiceMonth: varchar('invoice_month', { length: 7 }),
 });
 
 export const importLogs = pgTable('import_logs', {

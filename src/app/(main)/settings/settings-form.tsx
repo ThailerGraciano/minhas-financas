@@ -1,8 +1,8 @@
-import 'use client';
+'use client';
 
 import { useState } from 'react';
 import { updateClosingDay } from '@/app/actions/settings';
-import { fixCreditCardCompetencies } from '@/app/actions/transactions';
+import { fixAllCompetencies } from '@/app/actions/transactions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,7 +39,7 @@ export function SettingsForm({ initialClosingDay }: { initialClosingDay: number 
   const handleFixFaturas = async () => {
     setIsFixing(true);
     try {
-      const res = await fixCreditCardCompetencies();
+      const res = await fixAllCompetencies();
       if (res.success) {
         toast.success(`${res.count} faturas antigas foram corrigidas.`);
       }
@@ -102,7 +102,7 @@ export function SettingsForm({ initialClosingDay }: { initialClosingDay: number 
             className="w-full border-orange-500/50 text-orange-600 hover:bg-orange-500/10 hover:text-orange-700"
           >
             {isFixing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Corrigir Faturas Antigas
+            Corrigir Todas as Competências
           </Button>
         </CardContent>
       </Card>

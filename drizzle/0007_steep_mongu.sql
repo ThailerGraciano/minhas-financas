@@ -1,0 +1,1 @@
+ALTER TABLE "transactions" ADD COLUMN "invoice_month" varchar(7);

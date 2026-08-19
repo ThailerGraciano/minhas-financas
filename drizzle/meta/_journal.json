@@ -43,6 +43,20 @@
       "when": 1785192163609,
       "tag": "0005_flowery_tana_nile",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787145730737,
+      "tag": "0006_clammy_blazing_skull",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787154347545,
+      "tag": "0007_steep_mongu",
+      "breakpoints": true
     }
   ]
 }

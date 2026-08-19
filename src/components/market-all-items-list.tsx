@@ -20,6 +20,8 @@ interface MarketAllItemsListProps {
 type SortKey = 'description' | 'category' | 'quantity' | 'netPrice';
 type SortOrder = 'asc' | 'desc';
 
+const SortIcon = () => <ArrowUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />;
+
 export function MarketAllItemsList({ items }: MarketAllItemsListProps) {
   const [sortKey, setSortKey] = useState<SortKey>('netPrice');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -44,8 +46,8 @@ export function MarketAllItemsList({ items }: MarketAllItemsListProps) {
 
   const sortedItems = useMemo(() => {
     return [...items].sort((a, b) => {
-      let aVal: any = a[sortKey];
-      let bVal: any = b[sortKey];
+      let aVal: string | number = a[sortKey];
+      let bVal: string | number = b[sortKey];
 
       if (typeof aVal === 'string') {
         aVal = aVal.toLowerCase();
@@ -57,8 +59,6 @@ export function MarketAllItemsList({ items }: MarketAllItemsListProps) {
       return 0;
     });
   }, [items, sortKey, sortOrder]);
-
-  const SortIcon = () => <ArrowUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />;
 
   return (
     <Card className="rounded-[2rem] border-transparent shadow-sm w-full min-w-0">

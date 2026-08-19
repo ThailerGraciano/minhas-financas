@@ -2,7 +2,7 @@
 
 import { db } from '@/db';
 import { creditCards, transactions, accounts, categories, subcategories } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, ne } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { format } from 'date-fns';
 import { auth } from '@/auth';
@@ -80,10 +80,11 @@ export async function getInvoiceSummary(creditCardId: string | number, competenc
   const userId = session.user.id;
   const parsedId = Number(creditCardId);
   const cardTransactions = await db.query.transactions.findMany({
-    where: (t, { eq, and }) => and(
+    where: (t, { eq, ne, and }) => and(
       eq(t.creditCardId, parsedId),
-      eq(t.competencyMonth, competencyMonth),
+      eq(t.invoiceMonth, competencyMonth),
       eq(t.type, 'credit_card_expense'),
+      ne(t.status, 'ignored'),
       eq(t.userId, userId)
     ),
     with: {
@@ -134,7 +135,7 @@ export async function payFullInvoice(
         .where(
           and(
             eq(transactions.creditCardId, parsedCardId),
-            eq(transactions.competencyMonth, competencyMonth),
+            eq(transactions.invoiceMonth, competencyMonth),
             eq(transactions.type, 'credit_card_expense'),
             eq(transactions.userId, userId)
           )
@@ -157,7 +158,7 @@ export async function payFullInvoice(
         .where(
           and(
             eq(transactions.creditCardId, parsedCardId),
-            eq(transactions.competencyMonth, competencyMonth),
+            eq(transactions.invoiceMonth, competencyMonth),
             eq(transactions.type, 'credit_card_expense'),
             eq(transactions.status, 'pending'),
             eq(transactions.userId, userId)
@@ -253,7 +254,7 @@ export async function prepayInvoice(
         .where(
           and(
             eq(transactions.creditCardId, parsedCardId),
-            eq(transactions.competencyMonth, competencyMonth),
+            eq(transactions.invoiceMonth, competencyMonth),
             eq(transactions.type, 'credit_card_expense'),
             eq(transactions.userId, userId)
           )
@@ -330,6 +331,7 @@ export async function prepayInvoice(
         description: `Adiantamento de Fatura`,
         date: date,
         competencyMonth: competencyMonth,
+        invoiceMonth: competencyMonth,
         status: 'pending', // Keeps it pending so it reduces the pending sum, and gets marked as paid later
       });
 
@@ -369,15 +371,15 @@ export async function getCreditCardsWithSummary(competencyMonth: string) {
 
   const cardsWithSummary = await Promise.all(
     cards.map(async (card) => {
-      const targetInvoiceMonth = getTargetInvoiceMonth(competencyMonth, closingDay, card.dueDay);
-      // Busca transações do cartão na competência informada
+      // Busca transações do cartão na competência informada (Invoice Month)
       const cardTxs = await db.select()
         .from(transactions)
         .where(
           and(
             eq(transactions.creditCardId, card.id),
-            eq(transactions.competencyMonth, targetInvoiceMonth),
+            eq(transactions.invoiceMonth, competencyMonth),
             eq(transactions.type, 'credit_card_expense'),
+            ne(transactions.status, 'ignored'),
             eq(transactions.userId, userId)
           )
         );
@@ -402,7 +404,7 @@ export async function getCreditCardsWithSummary(competencyMonth: string) {
         invoice_total,
         invoice_paid,
         invoice_pending,
-        targetInvoiceMonth,
+        targetInvoiceMonth: competencyMonth,
       };
     })
   );
@@ -428,8 +430,9 @@ export async function adjustInvoice(
         .where(
           and(
             eq(transactions.creditCardId, parsedCardId),
-            eq(transactions.competencyMonth, competencyMonth),
+            eq(transactions.invoiceMonth, competencyMonth),
             eq(transactions.type, 'credit_card_expense'),
+            ne(transactions.status, 'ignored'),
             eq(transactions.userId, userId)
           )
         );
@@ -491,6 +494,7 @@ export async function adjustInvoice(
           description: `Ajuste de Fatura - ${competencyMonth}`,
           date: format(new Date(), 'yyyy-MM-dd'),
           competencyMonth: competencyMonth,
+          invoiceMonth: competencyMonth,
           status: 'pending',
         });
 
@@ -537,6 +541,7 @@ export async function adjustInvoice(
           description: `Adiantamento de Fatura - ${competencyMonth}`,
           date: format(new Date(), 'yyyy-MM-dd'),
           competencyMonth: competencyMonth,
+          invoiceMonth: competencyMonth,
           status: 'pending',
         });
 
@@ -568,7 +573,7 @@ export async function getCreditCardsCategorySummary(competencyMonth: string) {
   const condition = buildCreditCardCompetencyCondition(competencyMonth, closingDay, userId, userCards);
 
   const cardTxs = await db.query.transactions.findMany({
-    where: condition,
+    where: and(condition, ne(transactions.status, 'ignored')),
     with: {
       category: true,
       subcategory: true,

@@ -32,7 +32,7 @@ type TooltipPayload = {
   value: number;
   color?: string;
   fill?: string;
-  payload: Record<string, any>;
+  payload: Record<string, unknown>;
 };
 
 type CustomTooltipProps = {
@@ -44,7 +44,7 @@ type CustomTooltipProps = {
 
 const CustomTooltip = ({ active, payload, label, hoveredKey }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
-    const isFuture = payload[0]?.payload?.isFuture;
+    const isFuture = Boolean(payload[0]?.payload?.isFuture);
 
     return (
       <div className="bg-popover border text-popover-foreground rounded-lg shadow-md p-3 min-w-[200px]">
@@ -84,7 +84,7 @@ const CustomTooltip = ({ active, payload, label, hoveredKey }: CustomTooltipProp
 export function ExpensesForecastChart({
   data,
 }: {
-  data: Record<string, any>[];
+  data: Record<string, unknown>[];
 }) {
   const [hoveredKey, setHoveredKey] = React.useState<string | null>(null);
 

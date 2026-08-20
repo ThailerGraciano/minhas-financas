@@ -331,11 +331,11 @@ export function ReceiptReviewGrid({ initialData, onSave, isSaving }: ReceiptRevi
       </div>
 
       <div className="flex justify-between items-center pt-4">
-        <Button variant="outline" onClick={handleAddItem} className="gap-2" disabled={isSaving}>
+        <Button variant="outline" onClick={handleAddItem} className="gap-2" isLoading={isSaving} disabled={isSaving}>
           <Plus className="w-4 h-4" />
           Adicionar Linha
         </Button>
-        <Button onClick={() => onSave?.(data, selectedTxIds)} className="gap-2" disabled={isSaving}>
+        <Button onClick={() => onSave?.(data, selectedTxIds)} className="gap-2" isLoading={isSaving} disabled={isSaving}>
           {isSaving ? 'Salvando...' : 'Salvar Compra'}
         </Button>
       </div>

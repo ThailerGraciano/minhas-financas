@@ -100,9 +100,9 @@ export default function RegisterPage() {
             <Button 
               type="submit" 
               className="w-full font-semibold transition-all"
-              disabled={isLoading}
+              isLoading={isLoading} disabled={isLoading}
             >
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              
               {isLoading ? 'Criando conta...' : 'Cadastrar'}
             </Button>
           </form>

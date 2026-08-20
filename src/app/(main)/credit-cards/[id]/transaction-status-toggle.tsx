@@ -31,7 +31,7 @@ export function TransactionStatusToggle({ transactionId, initialStatus }: Transa
       size="sm"
       className={`gap-2 ${isPaid ? 'text-green-600 hover:text-green-700 hover:bg-green-100/50' : 'text-muted-foreground hover:text-foreground'}`}
       onClick={handleToggle}
-      disabled={isPending}
+      isLoading={isPending} disabled={isPending}
       title={isPaid ? 'Marcar como Pendente' : 'Dar baixa'}
     >
       {isPaid ? (

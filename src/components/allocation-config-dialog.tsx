@@ -215,7 +215,7 @@ export function AllocationConfigDialog({ initialData }: AllocationConfigDialogPr
           <Button 
             type="submit" 
             form="allocation-form" 
-            disabled={isPending || !isTotalValid}
+            isLoading={isPending} disabled={isPending || !isTotalValid}
             className="w-full sm:w-auto"
           >
             {isPending ? 'Salvando...' : 'Salvar Configurações'}

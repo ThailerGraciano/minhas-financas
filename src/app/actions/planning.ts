@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { accounts, creditCards, fixedTransactions, settings, transactions } from "@/db/schema";
 import { getDefaultCompetencyMonth } from "@/lib/date-utils";
 import { addDays, differenceInDays, format, lastDayOfMonth, parseISO } from "date-fns";
-import { and, asc, eq, gte, inArray, lte, or, SQL } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lte, ne, or, SQL } from "drizzle-orm";
 
 export async function getProjectedCashFlow(accountId?: string, reqCompetencyMonth?: string) {
   const session = await auth();
@@ -85,10 +85,11 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
   // Limitar se o end date for menor que o start date (ex: competência passada, o hoje já passou do end date)
   const diffDays = Math.max(0, differenceInDays(targetEndDate, startProjectionDateParsed));
 
-  // 2. Busca Ampla: Buscar TODAS as transações normais na janela da competência
+  // 2. Busca Ampla: Buscar TODAS as transações normais na janela da competência (EXCLUINDO CARTÃO)
   const broadConditions: (SQL | undefined)[] = [
     eq(transactions.userId, userId),
     lte(transactions.date, targetEndDateStr),
+    ne(transactions.type, "credit_card_expense"),
   ];
 
   if (isFutureCompetency) {
@@ -118,16 +119,10 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
     if (accountId === "checking_accounts") {
       const checkingIds = allAccounts.map((a) => a.id);
       if (checkingIds.length > 0) {
-        broadConditions.push(
-          or(inArray(transactions.accountId, checkingIds), eq(transactions.type, "credit_card_expense"))!,
-        );
+        broadConditions.push(inArray(transactions.accountId, checkingIds));
       } else {
         broadConditions.push(eq(transactions.id, -1)); // Force no results
       }
-    } else if (isCheckingAccount) {
-      broadConditions.push(
-        or(eq(transactions.accountId, Number(accountId)), eq(transactions.type, "credit_card_expense"))!,
-      );
     } else {
       broadConditions.push(eq(transactions.accountId, Number(accountId)));
     }
@@ -240,26 +235,55 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
   // As 'paid' já cumpriram seu papel na deduplicação
   const finalPendingTxs = mergedTxs.filter((tx) => tx.status === "pending");
 
-  // 2.5 Group credit card transactions into invoices
-  const processedTxs = [];
-  const ccGroups = new Map<string, (typeof finalPendingTxs)[0]>();
-
+  // 2.5 Buscar e agrupar faturas de cartão de crédito pendentes
+  const processedTxs: typeof finalPendingTxs = [];
+  const pendingCCTxs: any[] = [];
+  
+  // Extrair as virtuais de cartão de crédito de finalPendingTxs e separar do resto
   for (const tx of finalPendingTxs) {
-    if (tx.type === "credit_card_expense" && tx.creditCardId && tx.competencyMonth) {
-      const groupKey = `${tx.creditCardId}-${tx.competencyMonth}`;
-      if (!ccGroups.has(groupKey)) {
-        const card = userCards.find((c) => c.id === tx.creditCardId);
-        const dueDay = card?.dueDay || 10;
-        const paymentDate = `${tx.competencyMonth}-${String(dueDay).padStart(2, "0")}`;
+    if (tx.type === "credit_card_expense") {
+      pendingCCTxs.push(tx);
+    } else {
+      processedTxs.push(tx);
+    }
+  }
+  
+  const includeCreditCards = !accountId || accountId === "all" || isCheckingAccount;
+  
+  if (includeCreditCards) {
+    // Buscar também as transações pendentes reais do banco de dados
+    const dbPendingCCTxs = await db.query.transactions.findMany({
+      where: and(
+        eq(transactions.userId, userId),
+        eq(transactions.type, "credit_card_expense"),
+        eq(transactions.status, "pending")
+      ),
+      with: { creditCard: true }
+    });
+    
+    pendingCCTxs.push(...dbPendingCCTxs);
 
+    const ccGroups = new Map<string, typeof processedTxs[0]>();
+
+    for (const tx of pendingCCTxs) {
+      if (!tx.creditCardId) continue;
+      
+      const invMonth = tx.invoiceMonth || tx.competencyMonth || tx.date.substring(0, 7);
+      const groupKey = `${tx.creditCardId}-${invMonth}`;
+      
+      if (!ccGroups.has(groupKey)) {
+        const card = tx.creditCard || userCards.find((c) => c.id === tx.creditCardId);
+        const dueDay = card?.dueDay || 10;
+        const paymentDate = `${invMonth}-${String(dueDay).padStart(2, "0")}`;
+        
         ccGroups.set(groupKey, {
           ...tx,
           id: -(tx.creditCardId + 900000 + Math.floor(Math.random() * 10000)),
-          type: "expense",
+          type: "expense", // Invoice will manifest as a checking account expense
           amount: "0",
           date: paymentDate,
-          description: `Fatura Projetada: ${tx.creditCard?.name || card?.name || "Cartão"}`,
-          invoiceMonth: tx.competencyMonth,
+          description: `Fatura Projetada: ${card?.name || "Cartão"}`,
+          invoiceMonth: invMonth,
           isFixed: false,
           fixedTransactionId: null,
           installmentCurrent: null,
@@ -279,15 +303,19 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
           },
         });
       }
+      
       const group = ccGroups.get(groupKey)!;
       group.amount = String(Number(group.amount) + Number(tx.amount));
-    } else {
-      processedTxs.push(tx);
     }
-  }
 
-  for (const group of ccGroups.values()) {
-    processedTxs.push(group);
+    // Apenas inserir a fatura projetada se sua data de vencimento cair dentro da nossa janela de interesse
+    for (const group of ccGroups.values()) {
+      if (group.date <= targetEndDateStr) {
+        if (!isFutureCompetency || group.date >= targetStartDateStr) {
+          processedTxs.push(group);
+        }
+      }
+    }
   }
 
   // Split into overdue (before start projection date) and projected (start projection date and future)

@@ -120,8 +120,8 @@ export function AccountFormDialog({
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={isPending}>
-              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" isLoading={isPending} disabled={isPending}>
+              
               {isPending ? 'Salvando...' : 'Salvar Conta'}
             </Button>
           </DialogFooter>

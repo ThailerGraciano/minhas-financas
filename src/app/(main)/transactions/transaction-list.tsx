@@ -503,7 +503,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
               }}
               disabled={!invoiceSelectedAccount || isPayingInvoice || isLoadingAccounts}
             >
-              {isPayingInvoice && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              
               Confirmar Pagamento
             </AlertDialogAction>
           </AlertDialogFooter>

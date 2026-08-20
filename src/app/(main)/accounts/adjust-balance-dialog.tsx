@@ -166,8 +166,8 @@ export function AdjustBalanceDialog({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" isLoading={isPending} disabled={isPending}>
+              
               {isPending ? 'Ajustando...' : 'Confirmar Ajuste'}
             </Button>
           </DialogFooter>

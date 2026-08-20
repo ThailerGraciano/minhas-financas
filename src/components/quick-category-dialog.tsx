@@ -171,8 +171,8 @@ export function QuickCategoryDialog({ type, onSuccess, isSubcategoryMode, parent
             <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={isPending}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" isLoading={isPending} disabled={isPending}>
+              
               {isPending 
                 ? (isSubcategoryMode ? "Criando..." : "Criando...") 
                 : (isSubcategoryMode ? "Criar Subcategoria" : "Criar Categoria")

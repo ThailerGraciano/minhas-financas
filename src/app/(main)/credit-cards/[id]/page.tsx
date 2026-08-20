@@ -13,6 +13,7 @@ import { PrepayInvoiceDialog } from './prepay-invoice-dialog';
 import { AdjustInvoiceDialog } from './adjust-invoice-dialog';
 import { InvoiceTransactionList } from './invoice-transaction-list';
 import { getDefaultCompetencyMonth } from '@/lib/date-utils';
+import { ExportCSVButton } from './export-csv-button';
 
 export default async function CreditCardInvoicePage(props: {
   params: Promise<{ id: string }>;
@@ -36,10 +37,12 @@ export default async function CreditCardInvoicePage(props: {
   const currentMonth = monthParam || getDefaultCompetencyMonth(card.closingDay);
 
   const summary = await getInvoiceSummary(id, currentMonth);
+
+  console.log("summary - ", summary)
   const accounts = await getAccounts();
 
-  const progressPercentage = summary.total_amount > 0 
-    ? Math.round((summary.paid_amount / summary.total_amount) * 100) 
+  const progressPercentage = summary.total_amount > 0
+    ? Math.round((summary.paid_amount / summary.total_amount) * 100)
     : 0;
 
   const formatCurrency = (value: number) => {
@@ -68,20 +71,20 @@ export default async function CreditCardInvoicePage(props: {
             <p className="text-muted-foreground text-sm">Gestão de faturas e pagamentos</p>
           </div>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row gap-2">
           <AdjustInvoiceDialog
             creditCardId={id}
             competencyMonth={currentMonth}
             totalAmount={summary.total_amount}
           />
-          <PrepayInvoiceDialog 
+          <PrepayInvoiceDialog
             creditCardId={id}
             competencyMonth={currentMonth}
             pendingAmount={summary.pending_amount}
             accounts={accounts}
           />
-          <PayInvoiceDialog 
+          <PayInvoiceDialog
             creditCardId={id}
             competencyMonth={currentMonth}
             pendingAmount={summary.pending_amount}
@@ -91,9 +94,9 @@ export default async function CreditCardInvoicePage(props: {
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-muted/30 rounded-lg border">
-        <CompetencyFilter 
-          closingDay={card.closingDay} 
-          defaultMonth={getDefaultCompetencyMonth(card.closingDay)} 
+        <CompetencyFilter
+          closingDay={card.closingDay}
+          defaultMonth={getDefaultCompetencyMonth(card.closingDay)}
         />
       </div>
 
@@ -156,10 +159,15 @@ export default async function CreditCardInvoicePage(props: {
 
       {/* Expenses Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Despesas da Fatura - {currentMonth}</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 pb-0">
+          <CardTitle className="text-base md:text-lg truncate">Despesas da Fatura - {currentMonth}</CardTitle>
+          <ExportCSVButton
+            transactions={summary.transactions}
+            invoiceMonth={currentMonth}
+            cardName={card.name}
+          />
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-2 sm:p-6 pt-0">
           {summary.transactions.length === 0 ? (
             <div className="text-center p-8 text-muted-foreground border rounded-lg border-dashed">
               Nenhuma despesa registrada nesta fatura.

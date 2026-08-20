@@ -430,8 +430,8 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
                   <X className="h-3.5 w-3.5" /> Limpar filtros
                 </Button>
               )}
-              <Button onClick={handleLoad} disabled={loading} className="gap-2">
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              <Button onClick={handleLoad} isLoading={loading} disabled={loading} className="gap-2">
+                <Search className="h-4 w-4" />
                 Carregar Dados
               </Button>
             </div>
@@ -651,8 +651,8 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
               <Button variant="outline" onClick={() => setPendingChanges({})} disabled={isSaving}>
                 Descartar
               </Button>
-              <Button onClick={handleSaveBatch} disabled={isSaving} className="gap-2">
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              <Button onClick={handleSaveBatch} isLoading={isSaving} disabled={isSaving} className="gap-2">
+                <Save className="h-4 w-4" />
                 Salvar Tudo
               </Button>
             </div>

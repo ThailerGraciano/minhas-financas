@@ -55,12 +55,12 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
   const [amount, setAmount] = useState<number>(0);
   const [originalAmount, setOriginalAmount] = useState<number>(0);
   const [updateFuture, setUpdateFuture] = useState(false);
-  
+
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [selectedDestinationAccountId, setSelectedDestinationAccountId] = useState("");
   const [selectedInvoiceMonth, setSelectedInvoiceMonth] = useState("");
   const [fullTransaction, setFullTransaction] = useState<TransactionProp | null>(null);
-  
+
   const router = useRouter();
 
   useEffect(() => {
@@ -84,8 +84,8 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
         const dataToUse = details || transaction;
         setFullTransaction(dataToUse as TransactionProp);
         setSelectedAccountId(
-          dataToUse.accountId ? String(dataToUse.accountId) : 
-          dataToUse.creditCardId ? `cc-${dataToUse.creditCardId}` : ""
+          dataToUse.accountId ? String(dataToUse.accountId) :
+            dataToUse.creditCardId ? `cc-${dataToUse.creditCardId}` : ""
         );
         if (dataToUse.type === 'transfer' && dataToUse.destinationAccountId) {
           setSelectedDestinationAccountId(String(dataToUse.destinationAccountId));
@@ -185,6 +185,8 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
       destinationAccountId: selectedDestinationAccountId && transaction.type === 'transfer' ? Number(selectedDestinationAccountId) : undefined,
       updateFuture,
     };
+
+    console.log("updateData => ", updateData, transaction.id)
 
     const res = await updateTransaction(Number(transaction.id), updateData);
 
@@ -304,8 +306,8 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
                     Alterar o valor das próximas também?
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    {fullTransaction.fixedTransactionId 
-                      ? "O novo valor será aplicado a todas as ocorrências futuras." 
+                    {fullTransaction.fixedTransactionId
+                      ? "O novo valor será aplicado a todas as ocorrências futuras."
                       : "O novo valor será aplicado a todas as parcelas seguintes."}
                   </p>
                 </div>
@@ -365,8 +367,8 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button type="submit" isLoading={isPending} disabled={isPending}>
+
                 {isPending ? "Salvando..." : "Salvar Alterações"}
               </Button>
             </div>

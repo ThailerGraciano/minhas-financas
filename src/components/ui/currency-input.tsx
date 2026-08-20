@@ -4,11 +4,13 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 interface CurrencyInputProps
-  extends Omit<React.ComponentProps<"input">, "type" | "value" | "onChange"> {
+  extends Omit<React.ComponentProps<"input">, "type" | "value" | "onChange" | "defaultValue"> {
   /** The form field name — a hidden input with this name will hold the decimal value */
   name: string;
   /** Controlled decimal value (e.g. 12.50). If omitted, the component is uncontrolled. */
   value?: number;
+  /** Default decimal value (uncontrolled initialization). */
+  defaultValue?: number | string;
   /** Called with the new decimal value on every keystroke */
   onValueChange?: (value: number) => void;
 }
@@ -25,6 +27,7 @@ interface CurrencyInputProps
 function CurrencyInput({
   name,
   value: controlledValue,
+  defaultValue,
   onValueChange,
   className,
   id,
@@ -36,6 +39,9 @@ function CurrencyInput({
   const [cents, setCents] = React.useState<number>(() => {
     if (controlledValue !== undefined) {
       return Math.round(controlledValue * 100);
+    }
+    if (defaultValue !== undefined) {
+      return Math.round(Number(defaultValue) * 100);
     }
     return 0;
   });

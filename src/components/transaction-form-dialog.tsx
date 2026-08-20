@@ -288,6 +288,7 @@ export function TransactionFormDialog({
         baseData.creditCardId = Number(selectedCreditCardId);
         if (selectedInvoiceMonth) {
           baseData.competencyMonth = selectedInvoiceMonth;
+          baseData.invoiceMonth = selectedInvoiceMonth;
         }
       } else {
         baseData.accountId = Number(accountId);
@@ -752,7 +753,7 @@ export function TransactionFormDialog({
             </div>
 
             <div className="pt-4 sm:pt-8 flex flex-wrap justify-between gap-2 sm:gap-3 mt-3 sm:mt-4 border-t">
-              <Button type="button" variant="outline" onClick={handlePrevStep} disabled={isFirstStep || isPending} className="min-w-[100px] sm:w-32">
+              <Button type="button" variant="outline" onClick={handlePrevStep} isLoading={isPending} disabled={isFirstStep || isPending} className="min-w-[100px] sm:w-32">
                 <ChevronLeft className="mr-1 sm:mr-2 h-4 w-4" /> Voltar
               </Button>
               
@@ -762,11 +763,11 @@ export function TransactionFormDialog({
                 </Button>
               ) : (
                 <div className="flex flex-wrap gap-2 justify-end">
-                  <Button type="button" variant="secondary" onClick={() => handleSubmit("save-and-continue")} disabled={isPending} className="text-xs sm:text-sm px-2 sm:px-4">
-                    {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="mr-1 sm:mr-2 h-4 w-4" /> Adicionar Outra</>}
+                  <Button type="button" variant="secondary" onClick={() => handleSubmit("save-and-continue")} isLoading={isPending} disabled={isPending} className="text-xs sm:text-sm px-2 sm:px-4">
+                    <><Plus className="mr-1 sm:mr-2 h-4 w-4" /> Adicionar Outra</>
                   </Button>
-                  <Button type="button" onClick={() => handleSubmit("save-and-close")} disabled={isPending} className="bg-gradient-to-r from-violet-600 to-indigo-600 border-none text-xs sm:text-sm px-2 sm:px-4">
-                    {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <><Check className="mr-1 sm:mr-2 h-4 w-4" /> Finalizar</>}
+                  <Button type="button" onClick={() => handleSubmit("save-and-close")} isLoading={isPending} disabled={isPending} className="bg-gradient-to-r from-violet-600 to-indigo-600 border-none text-xs sm:text-sm px-2 sm:px-4">
+                    <><Check className="mr-1 sm:mr-2 h-4 w-4" /> Finalizar</>
                   </Button>
                 </div>
               )}

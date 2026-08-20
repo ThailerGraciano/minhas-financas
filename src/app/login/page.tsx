@@ -94,9 +94,9 @@ export default function LoginPage() {
             <Button 
               type="submit" 
               className="w-full font-semibold transition-all"
-              disabled={isLoading}
+              isLoading={isLoading} disabled={isLoading}
             >
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              
               {isLoading ? 'Entrando...' : 'Entrar'}
             </Button>
           </form>

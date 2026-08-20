@@ -111,7 +111,7 @@ function CategoryAccordionItem({ category }: { category: Category }) {
                 variant="ghost"
                 size="icon"
                 className={`h-8 w-8 shrink-0 ${category.type === 'expense' ? 'text-red-500 hover:text-red-600 hover:bg-red-50' : 'text-green-500 hover:text-green-600 hover:bg-green-50'}`}
-                disabled={isPending}
+                isLoading={isPending} disabled={isPending}
                 onClick={(e) => e.stopPropagation()}
               >
                 <CategoryIcon name={category.icon} className="h-5 w-5" />
@@ -181,7 +181,7 @@ function CategoryAccordionItem({ category }: { category: Category }) {
             }}
             disabled={isPending}
           >
-            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            <Trash2 className="h-4 w-4" />
           </Button>
           
           <AccordionTrigger className="w-8 justify-center py-0" />
@@ -289,9 +289,9 @@ function SubcategoryItem({ subcategory }: { subcategory: Subcategory }) {
           size="icon"
           className="h-6 w-6 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
           onClick={handleDelete}
-          disabled={isPending}
+          isLoading={isPending} disabled={isPending}
         >
-          {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+          <Trash2 className="h-3 w-3" />
         </Button>
       </div>
     </li>
@@ -334,9 +334,9 @@ function QuickAddSubcategory({ categoryId }: { categoryId: number }) {
         variant="secondary" 
         className="h-8 shrink-0" 
         onClick={handleAdd}
-        disabled={isPending || !name.trim()}
+        isLoading={isPending} disabled={isPending || !name.trim()}
       >
-        {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+        <Plus className="h-4 w-4" />
       </Button>
     </div>
   );

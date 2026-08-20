@@ -86,8 +86,8 @@ export function AddCategoryDialog() {
           </div>
 
           <div className="flex justify-end pt-4">
-            <Button type="submit" disabled={isPending}>
-              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" isLoading={isPending} disabled={isPending}>
+              
               {isPending ? 'Salvando...' : 'Salvar Categoria'}
             </Button>
           </div>
@@ -125,8 +125,8 @@ export function AddSubcategoryForm({ categoryId }: { categoryId: string }) {
         className="h-8 text-sm"
         required
       />
-      <Button type="submit" size="sm" disabled={isPending || !name.trim()}>
-        {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+      <Button type="submit" size="sm" isLoading={isPending} disabled={isPending || !name.trim()}>
+        
         {isPending ? 'Adicionando...' : 'Adicionar'}
       </Button>
     </form>
@@ -228,7 +228,7 @@ export function CategoryActions({ category }: { category: { id: number; name: st
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={isEditPending}>
               Cancelar
             </Button>
-            <Button onClick={handleUpdateIcon} disabled={isEditPending}>
+            <Button onClick={handleUpdateIcon} isLoading={isEditPending} disabled={isEditPending}>
               {isEditPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -260,7 +260,7 @@ export function CategoryActions({ category }: { category: { id: number; name: st
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} disabled={isDeletePending}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={isDeletePending}>
+            <Button variant="destructive" onClick={handleDelete} isLoading={isDeletePending} disabled={isDeletePending}>
               {isDeletePending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

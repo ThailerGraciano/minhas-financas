@@ -924,13 +924,17 @@ export async function updateTransaction(
       }
 
       const type = inputData.type || oldTx.type;
-      if (inputData.date) {
-        const parsedDate = parseISO(inputData.date);
-        inputData.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
-      }
-
-      if (type !== 'credit_card_expense') {
+      
+      if (type === 'credit_card_expense') {
+        if (inputData.competencyMonth) {
+          inputData.invoiceMonth = inputData.competencyMonth;
+        }
+      } else {
         inputData.invoiceMonth = null;
+        if (inputData.date) {
+          const parsedDate = parseISO(inputData.date);
+          inputData.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
+        }
       }
 
       const { destinationAccountId, updateFuture, ...data } = inputData;

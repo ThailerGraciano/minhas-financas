@@ -109,7 +109,7 @@ export function AiChat() {
             <Button 
               type="submit" 
               size="icon" 
-              disabled={isLoading || !input.trim()}
+              isLoading={isLoading} disabled={isLoading || !input.trim()}
               className="rounded-full shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white"
             >
               <Send className="h-4 w-4" />

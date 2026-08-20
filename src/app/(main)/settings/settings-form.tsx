@@ -94,8 +94,8 @@ export function SettingsForm({ initialClosingDay }: { initialClosingDay: number 
             )}
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={isPending}>
-              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" isLoading={isPending} disabled={isPending}>
+              
               {isPending ? 'Salvando...' : 'Salvar Alterações'}
             </Button>
           </CardFooter>
@@ -115,7 +115,7 @@ export function SettingsForm({ initialClosingDay }: { initialClosingDay: number 
             disabled={isFixing}
             className="w-full border-orange-500/50 text-orange-600 hover:bg-orange-500/10 hover:text-orange-700"
           >
-            {isFixing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            
             Corrigir Todas as Competências
           </Button>
           <Button 
@@ -124,7 +124,7 @@ export function SettingsForm({ initialClosingDay }: { initialClosingDay: number 
             disabled={isBackfilling}
             className="w-full border-orange-500/50 text-orange-600 hover:bg-orange-500/10 hover:text-orange-700 mt-2"
           >
-            {isBackfilling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            
             Restaurar Faturas Antigas
           </Button>
         </CardContent>

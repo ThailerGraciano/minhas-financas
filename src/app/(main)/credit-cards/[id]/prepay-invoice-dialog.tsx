@@ -135,8 +135,8 @@ export function PrepayInvoiceDialog({ creditCardId, competencyMonth, pendingAmou
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={!selectedAccountId || isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" isLoading={isSubmitting} disabled={!selectedAccountId || isSubmitting}>
+              
               Confirmar Adiantamento
             </Button>
           </DialogFooter>

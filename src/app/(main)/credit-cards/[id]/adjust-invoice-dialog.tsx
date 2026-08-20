@@ -141,9 +141,9 @@ export function AdjustInvoiceDialog({ creditCardId, competencyMonth, totalAmount
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={realAmount <= 0 || hasNoDifference || isSubmitting}
+            isLoading={isSubmitting} disabled={realAmount <= 0 || hasNoDifference || isSubmitting}
           >
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            
             Confirmar Ajuste
           </Button>
         </DialogFooter>

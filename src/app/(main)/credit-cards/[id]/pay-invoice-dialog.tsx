@@ -102,8 +102,8 @@ export function PayInvoiceDialog({ creditCardId, competencyMonth, pendingAmount,
           <Button variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button onClick={handlePay} disabled={!selectedAccountId || isSubmitting}>
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Button onClick={handlePay} isLoading={isSubmitting} disabled={!selectedAccountId || isSubmitting}>
+            
             Confirmar Pagamento
           </Button>
         </DialogFooter>

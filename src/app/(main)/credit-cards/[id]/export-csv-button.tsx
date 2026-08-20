@@ -5,7 +5,15 @@ import { Download } from "lucide-react";
 import { exportTransactionsToCSV } from "@/lib/utils/export";
 
 interface ExportCSVButtonProps {
-  transactions: any[];
+  transactions: {
+    date: string;
+    description: string | null;
+    amount: string | number;
+    type: string;
+    status: string;
+    category?: { name: string } | null;
+    subcategory?: { name: string } | null;
+  }[];
   invoiceMonth: string;
   cardName: string;
 }

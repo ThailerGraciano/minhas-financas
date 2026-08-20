@@ -237,7 +237,7 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
 
   // 2.5 Buscar e agrupar faturas de cartão de crédito pendentes
   const processedTxs: typeof finalPendingTxs = [];
-  const pendingCCTxs: any[] = [];
+  const pendingCCTxs: typeof finalPendingTxs = [];
   
   // Extrair as virtuais de cartão de crédito de finalPendingTxs e separar do resto
   for (const tx of finalPendingTxs) {
@@ -258,7 +258,11 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
         eq(transactions.type, "credit_card_expense"),
         eq(transactions.status, "pending")
       ),
-      with: { creditCard: true }
+      with: { 
+        category: true,
+        account: true,
+        creditCard: true 
+      }
     });
     
     pendingCCTxs.push(...dbPendingCCTxs);

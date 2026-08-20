@@ -4,7 +4,7 @@ import { addMonths, format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -36,7 +36,13 @@ export function CompetencyFilter({ closingDay, value, defaultMonth, onChange }: 
   const currentDate = new Date(`${currentMonth}-01T00:00:00`);
 
   // Gera opções: 12 meses passados + mês atual + 12 meses futuros
-  const monthOptions = useMemo(() => {
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line
+    setIsMounted(true);
+  }, []);
+
+  const monthOptions = isMounted ? (() => {
     const options: { value: string; label: string }[] = [];
     const now = new Date();
 
@@ -49,9 +55,8 @@ export function CompetencyFilter({ closingDay, value, defaultMonth, onChange }: 
         label: label.charAt(0).toUpperCase() + label.slice(1),
       });
     }
-
     return options;
-  }, []);
+  })() : [];
 
   const navigateToMonth = (monthStr: string) => {
     if (onChange) {

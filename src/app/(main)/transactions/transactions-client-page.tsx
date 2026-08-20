@@ -1,5 +1,7 @@
 'use client';
 
+import { useCallback } from 'react';
+
 import { getTransactions } from '@/app/actions/transactions';
 import { TransactionList } from './transaction-list';
 import { ClientDataLoader } from '@/components/client-data-loader';
@@ -56,11 +58,16 @@ export function TransactionsClientPage({
     </div>
   );
 
+  const fetchTransactions = useCallback(
+    (month: string) => getTransactions(month, initialAccountId),
+    [initialAccountId]
+  );
+
   return (
     <ClientDataLoader
       closingDay={closingDay}
       initialData={initialTransactions}
-      fetchAction={(month) => getTransactions(month, initialAccountId)}
+      fetchAction={fetchTransactions}
       headerContent={headerContent}
     >
       {(transactions) => (

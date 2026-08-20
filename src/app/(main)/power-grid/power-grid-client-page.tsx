@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   getTransactionsForGrid,
   getGridFilterOptions,
@@ -8,10 +8,11 @@ import {
   type GridTransaction,
 } from "@/app/actions/power-grid";
 import { processBatchUpdates } from "@/app/actions/batch";
-import { generateInvoiceOptions } from "@/lib/competency-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { parseISO, addMonths, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   Select,
   SelectContent,
@@ -84,6 +85,19 @@ type PendingChange = {
   changes?: Partial<GridTransaction>;
 };
 
+function generateInvoiceOptions(baseDateStr?: string): { value: string; label: string }[] {
+  const baseDate = baseDateStr ? parseISO(baseDateStr) : new Date();
+  
+  const options = [];
+  for (let i = -6; i <= 12; i++) {
+    const d = addMonths(baseDate, i);
+    const value = format(d, "yyyy-MM");
+    const label = format(d, "MMMM/yyyy", { locale: ptBR });
+    options.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) });
+  }
+  return options;
+}
+
 export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps) {
   // ─── Filter state ──────────────────────────────────────
   const [dateStart, setDateStart] = useState("");
@@ -110,7 +124,12 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
     balanceAdjustments: Array<{ accountId: number; delta: number }>;
   } | null>(null);
 
-  const invoiceOptions = useMemo(() => generateInvoiceOptions(), []);
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line
+    setIsMounted(true);
+  }, []);
+  const invoiceOptions = isMounted ? generateInvoiceOptions() : [];
 
   const activeFilterCount = [
     dateStart,

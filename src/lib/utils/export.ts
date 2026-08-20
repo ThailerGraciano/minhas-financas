@@ -1,6 +1,18 @@
 import { format, parseISO } from "date-fns";
 
-export function exportTransactionsToCSV(transactions: any[], invoiceMonth: string, cardName: string) {
+export function exportTransactionsToCSV(
+  transactions: {
+    date: string;
+    description: string | null;
+    amount: string | number;
+    type: string;
+    status: string;
+    category?: { name: string } | null;
+    subcategory?: { name: string } | null;
+  }[], 
+  invoiceMonth: string, 
+  cardName: string
+) {
   // Cabeçalho do CSV
   const header = ['"Data"', '"Descrição"', '"Categoria"', '"Subcategoria"', '"Valor"', '"Status"'].join(",");
 
@@ -10,7 +22,7 @@ export function exportTransactionsToCSV(transactions: any[], invoiceMonth: strin
     let formattedDate = "";
     try {
       formattedDate = format(parseISO(t.date), "dd/MM/yyyy");
-    } catch (e) {
+    } catch (_e) {
       // Fallback em caso de erro no parseISO
       formattedDate = t.date ? new Date(t.date).toLocaleDateString("pt-BR") : "";
     }

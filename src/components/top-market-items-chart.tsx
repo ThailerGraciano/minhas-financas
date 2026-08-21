@@ -72,7 +72,7 @@ export function TopMarketItemsChart({ data }: TopMarketItemsChartProps) {
             layout="vertical"
             margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
           >
-            <CartesianGrid horizontal={true} vertical={false} strokeDasharray="3 3" />
+            <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
             <XAxis
               type="number"
               tickLine={false}
@@ -103,7 +103,7 @@ export function TopMarketItemsChart({ data }: TopMarketItemsChartProps) {
                 />
               }
             />
-            <Bar dataKey="netPrice" fill="var(--color-netPrice)" radius={[0, 4, 4, 0]} />
+            <Bar dataKey="netPrice" fill="var(--color-netPrice)" radius={[0, 4, 4, 0]} stroke="transparent" />
           </BarChart>
         </ChartContainer>
       </CardContent>

@@ -116,7 +116,10 @@ export function DashboardClientPage({ closingDay, initialData }: { closingDay: n
                 <ArrowUpCircle className="h-5 w-5 text-green-500" />
                 <span className="text-sm font-medium text-muted-foreground">Receitas do Mês</span>
               </div>
-              <div className="text-4xl font-bold text-green-500">{formatCurrency(dashboard.data.totalIncome)}</div>
+              <div className="text-4xl font-bold text-foreground">
+                <span className="text-muted-foreground text-sm mr-1">R$</span>
+                {new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(dashboard.data.totalIncome)}
+              </div>
             </div>
 
             <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm flex flex-col space-y-4">
@@ -124,7 +127,10 @@ export function DashboardClientPage({ closingDay, initialData }: { closingDay: n
                 <ArrowDownCircle className="h-5 w-5 text-red-500" />
                 <span className="text-sm font-medium text-muted-foreground">Despesas do Mês</span>
               </div>
-              <div className="text-4xl font-bold text-red-500">{formatCurrency(dashboard.data.totalExpense)}</div>
+              <div className="text-4xl font-bold text-foreground">
+                <span className="text-muted-foreground text-sm mr-1">R$</span>
+                {new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(dashboard.data.totalExpense)}
+              </div>
             </div>
           </div>
 

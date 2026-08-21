@@ -87,7 +87,7 @@ export function MarketCategoryHistoryChart({ data }: MarketCategoryHistoryChartP
                 </linearGradient>
               ))}
             </defs>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" />
+            <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
             <XAxis
               dataKey="month"
               tickLine={false}
@@ -105,13 +105,13 @@ export function MarketCategoryHistoryChart({ data }: MarketCategoryHistoryChartP
               content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />}
             />
             {categories.map((cat, index) => (
-              <Area
-                key={cat}
-                type="monotone"
-                dataKey={cat}
-                stackId="1"
-                stroke={COLORS[index % COLORS.length]}
-                fill={`url(#fill${index})`}
+              <Area 
+                key={cat} 
+                type="monotone" 
+                dataKey={cat} 
+                stackId="1" 
+                stroke={COLORS[index % COLORS.length]} 
+                fill={`url(#fill${index})`} 
               />
             ))}
             <ChartLegend content={<ChartLegendContent />} className="mt-4" />

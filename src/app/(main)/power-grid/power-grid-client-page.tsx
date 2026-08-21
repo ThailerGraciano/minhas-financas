@@ -521,10 +521,10 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
                   key={tx.id}
                   className={`p-4 transition-colors ${
                     isDeleted 
-                      ? "bg-red-500/10 border-red-500/50 opacity-60" 
+                      ? "bg-destructive/5 border-destructive/50 opacity-60" 
                       : isEdited
-                        ? "bg-green-500/10 border-green-500/50"
-                        : "hover:bg-muted/30"
+                        ? "bg-success/5 border-success/50"
+                        : "hover:bg-white/5 border-b border-white/5 shadow-none rounded-xl"
                   }`}
                 >
                   {/* Top Row */}

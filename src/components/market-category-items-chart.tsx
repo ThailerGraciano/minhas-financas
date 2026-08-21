@@ -48,7 +48,7 @@ export function MarketCategoryItemsChart({ data }: MarketCategoryItemsChartProps
             layout="vertical"
             margin={{ top: 0, right: 20, left: 0, bottom: 0 }}
           >
-            <CartesianGrid horizontal={true} vertical={false} strokeDasharray="3 3" />
+            <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
             <XAxis type="number" hide />
             <YAxis
               dataKey="category"
@@ -72,7 +72,7 @@ export function MarketCategoryItemsChart({ data }: MarketCategoryItemsChartProps
                 />
               }
             />
-            <Bar dataKey="value" fill="var(--color-primary)" radius={[0, 4, 4, 0]} />
+            <Bar dataKey="value" fill="var(--color-primary)" radius={[0, 4, 4, 0]} stroke="transparent" />
           </BarChart>
         </ChartContainer>
       </CardContent>

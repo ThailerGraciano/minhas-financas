@@ -14,13 +14,13 @@ interface ExpenseTreemapProps {
 // Function to generate consistent colors based on string hash
 const stringToColorClass = (str: string) => {
   const colors = [
-    { bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-500' },
-    { bg: 'emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-500' },
-    { bg: 'bg-purple-500/10', border: 'border-purple-500/30', text: 'text-purple-500' },
-    { bg: 'bg-orange-500/10', border: 'border-orange-500/30', text: 'text-orange-500' },
-    { bg: 'bg-rose-500/10', border: 'border-rose-500/30', text: 'text-rose-500' },
-    { bg: 'bg-indigo-500/10', border: 'border-indigo-500/30', text: 'text-indigo-500' },
-    { bg: 'bg-cyan-500/10', border: 'border-cyan-500/30', text: 'text-cyan-500' },
+    { bg: 'bg-blue-500/10', border: 'border-transparent', text: 'text-blue-500' },
+    { bg: 'bg-emerald-500/10', border: 'border-transparent', text: 'text-emerald-500' },
+    { bg: 'bg-purple-500/10', border: 'border-transparent', text: 'text-purple-500' },
+    { bg: 'bg-orange-500/10', border: 'border-transparent', text: 'text-orange-500' },
+    { bg: 'bg-rose-500/10', border: 'border-transparent', text: 'text-rose-500' },
+    { bg: 'bg-indigo-500/10', border: 'border-transparent', text: 'text-indigo-500' },
+    { bg: 'bg-cyan-500/10', border: 'border-transparent', text: 'text-cyan-500' },
   ];
   let hash = 0;
   for (let i = 0; i < str.length; i++) {

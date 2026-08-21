@@ -12,22 +12,12 @@ import {
 } from "@/components/ui/chart"
 
 const COLORS = [
-  "#3b82f6", // blue-500
-  "#ef4444", // red-500
-  "#eab308", // yellow-500
-  "#a855f7", // purple-500
-  "#22c55e", // green-500
-  "#f97316", // orange-500
-  "#ec4899", // pink-500
-  "#06b6d4", // cyan-500
-  "#8b5cf6", // violet-500
-  "#14b8a6", // teal-500
-  "#f43f5e", // rose-500
-  "#84cc16", // lime-500
-  "#6366f1", // indigo-500
-  "#0ea5e9", // sky-500
-  "#10b981", // emerald-500
-  "#d946ef", // fuchsia-500
+  "hsl(var(--primary))",
+  "hsl(var(--primary) / 0.8)",
+  "hsl(var(--primary) / 0.6)",
+  "hsl(var(--primary) / 0.4)",
+  "hsl(var(--primary) / 0.2)",
+  "hsl(var(--primary) / 0.1)",
 ];
 
 type TooltipPayload = {
@@ -131,7 +121,7 @@ export function InstallmentsStackedChart({
             );
           })}
         </defs>
-        <CartesianGrid vertical={false} strokeDasharray="3 3" />
+        <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
         <XAxis
           dataKey="month"
           tickLine={false}

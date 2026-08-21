@@ -285,18 +285,25 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
           Nenhuma transação encontrada para este período.
         </div>
       ) : (
-        <div className="space-y-3 sm:space-y-4 -mx-2 sm:mx-0">
+        <div className="flex flex-col gap-2 -mx-2 sm:mx-0">
           {displayedTransactions.map((tx) => (
             <div
               key={tx.id}
-              className="bg-card rounded-2xl sm:rounded-[1.5rem] border-transparent shadow-sm transition-all hover:bg-card/80 mb-2 sm:mb-3"
+              className="flex items-center justify-between gap-1.5 sm:gap-2 md:gap-3 p-2.5 sm:p-3 md:p-4 rounded-xl border-b border-white/5 transition-colors hover:bg-white/5"
             >
-              <div className="p-2.5 sm:p-3 md:p-5 flex items-center justify-between gap-1.5 sm:gap-2 md:gap-3">
                 <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1">
-                  <button
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => handleMarkAsPaid(tx)}
-                    disabled={loadingId === tx.id}
-                    className="shrink-0 focus:outline-none disabled:opacity-50 transition-transform hover:scale-110"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleMarkAsPaid(tx);
+                      }
+                    }}
+                    aria-disabled={loadingId === tx.id}
+                    className={`shrink-0 focus:outline-none transition-transform hover:scale-110 cursor-pointer ${loadingId === tx.id ? 'opacity-50 pointer-events-none' : ''}`}
                     title={tx.status === "paid" ? "Estornar pagamento" : "Marcar como Pago"}
                   >
                     {loadingId === tx.id ? (
@@ -306,7 +313,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                     ) : (
                       <Circle className="w-5 h-5 md:w-6 md:h-6 text-muted-foreground" />
                     )}
-                  </button>
+                  </div>
 
                   {getIcon(tx.type)}
 
@@ -314,8 +321,10 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                     <span className="font-medium text-sm md:text-base truncate">{tx.description}</span>
                     <span className="text-[11px] md:text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                       <span className="truncate max-w-[70px] md:max-w-none">{getSource(tx)}</span>
-                      <span className="mx-0.5 md:mx-1">•</span>
-                      <span className="truncate max-w-[70px] md:max-w-none">{tx.category?.name || "Geral"}</span>
+                      <span className="mx-0.5 md:mx-1"></span>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] md:text-xs font-medium bg-primary/10 text-primary truncate max-w-[90px] md:max-w-none">
+                        {tx.category?.name || "Geral"}
+                      </span>
                       {tx.installmentTotal && tx.installmentTotal > 1 && (
                         <span className="ml-1 text-primary">
                           ({tx.installmentCurrent}/{tx.installmentTotal})
@@ -360,7 +369,6 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                   )}
                 </div>
               </div>
-            </div>
           ))}
         </div>
       )}

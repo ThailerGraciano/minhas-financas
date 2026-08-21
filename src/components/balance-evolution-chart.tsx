@@ -23,8 +23,8 @@ interface BalanceEvolutionChartProps {
 // Cores hardcoded para garantir visibilidade independente do tema monocromático.
 // O tema deste projeto usa --chart-* em escala de cinza (chroma=0), então
 // usamos oklch com chroma real para as duas linhas se distinguirem.
-const COLOR_PAST   = 'oklch(0.88 0.14 153)';        // verde neon (primary)
-const COLOR_FUTURE = 'oklch(0.60 0.08 153)';    // verde mais escuro
+const COLOR_PAST   = 'hsl(var(--primary))';
+const COLOR_FUTURE = 'hsl(var(--primary) / 0.4)';
 
 const chartConfig = {
   balancePast: {
@@ -76,7 +76,7 @@ export function BalanceEvolutionChart({ data }: BalanceEvolutionChartProps) {
         data={data}
         margin={{ top: 12, right: 16, left: 8, bottom: 0 }}
       >
-        <CartesianGrid vertical={false} stroke="transparent" />
+        <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
 
         <XAxis
           dataKey="month"

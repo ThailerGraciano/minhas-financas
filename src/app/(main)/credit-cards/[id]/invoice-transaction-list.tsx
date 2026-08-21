@@ -128,7 +128,7 @@ export function InvoiceTransactionList({ transactions }: { transactions: Transac
                   <div className="flex flex-col overflow-hidden">
                     <span className="font-medium truncate" title={tx.description}>{tx.description}</span>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 overflow-hidden">
-                      <span className="bg-muted px-1.5 py-0.5 rounded-sm truncate" title={tx.category?.name || 'Sem categoria'}>{tx.category?.name || 'Sem categoria'}</span>
+                      <span className="bg-primary/10 text-primary font-medium px-1.5 py-0.5 rounded-sm truncate" title={tx.category?.name || 'Sem categoria'}>{tx.category?.name || 'Sem categoria'}</span>
                     </div>
                   </div>
                 </TableCell>

@@ -27,7 +27,8 @@ export function AccountBalancesSummary({ balances, totalBalance }: { balances: B
       <div className="py-6 px-2 flex flex-col space-y-2">
         <span className="text-sm font-medium text-muted-foreground">Saldo Total Geral</span>
         <span className="text-5xl md:text-6xl font-bold text-foreground tracking-tight">
-          {formatCurrency(totalBalance)}
+          <span className="text-muted-foreground text-3xl md:text-4xl mr-2">R$</span>
+          {new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(totalBalance)}
         </span>
       </div>
 
@@ -41,7 +42,10 @@ export function AccountBalancesSummary({ balances, totalBalance }: { balances: B
               </div>
               <div className="flex flex-col space-y-1">
                 <span className="text-sm font-medium text-muted-foreground truncate">{b.label}</span>
-                <span className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground truncate">{formatCurrency(b.total)}</span>
+                <span className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground truncate">
+                  <span className="text-muted-foreground text-sm mr-1">R$</span>
+                  {new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(b.total)}
+                </span>
               </div>
             </div>
           ))}

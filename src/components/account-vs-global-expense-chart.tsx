@@ -89,7 +89,7 @@ export function AccountVsGlobalExpenseChart({ initialData, competencyMonth }: Ac
       </div>
       <ChartContainer config={chartConfig} className="min-h-[260px] w-full" style={{ opacity: isPending ? 0.6 : 1 }}>
         <ComposedChart accessibilityLayer data={data} margin={{ top: 12, right: 16, left: 8, bottom: 0 }}>
-          <CartesianGrid vertical={false} strokeDasharray="3 3" />
+          <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
           <XAxis
             dataKey="accountName"
             tickLine={false}
@@ -114,7 +114,7 @@ export function AccountVsGlobalExpenseChart({ initialData, competencyMonth }: Ac
             }
           />
           <ChartLegend content={<ChartLegendContent />} />
-          <Bar dataKey="income" name="income" fill="var(--color-income)" radius={[4, 4, 0, 0]} maxBarSize={60} />
+          <Bar dataKey="income" name="income" fill="var(--color-income)" radius={[4, 4, 0, 0]} maxBarSize={60} stroke="transparent" />
           <Line 
             type="monotone" 
             dataKey="globalExpense" 

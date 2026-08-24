@@ -78,8 +78,9 @@ function CurrencyInput({
     e.preventDefault();
 
     if (e.key === "Backspace") {
-      const next = Math.floor(currentCents / 10);
-      updateValue(next);
+      const next = Math.trunc(currentCents / 10);
+      // Se apagar tudo, reseta para 0 positivo
+      updateValue(next === 0 ? 0 : next);
       return;
     }
 
@@ -88,11 +89,27 @@ function CurrencyInput({
       return;
     }
 
+    // Toggle sinal negativo/positivo
+    if (e.key === "-") {
+      if (Object.is(currentCents, 0)) {
+        updateValue(-0);
+      } else if (Object.is(currentCents, -0)) {
+        updateValue(0);
+      } else {
+        updateValue(currentCents * -1);
+      }
+      return;
+    }
+
     // Only accept digit keys
     if (/^[0-9]$/.test(e.key)) {
+      const isNegative = currentCents < 0 || Object.is(currentCents, -0);
+      const base = Math.abs(currentCents);
+      
       // Prevent absurdly large values (max ~999.999.999,99)
-      if (currentCents > 9_999_999_999) return;
-      const next = currentCents * 10 + Number(e.key);
+      if (base > 9_999_999_999) return;
+      
+      const next = (base * 10 + Number(e.key)) * (isNegative ? -1 : 1);
       updateValue(next);
     }
   };

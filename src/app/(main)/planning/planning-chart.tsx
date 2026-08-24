@@ -2,7 +2,7 @@
 
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CartesianGrid, Line, LineChart, XAxis, YAxis, ResponsiveContainer } from "recharts";
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from "recharts";
 import {
   ChartConfig,
   ChartContainer,
@@ -41,8 +41,14 @@ export function PlanningChart({ data }: PlanningChartProps) {
 
   return (
     <ChartContainer config={chartConfig} className="min-h-[250px] w-full mt-4">
-      <LineChart accessibilityLayer data={formattedData} margin={{ top: 10, left: -10, right: 10, bottom: 0 }}>
-        <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-muted" />
+      <AreaChart accessibilityLayer data={formattedData} margin={{ top: 10, left: -10, right: 10, bottom: 0 }}>
+        <defs>
+          <linearGradient id="colorBalancePlanning" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.5} />
+            <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
         <XAxis
           dataKey="formattedDate"
           tickLine={false}
@@ -67,15 +73,16 @@ export function PlanningChart({ data }: PlanningChartProps) {
           cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1, strokeDasharray: '4 4' }}
           content={<ChartTooltipContent indicator="line" />}
         />
-        <Line
+        <Area
           type="monotone"
           dataKey="projected_balance"
           stroke="var(--color-projected_balance)"
           strokeWidth={3}
+          fill="url(#colorBalancePlanning)"
           dot={false}
           activeDot={{ r: 6, fill: "var(--color-projected_balance)" }}
         />
-      </LineChart>
+      </AreaChart>
     </ChartContainer>
   );
 }

@@ -52,27 +52,26 @@ export async function BalanceAllocator({ projectedBalance, competencyMonth }: Ba
             Nenhuma regra configurada. O valor excedente permanecerá na conta.
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
             {rules.map((rule) => {
               const ruleAmount = distributableAmount * (rule.percentage / 100);
               return (
-                <Card key={rule.id} className="bg-card shadow-sm hover:shadow-md transition-shadow">
-                  <CardHeader className="p-4 pb-2">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base font-medium truncate pr-2 text-muted-foreground" title={rule.name}>
-                        {rule.name}
-                      </CardTitle>
-                      <Badge variant="secondary" className="shrink-0 font-medium">
-                        {rule.percentage}%
-                      </Badge>
+                <div key={rule.id} className="bg-card border border-white/5 rounded-2xl p-5 hover:border-primary/30 transition-colors">
+                  {/* Linha Superior do Card */}
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-sm sm:text-base truncate pr-2 text-foreground" title={rule.name}>
+                      {rule.name}
+                    </span>
+                    <div className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center border-2 border-primary/30 text-xs font-bold text-primary bg-primary/5">
+                      {rule.percentage}%
                     </div>
-                  </CardHeader>
-                  <CardContent className="p-4 pt-0">
-                    <div className="text-2xl font-bold text-foreground">
-                      {formatBRL(ruleAmount)}
-                    </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                  
+                  {/* Linha Inferior do Card */}
+                  <div className="text-xl sm:text-2xl font-bold mt-4 text-primary truncate" title={formatBRL(ruleAmount)}>
+                    {formatBRL(ruleAmount)}
+                  </div>
+                </div>
               );
             })}
           </div>

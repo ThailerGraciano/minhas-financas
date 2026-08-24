@@ -110,29 +110,9 @@ export async function adjustAccountBalance(
     let finalBalanceToSet = realBalance;
 
     if (!createTransaction) {
-      // User requested formula: "o real já deve considerar o que dei baixa neste mes, assim o ajuste do saldo inical deve ser na verdade 1000 - 150"
-      const currentMonth = format(new Date(), "yyyy-MM");
-      const accountTransactions = await db.query.transactions.findMany({
-        where: and(
-          eq(transactions.accountId, accountId),
-          eq(transactions.userId, userId),
-          eq(transactions.status, 'paid'),
-          eq(transactions.competencyMonth, currentMonth)
-        )
-      });
-      
-      let paidIncomes = 0;
-      let paidExpenses = 0;
-      
-      for (const tx of accountTransactions) {
-        if (tx.type === 'income') {
-          paidIncomes += Number(tx.amount);
-        } else if (tx.type === 'expense' || tx.type === 'credit_card_expense') {
-          paidExpenses += Number(tx.amount);
-        }
-      }
-      
-      finalBalanceToSet = realBalance - paidIncomes + paidExpenses;
+      // Quando não se cria transação, o usuário apenas quer forçar o currentBalance
+      // para o valor exato informado (realBalance).
+      finalBalanceToSet = realBalance;
     }
 
     // Force update the account balance directly to guarantee sync

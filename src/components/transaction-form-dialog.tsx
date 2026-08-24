@@ -450,8 +450,8 @@ export function TransactionFormDialog({
         {trigger ? (
           trigger
         ) : (
-          <Button className="cursor-pointer fixed bottom-20 md:bottom-8 right-4 md:right-8 rounded-full h-14 w-14 shadow-2xl p-0 bg-gradient-to-br from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 transition-all hover:scale-110 active:scale-95 z-[100] border-none flex items-center justify-center">
-            <Plus className="h-7 w-7 text-white pointer-events-none" />
+          <Button className="cursor-pointer fixed bottom-20 md:bottom-8 right-4 md:right-8 rounded-full h-14 w-14 shadow-2xl p-0 bg-primary text-primary-foreground hover:brightness-110 transition-all hover:scale-110 active:scale-95 z-[100] border-none flex items-center justify-center">
+            <Plus className="h-7 w-7 pointer-events-none" />
           </Button>
         )}
       </DialogTrigger>
@@ -766,7 +766,7 @@ export function TransactionFormDialog({
                   <Button type="button" variant="secondary" onClick={() => handleSubmit("save-and-continue")} isLoading={isPending} disabled={isPending} className="text-xs sm:text-sm px-2 sm:px-4">
                     <><Plus className="mr-1 sm:mr-2 h-4 w-4" /> Adicionar Outra</>
                   </Button>
-                  <Button type="button" onClick={() => handleSubmit("save-and-close")} isLoading={isPending} disabled={isPending} className="bg-gradient-to-r from-violet-600 to-indigo-600 border-none text-xs sm:text-sm px-2 sm:px-4">
+                  <Button type="button" onClick={() => handleSubmit("save-and-close")} isLoading={isPending} disabled={isPending} className="bg-primary text-primary-foreground hover:brightness-110 border-none text-xs sm:text-sm px-2 sm:px-4">
                     <><Check className="mr-1 sm:mr-2 h-4 w-4" /> Finalizar</>
                   </Button>
                 </div>

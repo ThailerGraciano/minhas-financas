@@ -528,6 +528,8 @@ async function changeTransactionStatus(id: number, newStatus: "paid" | "pending"
       return { success: true };
     }
 
+    const paidAt = newStatus === "paid" ? new Date() : null;
+
     if (transactionItem.type === "transfer") {
       const otherTx = transactionItem.parentTransactionId
         ? await tx.query.transactions.findFirst({
@@ -541,17 +543,17 @@ async function changeTransactionStatus(id: number, newStatus: "paid" | "pending"
       const destTx = transactionItem.parentTransactionId ? transactionItem : otherTx;
 
       if (originTx && destTx) {
-        await tx.update(transactions).set({ status: newStatus }).where(eq(transactions.id, originTx.id));
+        await tx.update(transactions).set({ status: newStatus, paidAt }).where(eq(transactions.id, originTx.id));
         await applyBalanceDelta(tx, originTx.accountId, originTx.amount, originTx.type, "paid", null, newStatus === "pending");
         
-        await tx.update(transactions).set({ status: newStatus }).where(eq(transactions.id, destTx.id));
+        await tx.update(transactions).set({ status: newStatus, paidAt }).where(eq(transactions.id, destTx.id));
         await applyBalanceDelta(tx, destTx.accountId, destTx.amount, destTx.type, "paid", originTx.id, newStatus === "pending");
       } else {
-        await tx.update(transactions).set({ status: newStatus }).where(eq(transactions.id, id));
+        await tx.update(transactions).set({ status: newStatus, paidAt }).where(eq(transactions.id, id));
         await applyBalanceDelta(tx, transactionItem.accountId, transactionItem.amount, transactionItem.type, "paid", transactionItem.parentTransactionId, newStatus === "pending");
       }
     } else {
-      await tx.update(transactions).set({ status: newStatus }).where(eq(transactions.id, id));
+      await tx.update(transactions).set({ status: newStatus, paidAt }).where(eq(transactions.id, id));
       await applyBalanceDelta(tx, transactionItem.accountId, transactionItem.amount, transactionItem.type, "paid", transactionItem.parentTransactionId, newStatus === "pending");
     }
 
@@ -576,8 +578,26 @@ export async function markTransactionAsPaid(id: string | number) {
 export async function toggleTransactionStatus(
   id: string | number,
   currentStatus: string,
+  isFixedVirtual: boolean = false,
+  virtualData?: {
+    type: string;
+    accountId: number | null;
+    creditCardId: number | null;
+    categoryId: number;
+    subcategoryId: number | null;
+    amount: string;
+    description: string;
+    date: string;
+    competencyMonth: string;
+    fixedTransactionId: string | null;
+  }
 ): Promise<{ success: boolean; newStatus?: string; error?: string }> {
   try {
+    if (isFixedVirtual && virtualData) {
+      await payVirtualTransaction(virtualData);
+      return { success: true, newStatus: "paid" };
+    }
+
     const newStatus = currentStatus === "paid" ? "pending" : "paid";
     const result = await changeTransactionStatus(Number(id), newStatus);
 

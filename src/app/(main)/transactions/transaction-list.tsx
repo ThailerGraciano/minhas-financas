@@ -1,7 +1,7 @@
 "use client";
 
 import { getAccounts } from "@/app/actions/accounts";
-import { payFullInvoice } from "@/app/actions/credit-cards";
+import { payFullInvoice, revertInvoicePayment } from "@/app/actions/credit-cards";
 import { deleteTransaction, payVirtualTransaction, toggleTransactionStatus } from "@/app/actions/transactions";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -13,8 +13,9 @@ import {
   Circle,
   CreditCard,
   Loader2,
+  MinusCircle,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,6 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import { Pencil, Trash } from "lucide-react";
 
 export type TransactionWithRelations = {
@@ -72,6 +74,38 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
   const [invoiceSelectedAccount, setInvoiceSelectedAccount] = useState<string>("");
   const [isPayingInvoice, setIsPayingInvoice] = useState(false);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  const handleToggleStatus = (tx: TransactionWithRelations) => {
+    // Ignore grouped credit card invoices
+    if (tx.isGroup && tx.creditCardId) {
+      handleMarkAsPaid(tx);
+      return;
+    }
+
+    setLoadingId(tx.id);
+    startTransition(async () => {
+      const isVirtual = tx.id < 0 && !tx.isGroup;
+
+      const virtualData = isVirtual
+        ? {
+            type: tx.type,
+            accountId: tx.accountId ?? null,
+            creditCardId: tx.creditCardId ?? null,
+            categoryId: tx.categoryId ?? 0,
+            subcategoryId: tx.subcategoryId ?? null,
+            amount: String(tx.amount),
+            description: tx.description,
+            date: tx.date,
+            competencyMonth: tx.competencyMonth ?? "",
+            fixedTransactionId: tx.fixedTransactionId ?? null,
+          }
+        : undefined;
+
+      await toggleTransactionStatus(tx.id, tx.status, isVirtual, virtualData);
+      setLoadingId(null);
+    });
+  };
 
   const handleDelete = async (mode: "single" | "future" = "single") => {
     if (!transactionToDelete) return;
@@ -81,12 +115,12 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
     const fixedId = transactionToDelete.fixedTransactionId ?? undefined;
 
     const result = await deleteTransaction(
-      transactionToDelete.id, 
-      mode, 
-      isVirtual, 
+      transactionToDelete.id,
+      mode,
+      isVirtual,
       fixedId,
       isVirtual ? transactionToDelete.date : undefined,
-      isVirtual ? transactionToDelete.competencyMonth : undefined
+      isVirtual ? transactionToDelete.competencyMonth : undefined,
     );
 
     if (result && !result.success && result.error) {
@@ -98,15 +132,22 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
   };
 
   const handleMarkAsPaid = async (tx: TransactionWithRelations) => {
-    // Grouped credit card invoices — open inline pay dialog
+    // Grouped credit card invoices
     if (tx.isGroup && tx.creditCardId) {
-      setInvoiceToPay(tx);
-      setInvoiceSelectedAccount("");
-      setIsLoadingAccounts(true);
-      getAccounts().then((accs) => {
-        setInvoiceAccounts(accs);
-        setIsLoadingAccounts(false);
-      });
+      if (tx.status === "paid") {
+        setLoadingId(tx.id);
+        await revertInvoicePayment(tx.creditCardId, tx.competencyMonth || "");
+        setLoadingId(null);
+      } else {
+        // Open inline pay dialog for pending/partial
+        setInvoiceToPay(tx);
+        setInvoiceSelectedAccount("");
+        setIsLoadingAccounts(true);
+        getAccounts().then((accs) => {
+          setInvoiceAccounts(accs);
+          setIsLoadingAccounts(false);
+        });
+      }
       return;
     }
 
@@ -139,26 +180,26 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
     switch (type) {
       case "income":
         return (
-          <div className="hidden md:flex items-center justify-center bg-green-500/10 p-1.5 md:p-2.5 rounded-full shrink-0">
-            <ArrowUpCircle className="w-4 h-4 md:w-5 md:h-5 text-green-500" />
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-green-500/10 shrink-0">
+            <ArrowUpCircle className="w-6 h-6 text-green-500" />
           </div>
         );
       case "transfer":
         return (
-          <div className="hidden md:flex items-center justify-center bg-blue-500/10 p-1.5 md:p-2.5 rounded-full shrink-0">
-            <ArrowRightLeft className="w-4 h-4 md:w-5 md:h-5 text-blue-500" />
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-blue-500/10 shrink-0">
+            <ArrowRightLeft className="w-6 h-6 text-blue-500" />
           </div>
         );
       case "credit_card_expense":
         return (
-          <div className="hidden md:flex items-center justify-center bg-orange-500/10 p-1.5 md:p-2.5 rounded-full shrink-0">
-            <CreditCard className="w-4 h-4 md:w-5 md:h-5 text-orange-500" />
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-orange-500/10 shrink-0">
+            <CreditCard className="w-6 h-6 text-orange-500" />
           </div>
         );
       default:
         return (
-          <div className="hidden md:flex items-center justify-center bg-red-500/10 p-1.5 md:p-2.5 rounded-full shrink-0">
-            <ArrowDownCircle className="w-4 h-4 md:w-5 md:h-5 text-red-500" />
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-destructive/10 shrink-0">
+            <ArrowDownCircle className="w-6 h-6 text-destructive" />
           </div>
         );
     }
@@ -183,7 +224,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
     let processedTxs = filteredTxs;
 
     if (groupCreditCards) {
-      const grouped = new Map<string, TransactionWithRelations>();
+      const grouped = new Map<string, TransactionWithRelations & { _pendingCount: number; _paidCount: number }>();
       const otherTxs: TransactionWithRelations[] = [];
 
       filteredTxs.forEach((tx) => {
@@ -213,15 +254,30 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
               competencyMonth: tx.competencyMonth,
               creditCard: tx.creditCard,
               category: { id: 0, name: "Fatura" },
+              _pendingCount: 0,
+              _paidCount: 0,
             });
           }
           const group = grouped.get(groupKey)!;
           group.amount = Number(group.amount) + Number(tx.amount);
-          if (tx.status === "pending") group.status = "pending";
+          if (tx.status === "pending") group._pendingCount++;
+          else if (tx.status === "paid") group._paidCount++;
         } else {
           otherTxs.push(tx);
         }
       });
+
+      // Post-process groups for partial status
+      for (const group of grouped.values()) {
+        if (group._pendingCount > 0 && group._paidCount > 0) {
+          group.status = "partial";
+        } else if (group._pendingCount > 0) {
+          group.status = "pending";
+        } else if (group._paidCount > 0) {
+          group.status = "paid";
+        }
+      }
+
       processedTxs = [...otherTxs, ...Array.from(grouped.values())];
     }
 
@@ -285,90 +341,113 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
           Nenhuma transação encontrada para este período.
         </div>
       ) : (
-        <div className="flex flex-col gap-2 -mx-2 sm:mx-0">
+        <div className="flex flex-col gap-2">
           {displayedTransactions.map((tx) => (
             <div
               key={tx.id}
-              className="flex items-center justify-between gap-1.5 sm:gap-2 md:gap-3 p-2.5 sm:p-3 md:p-4 rounded-xl border-b border-white/5 transition-colors hover:bg-white/5"
+              className="group flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
             >
-                <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1">
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleMarkAsPaid(tx)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleMarkAsPaid(tx);
-                      }
-                    }}
-                    aria-disabled={loadingId === tx.id}
-                    className={`shrink-0 focus:outline-none transition-transform hover:scale-110 cursor-pointer ${loadingId === tx.id ? 'opacity-50 pointer-events-none' : ''}`}
-                    title={tx.status === "paid" ? "Estornar pagamento" : "Marcar como Pago"}
-                  >
-                    {loadingId === tx.id ? (
-                      <div className="w-5 h-5 md:w-6 md:h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                    ) : tx.status === "paid" ? (
-                      <CheckCircle2 className="w-5 h-5 md:w-6 md:h-6 text-green-500" />
-                    ) : (
-                      <Circle className="w-5 h-5 md:w-6 md:h-6 text-muted-foreground" />
-                    )}
-                  </div>
-
-                  {getIcon(tx.type)}
-
-                  <div className="flex flex-col min-w-0">
-                    <span className="font-medium text-sm md:text-base truncate">{tx.description}</span>
-                    <span className="text-[11px] md:text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                      <span className="truncate max-w-[70px] md:max-w-none">{getSource(tx)}</span>
-                      <span className="mx-0.5 md:mx-1"></span>
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] md:text-xs font-medium bg-primary/10 text-primary truncate max-w-[90px] md:max-w-none">
-                        {tx.category?.name || "Geral"}
-                      </span>
-                      {tx.installmentTotal && tx.installmentTotal > 1 && (
-                        <span className="ml-1 text-primary">
-                          ({tx.installmentCurrent}/{tx.installmentTotal})
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 md:gap-4 shrink-0">
-                  <div className="flex flex-col items-end text-right">
-                    <span
-                      className={`font-bold text-sm md:text-base ${tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)")) ? "text-green-600" : "text-foreground"}`}
-                    >
-                      {tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)"))
-                        ? "+"
-                        : "-"}
-                      {formatCurrency(tx.amount)}
-                    </span>
-                    <span className="text-[11px] md:text-xs text-muted-foreground">
-                      {format(parseISO(tx.date), "dd 'de' MMM", { locale: ptBR })}
-                    </span>
-                  </div>
-
-                  {!tx.isGroup && (
-                    <div className="flex items-center gap-0.5 md:gap-1">
-                      <button
-                        onClick={() => setTransactionToEdit(tx)}
-                        className="p-2 text-muted-foreground hover:bg-muted hover:text-foreground rounded-full transition-colors focus:outline-none"
-                        title="Editar"
-                      >
-                        <Pencil className="w-4 h-4 md:w-[18px] md:h-[18px]" />
-                      </button>
-                      <button
-                        onClick={() => setTransactionToDelete(tx)}
-                        className="p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-full transition-colors focus:outline-none"
-                        title="Excluir"
-                      >
-                        <Trash className="w-4 h-4 md:w-[18px] md:h-[18px]" />
-                      </button>
-                    </div>
+              {/* Lado Esquerdo (Check, Ícone e Textos) */}
+              <div className="flex items-center gap-3 min-w-0 flex-[2] sm:flex-1">
+                <button
+                  type="button"
+                  onClick={() => handleToggleStatus(tx)}
+                  disabled={isPending && loadingId === tx.id}
+                  className="shrink-0 transition-colors"
+                >
+                  {isPending && loadingId === tx.id ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  ) : tx.status === "paid" ? (
+                    <CheckCircle2 className="w-5 h-5 text-success" />
+                  ) : tx.status === "partial" ? (
+                    <MinusCircle className="w-5 h-5 text-amber-500" />
+                  ) : (
+                    <Circle className="w-5 h-5 text-muted-foreground hover:text-foreground" />
                   )}
+                </button>
+                {getIcon(tx.type)}
+                <div className="flex flex-col min-w-0">
+                  <span className="font-medium text-base truncate">{tx.description}</span>
+                  <span className="text-xs text-muted-foreground truncate">
+                    {getSource(tx)} • {tx.category?.name || "Geral"}
+                  </span>
                 </div>
               </div>
+
+              {/* Centro (Data/Status) */}
+              <div className="hidden sm:flex flex-col items-center justify-center flex-1">
+                <span className="text-sm text-muted-foreground">
+                  {format(parseISO(tx.date), "dd 'de' MMM", { locale: ptBR })}
+                </span>
+                <button
+                  onClick={() => handleMarkAsPaid(tx)}
+                  disabled={loadingId === tx.id}
+                  className={`mt-1 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full transition-colors ${
+                    tx.status === "pending" || tx.status === "partial"
+                      ? "bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
+                      : "bg-green-500/10 text-green-500 hover:bg-green-500/20 group-hover:opacity-100"
+                  }`}
+                  title={tx.status === "paid" ? "Desfazer pagamento" : "Marcar como pago"}
+                >
+                  {loadingId === tx.id
+                    ? "..."
+                    : tx.status === "pending"
+                      ? "Pendente"
+                      : tx.status === "partial"
+                        ? "Parcial"
+                        : "Pago"}
+                </button>
+              </div>
+
+              {/* Lado Direito (Valores e Ações) */}
+              <div className="flex items-center gap-3 shrink-0 flex-1 justify-end">
+                <div className="flex flex-col items-end">
+                  <span
+                    className={`font-semibold ${
+                      tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)"))
+                        ? "text-green-500"
+                        : "text-destructive"
+                    }`}
+                  >
+                    {tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)"))
+                      ? "+"
+                      : "-"}
+                    {formatCurrency(tx.amount)}
+                  </span>
+
+                  {/* Somente visível no mobile onde o centro não aparece */}
+                  <span className="sm:hidden flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
+                    {format(parseISO(tx.date), "dd/MM")}
+                    {(tx.status === "pending" || tx.status === "partial") && (
+                      <button onClick={() => handleMarkAsPaid(tx)} className="text-amber-500 font-bold ml-1 uppercase">
+                        {tx.status === "partial" ? "Parcial" : "Pending"}
+                      </button>
+                    )}
+                  </span>
+                </div>
+
+                {!tx.isGroup && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setTransactionToEdit(tx)}
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setTransactionToDelete(tx)}
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                    >
+                      <Trash className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -511,7 +590,6 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
               }}
               disabled={!invoiceSelectedAccount || isPayingInvoice || isLoadingAccounts}
             >
-              
               Confirmar Pagamento
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -1,9 +1,9 @@
 'use client';
 
 import {
+  Area,
+  AreaChart,
   CartesianGrid,
-  Line,
-  LineChart,
   ReferenceLine,
   XAxis,
   YAxis,
@@ -23,8 +23,8 @@ interface BalanceEvolutionChartProps {
 // Cores hardcoded para garantir visibilidade independente do tema monocromático.
 // O tema deste projeto usa --chart-* em escala de cinza (chroma=0), então
 // usamos oklch com chroma real para as duas linhas se distinguirem.
-const COLOR_PAST   = 'hsl(var(--primary))';
-const COLOR_FUTURE = 'hsl(var(--primary) / 0.4)';
+const COLOR_PAST   = 'var(--primary)';
+const COLOR_FUTURE = 'var(--primary)';
 
 const chartConfig = {
   balancePast: {
@@ -71,11 +71,18 @@ export function BalanceEvolutionChart({ data }: BalanceEvolutionChartProps) {
 
   return (
     <ChartContainer config={chartConfig} className="min-h-[260px] w-full">
-      <LineChart
+      <AreaChart
         accessibilityLayer
         data={data}
         margin={{ top: 12, right: 16, left: 8, bottom: 0 }}
       >
+        <defs>
+          <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.5} />
+            <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+
         <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
 
         <XAxis
@@ -119,30 +126,33 @@ export function BalanceEvolutionChart({ data }: BalanceEvolutionChartProps) {
         />
 
         {/* Linha SÓLIDA — saldo histórico real (passado + mês atual) */}
-        <Line
+        <Area
           type="monotone"
           dataKey="balancePast"
           name="balancePast"
           stroke={COLOR_PAST}
           strokeWidth={4}
+          fill="url(#colorBalance)"
           dot={false}
           activeDot={{ r: 6, fill: COLOR_PAST, stroke: 'var(--background)', strokeWidth: 2 }}
           connectNulls
         />
 
         {/* Linha TRACEJADA — projeção futura (mês atual + futuros) */}
-        <Line
+        <Area
           type="monotone"
           dataKey="balanceFuture"
           name="balanceFuture"
           stroke={COLOR_PAST}
           strokeWidth={4}
+          strokeOpacity={0.4}
           strokeDasharray="6 6"
+          fill="url(#colorBalance)"
           dot={false}
           activeDot={{ r: 6, fill: COLOR_FUTURE, stroke: 'var(--background)', strokeWidth: 2 }}
           connectNulls
         />
-      </LineChart>
+      </AreaChart>
     </ChartContainer>
   );
 }

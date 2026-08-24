@@ -210,6 +210,7 @@ export async function payFullInvoice(
         userId,
         type: 'transfer',
         accountId: parsedAccountId,
+        creditCardId: parsedCardId,
         categoryId: category.id,
         subcategoryId: subcategoryId,
         amount: pendingAmount.toString(),
@@ -323,6 +324,7 @@ export async function prepayInvoice(
         userId,
         type: 'transfer',
         accountId: parsedAccountId,
+        creditCardId: parsedCardId,
         categoryId: category.id,
         subcategoryId: subcategoryId,
         amount: amount.toString(),
@@ -626,4 +628,93 @@ export async function getCreditCardsCategorySummary(competencyMonth: string) {
   result.sort((a, b) => b.value - a.value);
 
   return result;
+}
+
+export async function revertInvoicePayment(
+  creditCardId: string | number,
+  competencyMonth: string
+): Promise<{ success: boolean; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+  const parsedCardId = Number(creditCardId);
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      // 1. Mark expenses as pending
+      await tx.update(transactions)
+        .set({ status: 'pending' })
+        .where(
+          and(
+            eq(transactions.creditCardId, parsedCardId),
+            or(
+              eq(transactions.invoiceMonth, competencyMonth),
+              and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth))
+            ),
+            eq(transactions.type, 'credit_card_expense'),
+            eq(transactions.status, 'paid'),
+            eq(transactions.userId, userId)
+          )
+        );
+
+      // 2. Find transfer transactions related to this invoice payment
+      const paymentTransfers = await tx.select().from(transactions).where(
+        and(
+          eq(transactions.userId, userId),
+          eq(transactions.type, 'transfer'),
+          eq(transactions.competencyMonth, competencyMonth),
+          or(
+            eq(transactions.creditCardId, parsedCardId),
+            and(
+              isNull(transactions.creditCardId),
+              or(
+                sql`${transactions.description} LIKE 'Pagamento de Fatura - %'`,
+                sql`${transactions.description} LIKE 'Adiantamento de Fatura - %'`
+              )
+            )
+          )
+        )
+      );
+
+      // 3. Delete transfers and refund accounts
+      for (const t of paymentTransfers) {
+        if (t.accountId) {
+          const [account] = await tx.select().from(accounts).where(and(eq(accounts.id, t.accountId), eq(accounts.userId, userId)));
+          if (account) {
+            const newBalance = Number(account.currentBalance) + Number(t.amount);
+            await tx.update(accounts)
+              .set({ currentBalance: newBalance.toString() })
+              .where(and(eq(accounts.id, t.accountId), eq(accounts.userId, userId)));
+          }
+        }
+        await tx.delete(transactions).where(eq(transactions.id, t.id));
+      }
+
+      // 4. Delete negative credit card expenses that were created for prepayment
+      const prepaymentExpenses = await tx.select().from(transactions).where(
+        and(
+          eq(transactions.userId, userId),
+          eq(transactions.type, 'credit_card_expense'),
+          eq(transactions.creditCardId, parsedCardId),
+          eq(transactions.competencyMonth, competencyMonth),
+          sql`${transactions.amount} < 0`,
+          sql`${transactions.description} = 'Adiantamento de Fatura'`
+        )
+      );
+      for (const t of prepaymentExpenses) {
+        await tx.delete(transactions).where(eq(transactions.id, t.id));
+      }
+      
+      return { success: true };
+    });
+
+    revalidatePath('/credit-cards');
+    revalidatePath(`/credit-cards/${parsedCardId}`);
+    revalidatePath('/dashboard');
+    revalidatePath('/transactions');
+    return result;
+  } catch (error) {
+    console.error('Error reverting invoice payment:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Falha ao estornar fatura' };
+  }
 }

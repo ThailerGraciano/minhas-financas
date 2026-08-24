@@ -13,11 +13,11 @@ import {
 
 const COLORS = [
   "hsl(var(--primary))",
-  "hsl(var(--primary) / 0.8)",
-  "hsl(var(--primary) / 0.6)",
-  "hsl(var(--primary) / 0.4)",
-  "hsl(var(--primary) / 0.2)",
-  "hsl(var(--primary) / 0.1)",
+  "hsl(25, 95%, 53%)",    // Laranja mais claro/diferente
+  "hsl(15, 80%, 45%)",    // Cobre escuro
+  "hsl(35, 90%, 50%)",    // Ouro/Amarelo alaranjado
+  "hsl(5, 75%, 55%)",     // Laranja avermelhado
+  "hsl(45, 95%, 45%)",    // Ouro escuro
 ];
 
 type TooltipPayload = {
@@ -144,15 +144,15 @@ export function InstallmentsStackedChart({
         />
         <ChartLegend content={<ChartLegendContent />} />
         {keys.map((key, index) => {
-          const color = chartConfig[key]?.color || `hsl(${index * 40}, 70%, 50%)`;
+          const color = chartConfig[key]?.color || COLORS[index % COLORS.length];
           return (
             <Area
               key={key}
               type="monotone"
               dataKey={key}
-              stackId="a"
+              stackId="1"
               stroke={color}
-              fill={`url(#fill-${index})`}
+              fill={color}
               opacity={hoveredKey ? (hoveredKey === key ? 1 : 0.2) : 1}
               onMouseEnter={() => setHoveredKey(key)}
               onMouseLeave={() => setHoveredKey(null)}

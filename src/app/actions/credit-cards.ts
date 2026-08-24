@@ -1,13 +1,12 @@
-'use server';
+"use server";
 
-import { db } from '@/db';
-import { creditCards, transactions, accounts, categories, subcategories } from '@/db/schema';
-import { eq, and, ne, or, isNull } from 'drizzle-orm';
-import { revalidatePath } from 'next/cache';
-import { format } from 'date-fns';
-import { auth } from '@/auth';
-import { getTargetInvoiceMonth, buildCreditCardCompetencyCondition } from '@/lib/competency-utils';
-import { settings } from '@/db/schema';
+import { auth } from "@/auth";
+import { db } from "@/db";
+import { accounts, categories, creditCards, settings, subcategories, transactions } from "@/db/schema";
+import { buildCreditCardCompetencyCondition } from "@/lib/competency-utils";
+import { format } from "date-fns";
+import { and, eq, isNull, ne, or, sql } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 
 export async function getCreditCards() {
   const session = await auth();
@@ -15,23 +14,26 @@ export async function getCreditCards() {
   return await db.select().from(creditCards).where(eq(creditCards.userId, session.user.id));
 }
 
-export async function createCreditCard(data: Omit<typeof creditCards.$inferInsert, 'userId'>) {
+export async function createCreditCard(data: Omit<typeof creditCards.$inferInsert, "userId">) {
   try {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
     await db.insert(creditCards).values({ ...data, userId: session.user.id });
-    revalidatePath('/credit-cards');
+    revalidatePath("/credit-cards");
     return { success: true };
   } catch (error) {
-    console.error('Error creating credit card:', error);
-    return { success: false, error: 'Failed to create credit card' };
+    console.error("Error creating credit card:", error);
+    return { success: false, error: "Failed to create credit card" };
   }
 }
 
 export async function getCreditCard(id: number) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
-  const [card] = await db.select().from(creditCards).where(and(eq(creditCards.id, id), eq(creditCards.userId, session.user.id)));
+  const [card] = await db
+    .select()
+    .from(creditCards)
+    .where(and(eq(creditCards.id, id), eq(creditCards.userId, session.user.id)));
   return card;
 }
 
@@ -39,13 +41,16 @@ export async function updateCreditCard(id: number, data: Partial<typeof creditCa
   try {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
-    await db.update(creditCards).set(data).where(and(eq(creditCards.id, id), eq(creditCards.userId, session.user.id)));
-    revalidatePath('/credit-cards');
+    await db
+      .update(creditCards)
+      .set(data)
+      .where(and(eq(creditCards.id, id), eq(creditCards.userId, session.user.id)));
+    revalidatePath("/credit-cards");
     revalidatePath(`/credit-cards/${id}`);
     return { success: true };
   } catch (error) {
-    console.error('Error updating credit card:', error);
-    return { success: false, error: 'Failed to update credit card' };
+    console.error("Error updating credit card:", error);
+    return { success: false, error: "Failed to update credit card" };
   }
 }
 
@@ -55,22 +60,23 @@ export async function deleteCreditCard(id: number) {
     if (!session?.user?.id) throw new Error("Unauthorized");
     const userId = session.user.id;
 
-    const linkedTxs = await db.select({ id: transactions.id })
+    const linkedTxs = await db
+      .select({ id: transactions.id })
       .from(transactions)
       .where(and(eq(transactions.creditCardId, id), eq(transactions.userId, userId)))
       .limit(1);
 
     if (linkedTxs.length > 0) {
-      return { success: false, error: 'Não é possível excluir: existem transações vinculadas a este cartão.' };
+      return { success: false, error: "Não é possível excluir: existem transações vinculadas a este cartão." };
     }
 
     await db.delete(creditCards).where(and(eq(creditCards.id, id), eq(creditCards.userId, userId)));
-    revalidatePath('/credit-cards');
-    revalidatePath('/dashboard');
+    revalidatePath("/credit-cards");
+    revalidatePath("/dashboard");
     return { success: true };
   } catch (error) {
-    console.error('Error deleting credit card:', error);
-    return { success: false, error: 'Falha ao excluir cartão de crédito' };
+    console.error("Error deleting credit card:", error);
+    return { success: false, error: "Falha ao excluir cartão de crédito" };
   }
 }
 
@@ -80,16 +86,14 @@ export async function getInvoiceSummary(creditCardId: string | number, competenc
   const userId = session.user.id;
   const parsedId = Number(creditCardId);
   const cardTransactions = await db.query.transactions.findMany({
-    where: (t, { eq, ne, and, or, isNull }) => and(
-      eq(t.creditCardId, parsedId),
-      or(
-        eq(t.invoiceMonth, competencyMonth),
-        and(isNull(t.invoiceMonth), eq(t.competencyMonth, competencyMonth))
+    where: (t, { eq, ne, and, or, isNull }) =>
+      and(
+        eq(t.creditCardId, parsedId),
+        or(eq(t.invoiceMonth, competencyMonth), and(isNull(t.invoiceMonth), eq(t.competencyMonth, competencyMonth))),
+        eq(t.type, "credit_card_expense"),
+        ne(t.status, "ignored"),
+        eq(t.userId, userId),
       ),
-      eq(t.type, 'credit_card_expense'),
-      ne(t.status, 'ignored'),
-      eq(t.userId, userId)
-    ),
     with: {
       category: true,
       subcategory: true,
@@ -105,7 +109,7 @@ export async function getInvoiceSummary(creditCardId: string | number, competenc
     if (amount > 0) {
       total_amount += amount;
     }
-    if (t.status === 'pending') {
+    if (t.status === "pending") {
       pending_amount += amount;
     }
   }
@@ -122,7 +126,7 @@ export async function getInvoiceSummary(creditCardId: string | number, competenc
 export async function payFullInvoice(
   creditCardId: string | number,
   competencyMonth: string,
-  accountId: string | number
+  accountId: string | number,
 ): Promise<{ success: boolean; error?: string }> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
@@ -133,73 +137,80 @@ export async function payFullInvoice(
   try {
     const result = await db.transaction(async (tx) => {
       // 1. Get pending amount
-      const cardTransactions = await tx.select()
+      const cardTransactions = await tx
+        .select()
         .from(transactions)
         .where(
           and(
             eq(transactions.creditCardId, parsedCardId),
             or(
               eq(transactions.invoiceMonth, competencyMonth),
-              and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth))
+              and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth)),
             ),
-            eq(transactions.type, 'credit_card_expense'),
-            eq(transactions.userId, userId)
-          )
+            eq(transactions.type, "credit_card_expense"),
+            eq(transactions.userId, userId),
+          ),
         );
 
       let pendingAmount = 0;
       for (const t of cardTransactions) {
-        if (t.status === 'pending') {
+        if (t.status === "pending") {
           pendingAmount += Number(t.amount);
         }
       }
 
       if (pendingAmount <= 0) {
-        throw new Error('Não há valor pendente para pagar nesta fatura');
+        throw new Error("Não há valor pendente para pagar nesta fatura");
       }
 
       // 2. Update transactions to 'paid'
-      await tx.update(transactions)
-        .set({ status: 'paid' })
+      await tx
+        .update(transactions)
+        .set({ status: "paid" })
         .where(
           and(
             eq(transactions.creditCardId, parsedCardId),
             or(
               eq(transactions.invoiceMonth, competencyMonth),
-              and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth))
+              and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth)),
             ),
-            eq(transactions.type, 'credit_card_expense'),
-            eq(transactions.status, 'pending'),
-            eq(transactions.userId, userId)
-          )
+            eq(transactions.type, "credit_card_expense"),
+            eq(transactions.status, "pending"),
+            eq(transactions.userId, userId),
+          ),
         );
 
       // 3. Find or create Category for "Pagamento de Fatura"
       let category = await tx.query.categories.findFirst({
-        where: (categories, { eq, and }) => and(eq(categories.name, 'Pagamento de Fatura'), eq(categories.userId, userId))
+        where: (categories, { eq, and }) =>
+          and(eq(categories.name, "Pagamento de Fatura"), eq(categories.userId, userId)),
       });
       let subcategoryId = null;
 
       if (!category) {
-        const [newCategory] = await tx.insert(categories)
-          .values({ userId, name: 'Pagamento de Fatura', type: 'expense', icon: 'CreditCard' })
+        const [newCategory] = await tx
+          .insert(categories)
+          .values({ userId, name: "Pagamento de Fatura", type: "expense", icon: "CreditCard" })
           .returning();
-        
-        const [newSubcategory] = await tx.insert(subcategories)
-          .values({ userId, name: 'Geral', categoryId: newCategory.id })
+
+        const [newSubcategory] = await tx
+          .insert(subcategories)
+          .values({ userId, name: "Geral", categoryId: newCategory.id })
           .returning();
-          
+
         category = newCategory;
         subcategoryId = newSubcategory.id;
       } else {
         const subcategory = await tx.query.subcategories.findFirst({
-          where: (subcategories, { eq, and }) => and(eq(subcategories.categoryId, category!.id), eq(subcategories.userId, userId))
+          where: (subcategories, { eq, and }) =>
+            and(eq(subcategories.categoryId, category!.id), eq(subcategories.userId, userId)),
         });
         subcategoryId = subcategory?.id || null;
-        
+
         if (!subcategoryId) {
-          const [newSubcategory] = await tx.insert(subcategories)
-            .values({ userId, name: 'Geral', categoryId: category.id })
+          const [newSubcategory] = await tx
+            .insert(subcategories)
+            .values({ userId, name: "Geral", categoryId: category.id })
             .returning();
           subcategoryId = newSubcategory.id;
         }
@@ -208,23 +219,27 @@ export async function payFullInvoice(
       // 4. Create the transfer transaction for the payment (avoids double counting in expenses)
       await tx.insert(transactions).values({
         userId,
-        type: 'transfer',
+        type: "transfer",
         accountId: parsedAccountId,
         creditCardId: parsedCardId,
         categoryId: category.id,
         subcategoryId: subcategoryId,
         amount: pendingAmount.toString(),
         description: `Pagamento de Fatura - ${competencyMonth}`,
-        date: format(new Date(), 'yyyy-MM-dd'),
+        date: format(new Date(), "yyyy-MM-dd"),
         competencyMonth: competencyMonth,
-        status: 'paid',
+        status: "paid",
       });
 
       // 5. Deduct from account balance
-      const [account] = await tx.select().from(accounts).where(and(eq(accounts.id, parsedAccountId), eq(accounts.userId, userId)));
+      const [account] = await tx
+        .select()
+        .from(accounts)
+        .where(and(eq(accounts.id, parsedAccountId), eq(accounts.userId, userId)));
       if (account) {
         const newBalance = Number(account.currentBalance) - pendingAmount;
-        await tx.update(accounts)
+        await tx
+          .update(accounts)
           .set({ currentBalance: newBalance.toString() })
           .where(and(eq(accounts.id, parsedAccountId), eq(accounts.userId, userId)));
       }
@@ -232,14 +247,14 @@ export async function payFullInvoice(
       return { success: true };
     });
 
-    revalidatePath('/credit-cards');
+    revalidatePath("/credit-cards");
     revalidatePath(`/credit-cards/${parsedCardId}`);
-    revalidatePath('/dashboard');
-    revalidatePath('/transactions');
+    revalidatePath("/dashboard");
+    revalidatePath("/transactions");
     return result;
   } catch (error) {
-    console.error('Error paying full invoice:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Falha ao pagar fatura' };
+    console.error("Error paying full invoice:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Falha ao pagar fatura" };
   }
 }
 
@@ -248,7 +263,7 @@ export async function prepayInvoice(
   competencyMonth: string,
   accountId: string | number,
   amount: number,
-  date: string
+  date: string,
 ): Promise<{ success: boolean; error?: string }> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
@@ -259,61 +274,67 @@ export async function prepayInvoice(
   try {
     const result = await db.transaction(async (tx) => {
       // 1. Get pending amount to ensure they don't prepay more than owed
-      const cardTransactions = await tx.select()
+      const cardTransactions = await tx
+        .select()
         .from(transactions)
         .where(
           and(
             eq(transactions.creditCardId, parsedCardId),
             or(
               eq(transactions.invoiceMonth, competencyMonth),
-              and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth))
+              and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth)),
             ),
-            eq(transactions.type, 'credit_card_expense'),
-            eq(transactions.userId, userId)
-          )
+            eq(transactions.type, "credit_card_expense"),
+            eq(transactions.userId, userId),
+          ),
         );
 
       let pendingAmount = 0;
       for (const t of cardTransactions) {
-        if (t.status === 'pending') {
+        if (t.status === "pending") {
           pendingAmount += Number(t.amount);
         }
       }
 
       if (pendingAmount <= 0) {
-        throw new Error('Não há valor pendente para adiantar nesta fatura');
+        throw new Error("Não há valor pendente para adiantar nesta fatura");
       }
 
       if (amount > pendingAmount) {
-        throw new Error('O valor do adiantamento não pode ser maior que o saldo devedor pendente da fatura');
+        throw new Error("O valor do adiantamento não pode ser maior que o saldo devedor pendente da fatura");
       }
 
       // 2. Find or create Category for "Pagamento de Fatura"
       let category = await tx.query.categories.findFirst({
-        where: (categories, { eq, and }) => and(eq(categories.name, 'Pagamento de Fatura'), eq(categories.userId, userId))
+        where: (categories, { eq, and }) =>
+          and(eq(categories.name, "Pagamento de Fatura"), eq(categories.userId, userId)),
       });
       let subcategoryId = null;
 
       if (!category) {
-        const [newCategory] = await tx.insert(categories)
-          .values({ userId, name: 'Pagamento de Fatura', type: 'expense', icon: 'CreditCard' })
+        const [newCategory] = await tx
+          .insert(categories)
+          .values({ userId, name: "Pagamento de Fatura", type: "expense", icon: "CreditCard" })
           .returning();
-        
-        const [newSubcategory] = await tx.insert(subcategories)
-          .values({ userId, name: 'Geral', categoryId: newCategory.id })
+
+        const [newSubcategory] = await tx
+          .insert(subcategories)
+          .values({ userId, name: "Geral", categoryId: newCategory.id })
           .returning();
-          
+
         category = newCategory;
         subcategoryId = newSubcategory.id;
       } else {
         const subcategory = await tx.query.subcategories.findFirst({
-          where: (subcategories, { eq, and }) => and(eq(subcategories.categoryId, category!.id), eq(subcategories.userId, userId))
+          where: (subcategories, { eq, and }) =>
+            and(eq(subcategories.categoryId, category!.id), eq(subcategories.userId, userId)),
         });
         subcategoryId = subcategory?.id || null;
-        
+
         if (!subcategoryId) {
-          const [newSubcategory] = await tx.insert(subcategories)
-            .values({ userId, name: 'Geral', categoryId: category.id })
+          const [newSubcategory] = await tx
+            .insert(subcategories)
+            .values({ userId, name: "Geral", categoryId: category.id })
             .returning();
           subcategoryId = newSubcategory.id;
         }
@@ -322,7 +343,7 @@ export async function prepayInvoice(
       // 3. Create the transfer transaction (money leaving the checking account)
       await tx.insert(transactions).values({
         userId,
-        type: 'transfer',
+        type: "transfer",
         accountId: parsedAccountId,
         creditCardId: parsedCardId,
         categoryId: category.id,
@@ -331,13 +352,13 @@ export async function prepayInvoice(
         description: `Adiantamento de Fatura - ${competencyMonth}`,
         date: date,
         competencyMonth: competencyMonth,
-        status: 'paid',
+        status: "paid",
       });
 
       // 4. Create the negative expense on the credit card (reducing pending amount)
       await tx.insert(transactions).values({
         userId,
-        type: 'credit_card_expense',
+        type: "credit_card_expense",
         creditCardId: parsedCardId,
         categoryId: category.id,
         subcategoryId: subcategoryId,
@@ -346,14 +367,18 @@ export async function prepayInvoice(
         date: date,
         competencyMonth: competencyMonth,
         invoiceMonth: competencyMonth,
-        status: 'pending', // Keeps it pending so it reduces the pending sum, and gets marked as paid later
+        status: "pending", // Keeps it pending so it reduces the pending sum, and gets marked as paid later
       });
 
       // 5. Deduct from checking account balance
-      const [account] = await tx.select().from(accounts).where(and(eq(accounts.id, parsedAccountId), eq(accounts.userId, userId)));
+      const [account] = await tx
+        .select()
+        .from(accounts)
+        .where(and(eq(accounts.id, parsedAccountId), eq(accounts.userId, userId)));
       if (account) {
         const newBalance = Number(account.currentBalance) - amount;
-        await tx.update(accounts)
+        await tx
+          .update(accounts)
           .set({ currentBalance: newBalance.toString() })
           .where(and(eq(accounts.id, parsedAccountId), eq(accounts.userId, userId)));
       }
@@ -361,15 +386,15 @@ export async function prepayInvoice(
       return { success: true };
     });
 
-    revalidatePath('/credit-cards');
+    revalidatePath("/credit-cards");
     revalidatePath(`/credit-cards/${parsedCardId}`);
-    revalidatePath('/dashboard');
-    revalidatePath('/transactions');
-    revalidatePath('/planning');
+    revalidatePath("/dashboard");
+    revalidatePath("/transactions");
+    revalidatePath("/planning");
     return result;
   } catch (error) {
-    console.error('Error prepaying invoice:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Falha ao adiantar fatura' };
+    console.error("Error prepaying invoice:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Falha ao adiantar fatura" };
   }
 }
 
@@ -386,19 +411,20 @@ export async function getCreditCardsWithSummary(competencyMonth: string) {
   const cardsWithSummary = await Promise.all(
     cards.map(async (card) => {
       // Busca transações do cartão na competência informada (Invoice Month)
-      const cardTxs = await db.select()
+      const cardTxs = await db
+        .select()
         .from(transactions)
         .where(
           and(
             eq(transactions.creditCardId, card.id),
             or(
               eq(transactions.invoiceMonth, competencyMonth),
-              and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth))
+              and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth)),
             ),
-            eq(transactions.type, 'credit_card_expense'),
-            ne(transactions.status, 'ignored'),
-            eq(transactions.userId, userId)
-          )
+            eq(transactions.type, "credit_card_expense"),
+            ne(transactions.status, "ignored"),
+            eq(transactions.userId, userId),
+          ),
         );
 
       let invoice_total = 0;
@@ -409,7 +435,7 @@ export async function getCreditCardsWithSummary(competencyMonth: string) {
         if (amount > 0) {
           invoice_total += amount;
         }
-        if (t.status === 'pending') {
+        if (t.status === "pending") {
           invoice_pending += amount;
         }
       }
@@ -423,7 +449,7 @@ export async function getCreditCardsWithSummary(competencyMonth: string) {
         invoice_pending,
         targetInvoiceMonth: competencyMonth,
       };
-    })
+    }),
   );
 
   return cardsWithSummary;
@@ -432,8 +458,13 @@ export async function getCreditCardsWithSummary(competencyMonth: string) {
 export async function adjustInvoice(
   creditCardId: string | number,
   competencyMonth: string,
-  realAmount: number
-): Promise<{ success: boolean; error?: string; adjustmentType?: 'increase' | 'decrease' | 'none'; difference?: number }> {
+  realAmount: number,
+): Promise<{
+  success: boolean;
+  error?: string;
+  adjustmentType?: "increase" | "decrease" | "none";
+  difference?: number;
+}> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
@@ -442,19 +473,20 @@ export async function adjustInvoice(
   try {
     const result = await db.transaction(async (tx) => {
       // 1. Calculate current invoice total (same logic as getInvoiceSummary)
-      const cardTransactions = await tx.select()
+      const cardTransactions = await tx
+        .select()
         .from(transactions)
         .where(
           and(
             eq(transactions.creditCardId, parsedCardId),
             or(
               eq(transactions.invoiceMonth, competencyMonth),
-              and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth))
+              and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth)),
             ),
-            eq(transactions.type, 'credit_card_expense'),
-            ne(transactions.status, 'ignored'),
-            eq(transactions.userId, userId)
-          )
+            eq(transactions.type, "credit_card_expense"),
+            ne(transactions.status, "ignored"),
+            eq(transactions.userId, userId),
+          ),
         );
 
       let currentTotal = 0;
@@ -468,37 +500,42 @@ export async function adjustInvoice(
       const diff = realAmount - currentTotal;
 
       if (Math.abs(diff) < 0.01) {
-        return { success: true, adjustmentType: 'none' as const, difference: 0 };
+        return { success: true, adjustmentType: "none" as const, difference: 0 };
       }
 
       // 2. Find or create appropriate category
       if (diff > 0) {
         // Real > Calculated: missing expense, create adjustment
         let category = await tx.query.categories.findFirst({
-          where: (categories, { eq, and }) => and(eq(categories.name, 'Ajuste de Fatura'), eq(categories.userId, userId))
+          where: (categories, { eq, and }) =>
+            and(eq(categories.name, "Ajuste de Fatura"), eq(categories.userId, userId)),
         });
         let subcategoryId = null;
 
         if (!category) {
-          const [newCategory] = await tx.insert(categories)
-            .values({ userId, name: 'Ajuste de Fatura', type: 'expense', icon: 'Settings' })
+          const [newCategory] = await tx
+            .insert(categories)
+            .values({ userId, name: "Ajuste de Fatura", type: "expense", icon: "Settings" })
             .returning();
 
-          const [newSubcategory] = await tx.insert(subcategories)
-            .values({ userId, name: 'Geral', categoryId: newCategory.id })
+          const [newSubcategory] = await tx
+            .insert(subcategories)
+            .values({ userId, name: "Geral", categoryId: newCategory.id })
             .returning();
 
           category = newCategory;
           subcategoryId = newSubcategory.id;
         } else {
           const subcategory = await tx.query.subcategories.findFirst({
-            where: (subcategories, { eq, and }) => and(eq(subcategories.categoryId, category!.id), eq(subcategories.userId, userId))
+            where: (subcategories, { eq, and }) =>
+              and(eq(subcategories.categoryId, category!.id), eq(subcategories.userId, userId)),
           });
           subcategoryId = subcategory?.id || null;
 
           if (!subcategoryId) {
-            const [newSubcategory] = await tx.insert(subcategories)
-              .values({ userId, name: 'Geral', categoryId: category.id })
+            const [newSubcategory] = await tx
+              .insert(subcategories)
+              .values({ userId, name: "Geral", categoryId: category.id })
               .returning();
             subcategoryId = newSubcategory.id;
           }
@@ -506,46 +543,51 @@ export async function adjustInvoice(
 
         await tx.insert(transactions).values({
           userId,
-          type: 'credit_card_expense',
+          type: "credit_card_expense",
           creditCardId: parsedCardId,
           categoryId: category.id,
           subcategoryId: subcategoryId,
           amount: diff.toFixed(2),
           description: `Ajuste de Fatura - ${competencyMonth}`,
-          date: format(new Date(), 'yyyy-MM-dd'),
+          date: format(new Date(), "yyyy-MM-dd"),
           competencyMonth: competencyMonth,
           invoiceMonth: competencyMonth,
-          status: 'pending',
+          status: "pending",
         });
 
-        return { success: true, adjustmentType: 'increase' as const, difference: diff };
+        return { success: true, adjustmentType: "increase" as const, difference: diff };
       } else {
         // Real < Calculated: overstated, create negative credit
         let category = await tx.query.categories.findFirst({
-          where: (categories, { eq, and }) => and(eq(categories.name, 'Pagamento de Fatura'), eq(categories.userId, userId))
+          where: (categories, { eq, and }) =>
+            and(eq(categories.name, "Pagamento de Fatura"), eq(categories.userId, userId)),
         });
         let subcategoryId = null;
 
         if (!category) {
-          const [newCategory] = await tx.insert(categories)
-            .values({ userId, name: 'Pagamento de Fatura', type: 'expense', icon: 'CreditCard' })
+          const [newCategory] = await tx
+            .insert(categories)
+            .values({ userId, name: "Pagamento de Fatura", type: "expense", icon: "CreditCard" })
             .returning();
 
-          const [newSubcategory] = await tx.insert(subcategories)
-            .values({ userId, name: 'Geral', categoryId: newCategory.id })
+          const [newSubcategory] = await tx
+            .insert(subcategories)
+            .values({ userId, name: "Geral", categoryId: newCategory.id })
             .returning();
 
           category = newCategory;
           subcategoryId = newSubcategory.id;
         } else {
           const subcategory = await tx.query.subcategories.findFirst({
-            where: (subcategories, { eq, and }) => and(eq(subcategories.categoryId, category!.id), eq(subcategories.userId, userId))
+            where: (subcategories, { eq, and }) =>
+              and(eq(subcategories.categoryId, category!.id), eq(subcategories.userId, userId)),
           });
           subcategoryId = subcategory?.id || null;
 
           if (!subcategoryId) {
-            const [newSubcategory] = await tx.insert(subcategories)
-              .values({ userId, name: 'Geral', categoryId: category.id })
+            const [newSubcategory] = await tx
+              .insert(subcategories)
+              .values({ userId, name: "Geral", categoryId: category.id })
               .returning();
             subcategoryId = newSubcategory.id;
           }
@@ -553,31 +595,31 @@ export async function adjustInvoice(
 
         await tx.insert(transactions).values({
           userId,
-          type: 'credit_card_expense',
+          type: "credit_card_expense",
           creditCardId: parsedCardId,
           categoryId: category.id,
           subcategoryId: subcategoryId,
           amount: diff.toFixed(2), // negative value
           description: `Adiantamento de Fatura - ${competencyMonth}`,
-          date: format(new Date(), 'yyyy-MM-dd'),
+          date: format(new Date(), "yyyy-MM-dd"),
           competencyMonth: competencyMonth,
           invoiceMonth: competencyMonth,
-          status: 'pending',
+          status: "pending",
         });
 
-        return { success: true, adjustmentType: 'decrease' as const, difference: diff };
+        return { success: true, adjustmentType: "decrease" as const, difference: diff };
       }
     });
 
-    revalidatePath('/credit-cards');
+    revalidatePath("/credit-cards");
     revalidatePath(`/credit-cards/${parsedCardId}`);
-    revalidatePath('/dashboard');
-    revalidatePath('/transactions');
-    revalidatePath('/planning');
+    revalidatePath("/dashboard");
+    revalidatePath("/transactions");
+    revalidatePath("/planning");
     return result;
   } catch (error) {
-    console.error('Error adjusting invoice:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Falha ao ajustar fatura' };
+    console.error("Error adjusting invoice:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Falha ao ajustar fatura" };
   }
 }
 
@@ -589,28 +631,31 @@ export async function getCreditCardsCategorySummary(competencyMonth: string) {
   const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
   const closingDay = appSettings?.closingDay || 25;
 
-  const userCards = await db.select({ id: creditCards.id, dueDay: creditCards.dueDay }).from(creditCards).where(eq(creditCards.userId, userId));
+  const userCards = await db
+    .select({ id: creditCards.id, dueDay: creditCards.dueDay })
+    .from(creditCards)
+    .where(eq(creditCards.userId, userId));
   const condition = buildCreditCardCompetencyCondition(competencyMonth, closingDay, userId, userCards);
 
   const cardTxs = await db.query.transactions.findMany({
-    where: and(condition, ne(transactions.status, 'ignored')),
+    where: and(condition, ne(transactions.status, "ignored")),
     with: {
       category: true,
       subcategory: true,
-    }
+    },
   });
 
   const categoryMap = new Map<string, { value: number; subcategories: Map<string, number> }>();
 
   for (const t of cardTxs) {
     const amount = Number(t.amount);
-    const categoryName = t.category?.name || 'Sem Categoria';
-    const subcategoryName = t.subcategory?.name || 'Geral';
-    
+    const categoryName = t.category?.name || "Sem Categoria";
+    const subcategoryName = t.subcategory?.name || "Geral";
+
     if (!categoryMap.has(categoryName)) {
       categoryMap.set(categoryName, { value: 0, subcategories: new Map() });
     }
-    
+
     const catData = categoryMap.get(categoryName)!;
     catData.value += amount;
     catData.subcategories.set(subcategoryName, (catData.subcategories.get(subcategoryName) || 0) + amount);
@@ -621,7 +666,7 @@ export async function getCreditCardsCategorySummary(competencyMonth: string) {
     value: data.value,
     subcategories: Array.from(data.subcategories.entries())
       .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
+      .sort((a, b) => b.value - a.value),
   }));
 
   // Sort descending by value
@@ -632,7 +677,7 @@ export async function getCreditCardsCategorySummary(competencyMonth: string) {
 
 export async function revertInvoicePayment(
   creditCardId: string | number,
-  competencyMonth: string
+  competencyMonth: string,
 ): Promise<{ success: boolean; error?: string }> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
@@ -642,47 +687,55 @@ export async function revertInvoicePayment(
   try {
     const result = await db.transaction(async (tx) => {
       // 1. Mark expenses as pending
-      await tx.update(transactions)
-        .set({ status: 'pending' })
+      await tx
+        .update(transactions)
+        .set({ status: "pending" })
         .where(
           and(
             eq(transactions.creditCardId, parsedCardId),
             or(
               eq(transactions.invoiceMonth, competencyMonth),
-              and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth))
+              and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth)),
             ),
-            eq(transactions.type, 'credit_card_expense'),
-            eq(transactions.status, 'paid'),
-            eq(transactions.userId, userId)
-          )
+            eq(transactions.type, "credit_card_expense"),
+            eq(transactions.status, "paid"),
+            eq(transactions.userId, userId),
+          ),
         );
 
       // 2. Find transfer transactions related to this invoice payment
-      const paymentTransfers = await tx.select().from(transactions).where(
-        and(
-          eq(transactions.userId, userId),
-          eq(transactions.type, 'transfer'),
-          eq(transactions.competencyMonth, competencyMonth),
-          or(
-            eq(transactions.creditCardId, parsedCardId),
-            and(
-              isNull(transactions.creditCardId),
-              or(
-                sql`${transactions.description} LIKE 'Pagamento de Fatura - %'`,
-                sql`${transactions.description} LIKE 'Adiantamento de Fatura - %'`
-              )
-            )
-          )
-        )
-      );
+      const paymentTransfers = await tx
+        .select()
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.userId, userId),
+            eq(transactions.type, "transfer"),
+            eq(transactions.competencyMonth, competencyMonth),
+            or(
+              eq(transactions.creditCardId, parsedCardId),
+              and(
+                isNull(transactions.creditCardId),
+                or(
+                  sql`${transactions.description} LIKE 'Pagamento de Fatura - %'`,
+                  sql`${transactions.description} LIKE 'Adiantamento de Fatura - %'`,
+                ),
+              ),
+            ),
+          ),
+        );
 
       // 3. Delete transfers and refund accounts
       for (const t of paymentTransfers) {
         if (t.accountId) {
-          const [account] = await tx.select().from(accounts).where(and(eq(accounts.id, t.accountId), eq(accounts.userId, userId)));
+          const [account] = await tx
+            .select()
+            .from(accounts)
+            .where(and(eq(accounts.id, t.accountId), eq(accounts.userId, userId)));
           if (account) {
             const newBalance = Number(account.currentBalance) + Number(t.amount);
-            await tx.update(accounts)
+            await tx
+              .update(accounts)
               .set({ currentBalance: newBalance.toString() })
               .where(and(eq(accounts.id, t.accountId), eq(accounts.userId, userId)));
           }
@@ -691,30 +744,33 @@ export async function revertInvoicePayment(
       }
 
       // 4. Delete negative credit card expenses that were created for prepayment
-      const prepaymentExpenses = await tx.select().from(transactions).where(
-        and(
-          eq(transactions.userId, userId),
-          eq(transactions.type, 'credit_card_expense'),
-          eq(transactions.creditCardId, parsedCardId),
-          eq(transactions.competencyMonth, competencyMonth),
-          sql`${transactions.amount} < 0`,
-          sql`${transactions.description} = 'Adiantamento de Fatura'`
-        )
-      );
+      const prepaymentExpenses = await tx
+        .select()
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.userId, userId),
+            eq(transactions.type, "credit_card_expense"),
+            eq(transactions.creditCardId, parsedCardId),
+            eq(transactions.competencyMonth, competencyMonth),
+            sql`${transactions.amount} < 0`,
+            sql`${transactions.description} = 'Adiantamento de Fatura'`,
+          ),
+        );
       for (const t of prepaymentExpenses) {
         await tx.delete(transactions).where(eq(transactions.id, t.id));
       }
-      
+
       return { success: true };
     });
 
-    revalidatePath('/credit-cards');
+    revalidatePath("/credit-cards");
     revalidatePath(`/credit-cards/${parsedCardId}`);
-    revalidatePath('/dashboard');
-    revalidatePath('/transactions');
+    revalidatePath("/dashboard");
+    revalidatePath("/transactions");
     return result;
   } catch (error) {
-    console.error('Error reverting invoice payment:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Falha ao estornar fatura' };
+    console.error("Error reverting invoice payment:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Falha ao estornar fatura" };
   }
 }

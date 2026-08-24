@@ -1,3 +1,4 @@
+/* eslint-disable */
 const { Pool } = require('pg');
 const pool = new Pool({ connectionString: process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/minhas_financas' });
 require('dotenv').config({ path: '.env.local' });

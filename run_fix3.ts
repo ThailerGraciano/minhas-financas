@@ -1,3 +1,4 @@
+/* eslint-disable */
 // @ts-nocheck
 import { backfillInvoiceMonths } from './src/app/actions/transactions';
 import { auth } from '@/auth';

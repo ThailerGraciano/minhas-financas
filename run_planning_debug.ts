@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { getProjectedCashFlow } from "./src/app/actions/planning";
 import { db } from "./src/db";
 import { accounts } from "./src/db/schema";

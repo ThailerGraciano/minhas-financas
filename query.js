@@ -1,3 +1,4 @@
+/* eslint-disable */
 const { Pool } = require('pg');
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 pool.query("SELECT id, date, competency_month, status, amount, type FROM transactions WHERE description LIKE '%Salário Futura%';")

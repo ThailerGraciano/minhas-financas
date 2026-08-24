@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { db } from './src/db/index';
 import { transactions, creditCards, settings } from './src/db/schema';
 import { eq, and } from 'drizzle-orm';

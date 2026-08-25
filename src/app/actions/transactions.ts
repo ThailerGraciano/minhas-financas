@@ -768,25 +768,6 @@ export async function payVirtualTransaction(txData: {
       }
     } else {
       await db.transaction(async (tx) => {
-        const [insertedTx] = await tx
-          .insert(transactions)
-          .values({
-            userId,
-            type: txData.type,
-            accountId: txData.accountId,
-            creditCardId: txData.creditCardId,
-            categoryId: txData.categoryId,
-            subcategoryId: txData.subcategoryId,
-            amount: txData.amount,
-            description: txData.description,
-            date: txData.date,
-            competencyMonth: txData.competencyMonth,
-            status: "paid",
-            paidAt: new Date(),
-            fixedTransactionId: txData.fixedTransactionId || null,
-          })
-          .returning();
-
         await applyBalanceDelta(tx, txData.accountId, txData.amount, txData.type, "paid", null);
       });
     }

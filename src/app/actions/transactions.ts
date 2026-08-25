@@ -2,12 +2,12 @@
 
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { fixedTransactions, settings, transactions, creditCards, accounts } from "@/db/schema";
+import { accounts, creditCards, fixedTransactions, settings, transactions } from "@/db/schema";
+import { buildGlobalCompetencyCondition } from "@/lib/competency-utils";
 import { addMonths, endOfMonth, format, getDate, parseISO, subMonths } from "date-fns";
 import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { buildGlobalCompetencyCondition } from "@/lib/competency-utils";
 
 type NewTransaction = typeof transactions.$inferInsert;
 type CreateTransactionInput = Omit<NewTransaction, "userId"> & {
@@ -34,7 +34,7 @@ async function applyBalanceDelta(
   type: string,
   status: string,
   parentTransactionId?: number | null,
-  isRevert = false
+  isRevert = false,
 ) {
   if (!accountId || status !== "paid") return;
 
@@ -78,7 +78,7 @@ const transactionSchema = z
   })
   .passthrough()
   .superRefine((data, ctx) => {
-    if (data.type === 'credit_card_expense') {
+    if (data.type === "credit_card_expense") {
       if (!data.invoiceMonth || !/^\d{4}-\d{2}$/.test(data.invoiceMonth)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -136,6 +136,7 @@ export async function getTransactions(month?: string, accountId?: number) {
       category: true,
       creditCard: true,
     },
+    // Forced recompile to clear Next.js cache
     orderBy: (t, { desc }) => [desc(t.date)],
   });
 
@@ -184,7 +185,7 @@ export async function getTransactions(month?: string, accountId?: number) {
 
       const tempId = -Math.floor(Math.random() * 1000000) - 1;
 
-      const origin: typeof realTransactions[0] = {
+      const origin: (typeof realTransactions)[0] = {
         id: tempId,
         userId: userId,
         type: ft.type,
@@ -213,7 +214,7 @@ export async function getTransactions(month?: string, accountId?: number) {
       };
 
       if (ft.type === "transfer" && ft.destinationAccountId) {
-        const dest: typeof realTransactions[0] = {
+        const dest: (typeof realTransactions)[0] = {
           ...origin,
           id: tempId - 1,
           accountId: ft.destinationAccountId,
@@ -227,7 +228,7 @@ export async function getTransactions(month?: string, accountId?: number) {
       return [origin];
     });
 
-  const allTransactions = [...realTransactions, ...virtualTransactions].filter(t => t.status !== 'ignored');
+  const allTransactions = [...realTransactions, ...virtualTransactions].filter((t) => t.status !== "ignored");
 
   allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -250,13 +251,16 @@ export async function createTransaction(
   const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
   const closingDay = appSettings?.closingDay || 25;
   const parsedDate = parseISO(data.date);
-  
-  if (!data.competencyMonth) {
-    data.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
-  }
 
-  if (data.type !== 'credit_card_expense') {
+  if (data.type === "credit_card_expense") {
+    if (data.invoiceMonth) {
+      data.competencyMonth = data.invoiceMonth;
+    } else if (!data.competencyMonth) {
+      data.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
+    }
+  } else {
     data.invoiceMonth = null;
+    data.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
   }
 
   if (subcategoryRequiredTypes.includes(data.type) && (!data.subcategoryId || data.subcategoryId <= 0)) {
@@ -268,14 +272,21 @@ export async function createTransaction(
     const isTransfer = txData.type === "transfer" && destinationAccountId;
 
     if (isTransfer && !txData.categoryId) {
-       const { categories } = await import("@/db/schema");
-       const [cat] = await db.select().from(categories).where(and(eq(categories.userId, userId), eq(categories.type, 'transfer'))).limit(1);
-       if (cat) {
-           txData.categoryId = cat.id;
-       } else {
-           const [newCat] = await db.insert(categories).values({ userId, name: 'Transferência', type: 'transfer', icon: 'arrow-right-left' }).returning();
-           txData.categoryId = newCat.id;
-       }
+      const { categories } = await import("@/db/schema");
+      const [cat] = await db
+        .select()
+        .from(categories)
+        .where(and(eq(categories.userId, userId), eq(categories.type, "transfer")))
+        .limit(1);
+      if (cat) {
+        txData.categoryId = cat.id;
+      } else {
+        const [newCat] = await db
+          .insert(categories)
+          .values({ userId, name: "Transferência", type: "transfer", icon: "arrow-right-left" })
+          .returning();
+        txData.categoryId = newCat.id;
+      }
     }
 
     if (isFixed) {
@@ -303,20 +314,23 @@ export async function createTransaction(
         for (let i = 0; i < 12; i++) {
           const nextDate = addMonths(baseDate, i);
           const nextCompetency = addMonths(baseCompetency, i);
-          
+
           if (isTransfer) {
             const status = i === 0 ? txData.status || "pending" : "pending";
-            const [originTx] = await tx.insert(transactions).values({
-              ...txData,
-              userId,
-              description: `${txData.description} (Saída)`,
-              date: format(nextDate, "yyyy-MM-dd"),
-              competencyMonth: format(nextCompetency, "yyyy-MM"),
-              status,
-              fixedTransactionId: fixedTx.id,
-            }).returning();
+            const [originTx] = await tx
+              .insert(transactions)
+              .values({
+                ...txData,
+                userId,
+                description: `${txData.description} (Saída)`,
+                date: format(nextDate, "yyyy-MM-dd"),
+                competencyMonth: format(nextCompetency, "yyyy-MM"),
+                status,
+                fixedTransactionId: fixedTx.id,
+              })
+              .returning();
             await applyBalanceDelta(tx, txData.accountId, txData.amount, txData.type, status, null);
-            
+
             await tx.insert(transactions).values({
               ...txData,
               userId,
@@ -330,8 +344,8 @@ export async function createTransaction(
             });
             await applyBalanceDelta(tx, destinationAccountId, txData.amount, txData.type, status, originTx.id);
           } else {
-             const status = i === 0 ? txData.status || "pending" : "pending";
-             await tx.insert(transactions).values({
+            const status = i === 0 ? txData.status || "pending" : "pending";
+            await tx.insert(transactions).values({
               ...txData,
               userId,
               date: format(nextDate, "yyyy-MM-dd"),
@@ -367,97 +381,130 @@ export async function createTransaction(
       }
 
       const currentInstallment = current_installment || 1;
-      
+
       const result = await db.transaction(async (tx) => {
-          let originParentId: number | null = null;
-          let destParentId: number | null = null;
-          let finalReturnId: number | undefined = undefined;
+        let originParentId: number | null = null;
+        let destParentId: number | null = null;
+        let finalReturnId: number | undefined = undefined;
+
+        if (isTransfer) {
+          const [originTx] = await tx
+            .insert(transactions)
+            .values({
+              ...txData,
+              description: `${txData.description} (${currentInstallment}/${totalInstallments}) (Saída)`,
+              userId,
+              amount: currentInstallment === totalInstallments ? lastParcelAmount : baseParcelAmount,
+              installmentCurrent: currentInstallment,
+            })
+            .returning();
+          originParentId = originTx.id;
+          finalReturnId = originTx.id;
+          await applyBalanceDelta(
+            tx,
+            txData.accountId,
+            originTx.amount,
+            originTx.type,
+            originTx.status || "pending",
+            null,
+          );
+
+          const [destTx] = await tx
+            .insert(transactions)
+            .values({
+              ...txData,
+              accountId: destinationAccountId,
+              description: `${txData.description} (${currentInstallment}/${totalInstallments}) (Entrada)`,
+              userId,
+              amount: currentInstallment === totalInstallments ? lastParcelAmount : baseParcelAmount,
+              installmentCurrent: currentInstallment,
+              parentTransactionId: originTx.id,
+            })
+            .returning();
+          destParentId = destTx.id;
+          await applyBalanceDelta(
+            tx,
+            destinationAccountId,
+            destTx.amount,
+            destTx.type,
+            destTx.status || "pending",
+            originTx.id,
+          );
+        } else {
+          const [parentTx] = await tx
+            .insert(transactions)
+            .values({
+              ...txData,
+              description: `${txData.description} (${currentInstallment}/${totalInstallments})`,
+              userId,
+              amount: currentInstallment === totalInstallments ? lastParcelAmount : baseParcelAmount,
+              installmentCurrent: currentInstallment,
+            })
+            .returning();
+          originParentId = parentTx.id;
+          finalReturnId = parentTx.id;
+          await applyBalanceDelta(
+            tx,
+            txData.accountId,
+            parentTx.amount,
+            parentTx.type,
+            parentTx.status || "pending",
+            null,
+          );
+        }
+
+        const baseDate = parseISO(data.date);
+        const baseCompetency = txData.competencyMonth ? parseISO(`${txData.competencyMonth}-01`) : baseDate;
+
+        for (let i = currentInstallment + 1; i <= totalInstallments; i++) {
+          const nextDate = addMonths(baseDate, i - currentInstallment);
+          const nextCompetency = addMonths(baseCompetency, i - currentInstallment);
+          const isLast = i === totalInstallments;
 
           if (isTransfer) {
-             const [originTx] = await tx.insert(transactions).values({
+            const [originTx] = await tx
+              .insert(transactions)
+              .values({
                 ...txData,
-                description: `${txData.description} (${currentInstallment}/${totalInstallments}) (Saída)`,
+                description: `${txData.description} (${i}/${totalInstallments}) (Saída)`,
                 userId,
-                amount: currentInstallment === totalInstallments ? lastParcelAmount : baseParcelAmount,
-                installmentCurrent: currentInstallment,
-             }).returning();
-             originParentId = originTx.id;
-             finalReturnId = originTx.id;
-             await applyBalanceDelta(tx, txData.accountId, originTx.amount, originTx.type, originTx.status || "pending", null);
+                amount: isLast ? lastParcelAmount : baseParcelAmount,
+                date: format(nextDate, "yyyy-MM-dd"),
+                competencyMonth: format(nextCompetency, "yyyy-MM"),
+                status: "pending",
+                installmentCurrent: i,
+                installmentParentId: originParentId,
+              })
+              .returning();
 
-             const [destTx] = await tx.insert(transactions).values({
-                ...txData,
-                accountId: destinationAccountId,
-                description: `${txData.description} (${currentInstallment}/${totalInstallments}) (Entrada)`,
-                userId,
-                amount: currentInstallment === totalInstallments ? lastParcelAmount : baseParcelAmount,
-                installmentCurrent: currentInstallment,
-                parentTransactionId: originTx.id,
-             }).returning();
-             destParentId = destTx.id;
-             await applyBalanceDelta(tx, destinationAccountId, destTx.amount, destTx.type, destTx.status || "pending", originTx.id);
+            await tx.insert(transactions).values({
+              ...txData,
+              accountId: destinationAccountId,
+              description: `${txData.description} (${i}/${totalInstallments}) (Entrada)`,
+              userId,
+              amount: isLast ? lastParcelAmount : baseParcelAmount,
+              date: format(nextDate, "yyyy-MM-dd"),
+              competencyMonth: format(nextCompetency, "yyyy-MM"),
+              status: "pending",
+              installmentCurrent: i,
+              parentTransactionId: originTx.id,
+              installmentParentId: destParentId,
+            });
           } else {
-             const [parentTx] = await tx.insert(transactions).values({
-                ...txData,
-                description: `${txData.description} (${currentInstallment}/${totalInstallments})`,
-                userId,
-                amount: currentInstallment === totalInstallments ? lastParcelAmount : baseParcelAmount,
-                installmentCurrent: currentInstallment,
-             }).returning();
-             originParentId = parentTx.id;
-             finalReturnId = parentTx.id;
-             await applyBalanceDelta(tx, txData.accountId, parentTx.amount, parentTx.type, parentTx.status || "pending", null);
+            await tx.insert(transactions).values({
+              ...txData,
+              description: `${txData.description} (${i}/${totalInstallments})`,
+              userId,
+              amount: isLast ? lastParcelAmount : baseParcelAmount,
+              date: format(nextDate, "yyyy-MM-dd"),
+              competencyMonth: format(nextCompetency, "yyyy-MM"),
+              status: "pending",
+              installmentCurrent: i,
+              installmentParentId: originParentId,
+            });
           }
-
-          const baseDate = parseISO(data.date);
-          const baseCompetency = txData.competencyMonth ? parseISO(`${txData.competencyMonth}-01`) : baseDate;
-
-          for (let i = currentInstallment + 1; i <= totalInstallments; i++) {
-             const nextDate = addMonths(baseDate, i - currentInstallment);
-             const nextCompetency = addMonths(baseCompetency, i - currentInstallment);
-             const isLast = i === totalInstallments;
-
-             if (isTransfer) {
-                const [originTx] = await tx.insert(transactions).values({
-                  ...txData,
-                  description: `${txData.description} (${i}/${totalInstallments}) (Saída)`,
-                  userId,
-                  amount: isLast ? lastParcelAmount : baseParcelAmount,
-                  date: format(nextDate, "yyyy-MM-dd"),
-                  competencyMonth: format(nextCompetency, "yyyy-MM"),
-                  status: "pending",
-                  installmentCurrent: i,
-                  installmentParentId: originParentId,
-                }).returning();
-                
-                await tx.insert(transactions).values({
-                  ...txData,
-                  accountId: destinationAccountId,
-                  description: `${txData.description} (${i}/${totalInstallments}) (Entrada)`,
-                  userId,
-                  amount: isLast ? lastParcelAmount : baseParcelAmount,
-                  date: format(nextDate, "yyyy-MM-dd"),
-                  competencyMonth: format(nextCompetency, "yyyy-MM"),
-                  status: "pending",
-                  installmentCurrent: i,
-                  parentTransactionId: originTx.id,
-                  installmentParentId: destParentId,
-                });
-             } else {
-                await tx.insert(transactions).values({
-                  ...txData,
-                  description: `${txData.description} (${i}/${totalInstallments})`,
-                  userId,
-                  amount: isLast ? lastParcelAmount : baseParcelAmount,
-                  date: format(nextDate, "yyyy-MM-dd"),
-                  competencyMonth: format(nextCompetency, "yyyy-MM"),
-                  status: "pending",
-                  installmentCurrent: i,
-                  installmentParentId: originParentId,
-                });
-             }
-          }
-          return { success: true, parentId: finalReturnId };
+        }
+        return { success: true, parentId: finalReturnId };
       });
       revalidatePath("/transactions");
       revalidatePath("/");
@@ -477,14 +524,24 @@ export async function createTransaction(
           .returning();
         await applyBalanceDelta(tx, txData.accountId, txData.amount, txData.type, txData.status || "pending", null);
 
-        const [destTx] = await tx.insert(transactions).values({
-          ...txData,
-          userId,
-          accountId: destinationAccountId,
-          description: `${txData.description} (Entrada)`,
-          parentTransactionId: originTx.id,
-        }).returning();
-        await applyBalanceDelta(tx, destinationAccountId, txData.amount, txData.type, txData.status || "pending", originTx.id);
+        const [destTx] = await tx
+          .insert(transactions)
+          .values({
+            ...txData,
+            userId,
+            accountId: destinationAccountId,
+            description: `${txData.description} (Entrada)`,
+            parentTransactionId: originTx.id,
+          })
+          .returning();
+        await applyBalanceDelta(
+          tx,
+          destinationAccountId,
+          txData.amount,
+          txData.type,
+          txData.status || "pending",
+          originTx.id,
+        );
 
         return { success: true, parentId: originTx.id };
       });
@@ -544,17 +601,49 @@ async function changeTransactionStatus(id: number, newStatus: "paid" | "pending"
 
       if (originTx && destTx) {
         await tx.update(transactions).set({ status: newStatus, paidAt }).where(eq(transactions.id, originTx.id));
-        await applyBalanceDelta(tx, originTx.accountId, originTx.amount, originTx.type, "paid", null, newStatus === "pending");
-        
+        await applyBalanceDelta(
+          tx,
+          originTx.accountId,
+          originTx.amount,
+          originTx.type,
+          "paid",
+          null,
+          newStatus === "pending",
+        );
+
         await tx.update(transactions).set({ status: newStatus, paidAt }).where(eq(transactions.id, destTx.id));
-        await applyBalanceDelta(tx, destTx.accountId, destTx.amount, destTx.type, "paid", originTx.id, newStatus === "pending");
+        await applyBalanceDelta(
+          tx,
+          destTx.accountId,
+          destTx.amount,
+          destTx.type,
+          "paid",
+          originTx.id,
+          newStatus === "pending",
+        );
       } else {
         await tx.update(transactions).set({ status: newStatus, paidAt }).where(eq(transactions.id, id));
-        await applyBalanceDelta(tx, transactionItem.accountId, transactionItem.amount, transactionItem.type, "paid", transactionItem.parentTransactionId, newStatus === "pending");
+        await applyBalanceDelta(
+          tx,
+          transactionItem.accountId,
+          transactionItem.amount,
+          transactionItem.type,
+          "paid",
+          transactionItem.parentTransactionId,
+          newStatus === "pending",
+        );
       }
     } else {
       await tx.update(transactions).set({ status: newStatus, paidAt }).where(eq(transactions.id, id));
-      await applyBalanceDelta(tx, transactionItem.accountId, transactionItem.amount, transactionItem.type, "paid", transactionItem.parentTransactionId, newStatus === "pending");
+      await applyBalanceDelta(
+        tx,
+        transactionItem.accountId,
+        transactionItem.amount,
+        transactionItem.type,
+        "paid",
+        transactionItem.parentTransactionId,
+        newStatus === "pending",
+      );
     }
 
     return { success: true };
@@ -590,7 +679,7 @@ export async function toggleTransactionStatus(
     date: string;
     competencyMonth: string;
     fixedTransactionId: string | null;
-  }
+  },
 ): Promise<{ success: boolean; newStatus?: string; error?: string }> {
   try {
     if (isFixedVirtual && virtualData) {
@@ -631,55 +720,74 @@ export async function payVirtualTransaction(txData: {
 
     if (txData.type === "transfer" && txData.fixedTransactionId) {
       const ft = await db.query.fixedTransactions.findFirst({
-        where: and(eq(fixedTransactions.id, txData.fixedTransactionId), eq(fixedTransactions.userId, userId))
+        where: and(eq(fixedTransactions.id, txData.fixedTransactionId), eq(fixedTransactions.userId, userId)),
       });
       if (ft && ft.destinationAccountId) {
-        const [originTx] = await db.insert(transactions).values({
-          userId,
-          type: "transfer",
-          accountId: ft.accountId,
-          categoryId: ft.categoryId,
-          subcategoryId: ft.subcategoryId,
-          amount: ft.amount,
-          description: `${ft.description} (Saída)`,
-          date: txData.date,
-          competencyMonth: txData.competencyMonth,
-          status: "paid",
-          paidAt: new Date(),
-          fixedTransactionId: ft.id,
-        }).returning();
+        await db.transaction(async (tx) => {
+          const [originTx] = await tx
+            .insert(transactions)
+            .values({
+              userId,
+              type: "transfer",
+              accountId: ft.accountId,
+              categoryId: ft.categoryId,
+              subcategoryId: ft.subcategoryId,
+              amount: ft.amount,
+              description: `${ft.description} (Saída)`,
+              date: txData.date,
+              competencyMonth: txData.competencyMonth,
+              status: "paid",
+              paidAt: new Date(),
+              fixedTransactionId: ft.id,
+            })
+            .returning();
 
-        await db.insert(transactions).values({
-          userId,
-          type: "transfer",
-          accountId: ft.destinationAccountId,
-          categoryId: ft.categoryId,
-          subcategoryId: ft.subcategoryId,
-          amount: ft.amount,
-          description: `${ft.description} (Entrada)`,
-          date: txData.date,
-          competencyMonth: txData.competencyMonth,
-          status: "paid",
-          paidAt: new Date(),
-          fixedTransactionId: ft.id,
-          parentTransactionId: originTx.id,
+          await applyBalanceDelta(tx, ft.accountId, ft.amount, "transfer", "paid", null);
+
+          const [destTx] = await tx
+            .insert(transactions)
+            .values({
+              userId,
+              type: "transfer",
+              accountId: ft.destinationAccountId,
+              categoryId: ft.categoryId,
+              subcategoryId: ft.subcategoryId,
+              amount: ft.amount,
+              description: `${ft.description} (Entrada)`,
+              date: txData.date,
+              competencyMonth: txData.competencyMonth,
+              status: "paid",
+              paidAt: new Date(),
+              fixedTransactionId: ft.id,
+              parentTransactionId: originTx.id,
+            })
+            .returning();
+
+          await applyBalanceDelta(tx, ft.destinationAccountId, ft.amount, "transfer", "paid", originTx.id);
         });
       }
     } else {
-      await db.insert(transactions).values({
-        userId,
-        type: txData.type,
-        accountId: txData.accountId,
-        creditCardId: txData.creditCardId,
-        categoryId: txData.categoryId,
-        subcategoryId: txData.subcategoryId,
-        amount: txData.amount,
-        description: txData.description,
-        date: txData.date,
-        competencyMonth: txData.competencyMonth,
-        status: "paid",
-        paidAt: new Date(),
-        fixedTransactionId: txData.fixedTransactionId || null,
+      await db.transaction(async (tx) => {
+        const [insertedTx] = await tx
+          .insert(transactions)
+          .values({
+            userId,
+            type: txData.type,
+            accountId: txData.accountId,
+            creditCardId: txData.creditCardId,
+            categoryId: txData.categoryId,
+            subcategoryId: txData.subcategoryId,
+            amount: txData.amount,
+            description: txData.description,
+            date: txData.date,
+            competencyMonth: txData.competencyMonth,
+            status: "paid",
+            paidAt: new Date(),
+            fixedTransactionId: txData.fixedTransactionId || null,
+          })
+          .returning();
+
+        await applyBalanceDelta(tx, txData.accountId, txData.amount, txData.type, "paid", null);
       });
     }
 
@@ -706,13 +814,7 @@ export async function getCreditCardInvoices(creditCardId: number, month?: string
       and(
         eq(t.creditCardId, creditCardId),
         eq(t.type, "credit_card_expense"),
-        or(
-          eq(t.invoiceMonth, currentMonth),
-          and(
-            isNull(t.invoiceMonth),
-            eq(t.competencyMonth, currentMonth)
-          )
-        ),
+        or(eq(t.invoiceMonth, currentMonth), and(isNull(t.invoiceMonth), eq(t.competencyMonth, currentMonth))),
         eq(t.userId, userId),
       ),
     with: {
@@ -734,17 +836,19 @@ export async function getCreditCardInvoiceMonths(creditCardId: number) {
     columns: { invoiceMonth: true, competencyMonth: true },
   });
 
-  const uniqueMonths = [...new Set(txs.map((t) => t.invoiceMonth || t.competencyMonth).filter((m): m is string => Boolean(m)))];
+  const uniqueMonths = [
+    ...new Set(txs.map((t) => t.invoiceMonth || t.competencyMonth).filter((m): m is string => Boolean(m))),
+  ];
   return uniqueMonths.sort().reverse();
 }
 
 export async function deleteTransaction(
-  id: number, 
-  mode: "single" | "future" = "single", 
-  isFixedVirtual: boolean = false, 
+  id: number,
+  mode: "single" | "future" = "single",
+  isFixedVirtual: boolean = false,
   fixedTransactionId?: string,
   virtualDate?: string,
-  virtualCompetencyMonth?: string
+  virtualCompetencyMonth?: string,
 ) {
   try {
     const session = await auth();
@@ -756,33 +860,41 @@ export async function deleteTransaction(
         .select()
         .from(transactions)
         .where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
-      
+
       if (!transactionItem) {
         if (isFixedVirtual && fixedTransactionId) {
           if (mode === "future") {
-            await tx.update(fixedTransactions).set({ active: false }).where(eq(fixedTransactions.id, fixedTransactionId));
-            await tx.delete(transactions).where(and(eq(transactions.fixedTransactionId, fixedTransactionId), eq(transactions.status, 'pending')));
+            await tx
+              .update(fixedTransactions)
+              .set({ active: false })
+              .where(eq(fixedTransactions.id, fixedTransactionId));
+            await tx
+              .delete(transactions)
+              .where(and(eq(transactions.fixedTransactionId, fixedTransactionId), eq(transactions.status, "pending")));
             return { success: true };
           } else if (mode === "single" && virtualDate && virtualCompetencyMonth) {
             // Se for single, pegamos os dados originais da fixed_transaction
             const [ft] = await tx.select().from(fixedTransactions).where(eq(fixedTransactions.id, fixedTransactionId));
             if (ft) {
-              if (ft.type === 'transfer' && ft.destinationAccountId) {
+              if (ft.type === "transfer" && ft.destinationAccountId) {
                 // Insere Saída
-                const [outTx] = await tx.insert(transactions).values({
-                  userId: ft.userId,
-                  type: ft.type,
-                  accountId: ft.accountId,
-                  creditCardId: ft.creditCardId,
-                  categoryId: ft.categoryId,
-                  subcategoryId: ft.subcategoryId,
-                  amount: ft.amount,
-                  description: `${ft.description} (Saída)`,
-                  date: virtualDate,
-                  competencyMonth: virtualCompetencyMonth,
-                  status: 'ignored',
-                  fixedTransactionId: ft.id,
-                }).returning();
+                const [outTx] = await tx
+                  .insert(transactions)
+                  .values({
+                    userId: ft.userId,
+                    type: ft.type,
+                    accountId: ft.accountId,
+                    creditCardId: ft.creditCardId,
+                    categoryId: ft.categoryId,
+                    subcategoryId: ft.subcategoryId,
+                    amount: ft.amount,
+                    description: `${ft.description} (Saída)`,
+                    date: virtualDate,
+                    competencyMonth: virtualCompetencyMonth,
+                    status: "ignored",
+                    fixedTransactionId: ft.id,
+                  })
+                  .returning();
 
                 // Insere Entrada
                 await tx.insert(transactions).values({
@@ -796,7 +908,7 @@ export async function deleteTransaction(
                   description: `${ft.description} (Entrada)`,
                   date: virtualDate,
                   competencyMonth: virtualCompetencyMonth,
-                  status: 'ignored',
+                  status: "ignored",
                   fixedTransactionId: ft.id,
                   parentTransactionId: outTx.id,
                 });
@@ -812,7 +924,7 @@ export async function deleteTransaction(
                   description: ft.description,
                   date: virtualDate,
                   competencyMonth: virtualCompetencyMonth,
-                  status: 'ignored',
+                  status: "ignored",
                   fixedTransactionId: ft.id,
                 });
               }
@@ -828,7 +940,9 @@ export async function deleteTransaction(
       if (targetFixedId) {
         if (mode === "future") {
           await tx.update(fixedTransactions).set({ active: false }).where(eq(fixedTransactions.id, targetFixedId));
-          await tx.delete(transactions).where(and(eq(transactions.fixedTransactionId, targetFixedId), eq(transactions.status, 'pending')));
+          await tx
+            .delete(transactions)
+            .where(and(eq(transactions.fixedTransactionId, targetFixedId), eq(transactions.status, "pending")));
           return { success: true };
         } else if (isFixedVirtual) {
           return { success: false, error: "Não é possível excluir um único mês de uma projeção sem antes efetivá-la." };
@@ -836,7 +950,8 @@ export async function deleteTransaction(
       }
 
       if (mode === "future") {
-        const parentId = transactionItem.installmentParentId || transactionItem.parentTransactionId || transactionItem.id;
+        const parentId =
+          transactionItem.installmentParentId || transactionItem.parentTransactionId || transactionItem.id;
         const targetDate = transactionItem.date;
 
         const conditions = [
@@ -848,27 +963,40 @@ export async function deleteTransaction(
         const txsToDelete = await tx
           .select()
           .from(transactions)
-          .where(
-            and(
-              or(...conditions),
-              gte(transactions.date, targetDate),
-              eq(transactions.userId, userId),
-            ),
-          );
+          .where(and(or(...conditions), gte(transactions.date, targetDate), eq(transactions.userId, userId)));
 
         // Sort descending by ID to avoid foreign key constraints (children deleted before parents)
         txsToDelete.sort((a, b) => b.id - a.id);
 
         const idsToDelete = txsToDelete.map((t) => t.id);
         for (const targetId of idsToDelete) {
-          const linkedDests = await tx.select().from(transactions).where(eq(transactions.parentTransactionId, targetId));
+          const linkedDests = await tx
+            .select()
+            .from(transactions)
+            .where(eq(transactions.parentTransactionId, targetId));
           for (const ld of linkedDests) {
-            await applyBalanceDelta(tx, ld.accountId, ld.amount, ld.type, ld.status || "pending", ld.parentTransactionId, true);
+            await applyBalanceDelta(
+              tx,
+              ld.accountId,
+              ld.amount,
+              ld.type,
+              ld.status || "pending",
+              ld.parentTransactionId,
+              true,
+            );
             await tx.delete(transactions).where(eq(transactions.id, ld.id));
           }
           const [originItem] = await tx.select().from(transactions).where(eq(transactions.id, targetId));
           if (originItem) {
-             await applyBalanceDelta(tx, originItem.accountId, originItem.amount, originItem.type, originItem.status || "pending", originItem.parentTransactionId, true);
+            await applyBalanceDelta(
+              tx,
+              originItem.accountId,
+              originItem.amount,
+              originItem.type,
+              originItem.status || "pending",
+              originItem.parentTransactionId,
+              true,
+            );
           }
           await tx.delete(transactions).where(eq(transactions.id, targetId));
         }
@@ -885,22 +1013,70 @@ export async function deleteTransaction(
           if (otherTx) {
             const isChild = !!transactionItem.parentTransactionId;
             if (isChild) {
-              await applyBalanceDelta(tx, transactionItem.accountId, transactionItem.amount, transactionItem.type, transactionItem.status || "pending", transactionItem.parentTransactionId, true);
+              await applyBalanceDelta(
+                tx,
+                transactionItem.accountId,
+                transactionItem.amount,
+                transactionItem.type,
+                transactionItem.status || "pending",
+                transactionItem.parentTransactionId,
+                true,
+              );
               await tx.delete(transactions).where(eq(transactions.id, transactionItem.id));
-              await applyBalanceDelta(tx, otherTx.accountId, otherTx.amount, otherTx.type, otherTx.status || "pending", otherTx.parentTransactionId, true);
+              await applyBalanceDelta(
+                tx,
+                otherTx.accountId,
+                otherTx.amount,
+                otherTx.type,
+                otherTx.status || "pending",
+                otherTx.parentTransactionId,
+                true,
+              );
               await tx.delete(transactions).where(eq(transactions.id, otherTx.id));
             } else {
-              await applyBalanceDelta(tx, otherTx.accountId, otherTx.amount, otherTx.type, otherTx.status || "pending", otherTx.parentTransactionId, true);
+              await applyBalanceDelta(
+                tx,
+                otherTx.accountId,
+                otherTx.amount,
+                otherTx.type,
+                otherTx.status || "pending",
+                otherTx.parentTransactionId,
+                true,
+              );
               await tx.delete(transactions).where(eq(transactions.id, otherTx.id));
-              await applyBalanceDelta(tx, transactionItem.accountId, transactionItem.amount, transactionItem.type, transactionItem.status || "pending", transactionItem.parentTransactionId, true);
+              await applyBalanceDelta(
+                tx,
+                transactionItem.accountId,
+                transactionItem.amount,
+                transactionItem.type,
+                transactionItem.status || "pending",
+                transactionItem.parentTransactionId,
+                true,
+              );
               await tx.delete(transactions).where(eq(transactions.id, transactionItem.id));
             }
           } else {
-            await applyBalanceDelta(tx, transactionItem.accountId, transactionItem.amount, transactionItem.type, transactionItem.status || "pending", transactionItem.parentTransactionId, true);
+            await applyBalanceDelta(
+              tx,
+              transactionItem.accountId,
+              transactionItem.amount,
+              transactionItem.type,
+              transactionItem.status || "pending",
+              transactionItem.parentTransactionId,
+              true,
+            );
             await tx.delete(transactions).where(eq(transactions.id, transactionItem.id));
           }
         } else {
-          await applyBalanceDelta(tx, transactionItem.accountId, transactionItem.amount, transactionItem.type, transactionItem.status || "pending", transactionItem.parentTransactionId, true);
+          await applyBalanceDelta(
+            tx,
+            transactionItem.accountId,
+            transactionItem.amount,
+            transactionItem.type,
+            transactionItem.status || "pending",
+            transactionItem.parentTransactionId,
+            true,
+          );
           await tx.delete(transactions).where(eq(transactions.id, id));
         }
       }
@@ -938,14 +1114,16 @@ export async function updateTransaction(
         .where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
       if (!oldTx) {
         if (id < 0) {
-          throw new Error("Não é possível editar uma transação virtual futura. Confirme-a (marque como paga) primeiro para poder editá-la.");
+          throw new Error(
+            "Não é possível editar uma transação virtual futura. Confirme-a (marque como paga) primeiro para poder editá-la.",
+          );
         }
         throw new Error("Transação não encontrada");
       }
 
       const type = inputData.type || oldTx.type;
-      
-      if (type === 'credit_card_expense') {
+
+      if (type === "credit_card_expense") {
         if (inputData.competencyMonth) {
           inputData.invoiceMonth = inputData.competencyMonth;
         }
@@ -977,31 +1155,91 @@ export async function updateTransaction(
         const originOld = isDestinationTx ? otherTx : oldTx;
         const destOld = isDestinationTx ? oldTx : otherTx;
         if (originOld) {
-           await applyBalanceDelta(tx, originOld.accountId, originOld.amount, originOld.type, originOld.status || "pending", originOld.parentTransactionId, true);
+          await applyBalanceDelta(
+            tx,
+            originOld.accountId,
+            originOld.amount,
+            originOld.type,
+            originOld.status || "pending",
+            originOld.parentTransactionId,
+            true,
+          );
         }
         if (destOld) {
-           await applyBalanceDelta(tx, destOld.accountId, destOld.amount, destOld.type, destOld.status || "pending", destOld.parentTransactionId, true);
+          await applyBalanceDelta(
+            tx,
+            destOld.accountId,
+            destOld.amount,
+            destOld.type,
+            destOld.status || "pending",
+            destOld.parentTransactionId,
+            true,
+          );
         }
 
         // Update origin
         const originId = isDestinationTx ? otherTx?.id : id;
         if (originId) {
-          const originDesc = data.description ? `${data.description.replace(/\s*\(Saída\)|\s*\(Entrada\)/g, "")} (Saída)` : undefined;
-          const [updatedOrigin] = await tx.update(transactions).set({ ...data, accountId: originAccountId, description: originDesc || data.description }).where(eq(transactions.id, originId)).returning();
-          await applyBalanceDelta(tx, updatedOrigin.accountId, updatedOrigin.amount, updatedOrigin.type, updatedOrigin.status || "pending", updatedOrigin.parentTransactionId, false);
+          const originDesc = data.description
+            ? `${data.description.replace(/\s*\(Saída\)|\s*\(Entrada\)/g, "")} (Saída)`
+            : undefined;
+          const [updatedOrigin] = await tx
+            .update(transactions)
+            .set({ ...data, accountId: originAccountId, description: originDesc || data.description })
+            .where(eq(transactions.id, originId))
+            .returning();
+          await applyBalanceDelta(
+            tx,
+            updatedOrigin.accountId,
+            updatedOrigin.amount,
+            updatedOrigin.type,
+            updatedOrigin.status || "pending",
+            updatedOrigin.parentTransactionId,
+            false,
+          );
         }
 
         // Update destination
         const destId = isDestinationTx ? id : otherTx?.id;
         if (destId) {
-          const destDesc = data.description ? `${data.description.replace(/\s*\(Saída\)|\s*\(Entrada\)/g, "")} (Entrada)` : undefined;
-          const [updatedDest] = await tx.update(transactions).set({ ...data, accountId: destAccountId, description: destDesc || data.description }).where(eq(transactions.id, destId)).returning();
-          await applyBalanceDelta(tx, updatedDest.accountId, updatedDest.amount, updatedDest.type, updatedDest.status || "pending", updatedDest.parentTransactionId, false);
+          const destDesc = data.description
+            ? `${data.description.replace(/\s*\(Saída\)|\s*\(Entrada\)/g, "")} (Entrada)`
+            : undefined;
+          const [updatedDest] = await tx
+            .update(transactions)
+            .set({ ...data, accountId: destAccountId, description: destDesc || data.description })
+            .where(eq(transactions.id, destId))
+            .returning();
+          await applyBalanceDelta(
+            tx,
+            updatedDest.accountId,
+            updatedDest.amount,
+            updatedDest.type,
+            updatedDest.status || "pending",
+            updatedDest.parentTransactionId,
+            false,
+          );
         }
       } else {
-        await applyBalanceDelta(tx, oldTx.accountId, oldTx.amount, oldTx.type, oldTx.status || "pending", oldTx.parentTransactionId, true);
+        await applyBalanceDelta(
+          tx,
+          oldTx.accountId,
+          oldTx.amount,
+          oldTx.type,
+          oldTx.status || "pending",
+          oldTx.parentTransactionId,
+          true,
+        );
         const [updatedTx] = await tx.update(transactions).set(data).where(eq(transactions.id, id)).returning();
-        await applyBalanceDelta(tx, updatedTx.accountId, updatedTx.amount, updatedTx.type, updatedTx.status || "pending", updatedTx.parentTransactionId, false);
+        await applyBalanceDelta(
+          tx,
+          updatedTx.accountId,
+          updatedTx.amount,
+          updatedTx.type,
+          updatedTx.status || "pending",
+          updatedTx.parentTransactionId,
+          false,
+        );
       }
 
       if (updateFuture && (oldTx.fixedTransactionId || oldTx.installmentTotal)) {
@@ -1021,38 +1259,55 @@ export async function updateTransaction(
         const allRelated = await tx
           .select()
           .from(transactions)
-          .where(
-            and(
-              or(...conditions),
-              gte(transactions.date, targetDate),
-              eq(transactions.userId, userId),
-            ),
-          );
+          .where(and(or(...conditions), gte(transactions.date, targetDate), eq(transactions.userId, userId)));
 
         const updatedIds = [oldTx.id];
         if (oldTx.type === "transfer" && oldTx.parentTransactionId) {
-           updatedIds.push(oldTx.parentTransactionId);
+          updatedIds.push(oldTx.parentTransactionId);
         } else if (oldTx.type === "transfer") {
-           const child = allRelated.find(t => t.parentTransactionId === oldTx.id);
-           if (child) updatedIds.push(child.id);
+          const child = allRelated.find((t) => t.parentTransactionId === oldTx.id);
+          if (child) updatedIds.push(child.id);
         }
 
-        const futuresToUpdate = allRelated.filter(t => !updatedIds.includes(t.id));
+        const futuresToUpdate = allRelated.filter((t) => !updatedIds.includes(t.id));
 
         for (const targetTx of futuresToUpdate) {
-            await applyBalanceDelta(tx, targetTx.accountId, targetTx.amount, targetTx.type, targetTx.status || "pending", targetTx.parentTransactionId, true);
-            
-            const [updatedTx] = await tx.update(transactions).set({
+          await applyBalanceDelta(
+            tx,
+            targetTx.accountId,
+            targetTx.amount,
+            targetTx.type,
+            targetTx.status || "pending",
+            targetTx.parentTransactionId,
+            true,
+          );
+
+          const [updatedTx] = await tx
+            .update(transactions)
+            .set({
               amount: data.amount !== undefined ? data.amount : targetTx.amount,
-            }).where(eq(transactions.id, targetTx.id)).returning();
-            
-            await applyBalanceDelta(tx, updatedTx.accountId, updatedTx.amount, updatedTx.type, updatedTx.status || "pending", updatedTx.parentTransactionId, false);
+            })
+            .where(eq(transactions.id, targetTx.id))
+            .returning();
+
+          await applyBalanceDelta(
+            tx,
+            updatedTx.accountId,
+            updatedTx.amount,
+            updatedTx.type,
+            updatedTx.status || "pending",
+            updatedTx.parentTransactionId,
+            false,
+          );
         }
 
         if (oldTx.fixedTransactionId && data.amount !== undefined) {
-           await tx.update(fixedTransactions).set({
-             amount: data.amount
-           }).where(eq(fixedTransactions.id, oldTx.fixedTransactionId));
+          await tx
+            .update(fixedTransactions)
+            .set({
+              amount: data.amount,
+            })
+            .where(eq(fixedTransactions.id, oldTx.fixedTransactionId));
         }
       }
 
@@ -1114,17 +1369,17 @@ export async function fixAllCompetencies() {
 
   const allTxs = await db.select().from(transactions).where(eq(transactions.userId, userId));
   const cards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
-  const cardMap = new Map(cards.map(c => [c.id, c]));
+  const cardMap = new Map(cards.map((c) => [c.id, c]));
 
-  const { calculateCreditCardDueDate } = await import('@/lib/utils/competency');
-  
+  const { calculateCreditCardDueDate } = await import("@/lib/utils/competency");
+
   let updatedCount = 0;
 
   for (const tx of allTxs) {
     const parsedDate = parseISO(tx.date);
     let correctCompetency: string;
 
-    if (tx.type === 'credit_card_expense' && tx.creditCardId) {
+    if (tx.type === "credit_card_expense" && tx.creditCardId) {
       const card = cardMap.get(tx.creditCardId);
       if (!card) continue;
       const dueDate = calculateCreditCardDueDate(parsedDate, card.closingDay, card.dueDay);
@@ -1149,9 +1404,9 @@ export async function backfillInvoiceMonths() {
 
   const txsToUpdate = await db.query.transactions.findMany({
     where: and(
-      eq(transactions.type, 'credit_card_expense'),
+      eq(transactions.type, "credit_card_expense"),
       isNull(transactions.invoiceMonth),
-      eq(transactions.userId, userId)
+      eq(transactions.userId, userId),
     ),
   });
 
@@ -1160,8 +1415,8 @@ export async function backfillInvoiceMonths() {
   }
 
   const cards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
-  const cardMap = new Map(cards.map(c => [c.id, c]));
-  const { calculateCreditCardDueDate } = await import('@/lib/utils/competency');
+  const cardMap = new Map(cards.map((c) => [c.id, c]));
+  const { calculateCreditCardDueDate } = await import("@/lib/utils/competency");
 
   let updatedCount = 0;
 
@@ -1177,9 +1432,7 @@ export async function backfillInvoiceMonths() {
     }
 
     if (newInvoiceMonth) {
-      await db.update(transactions)
-        .set({ invoiceMonth: newInvoiceMonth })
-        .where(eq(transactions.id, tx.id));
+      await db.update(transactions).set({ invoiceMonth: newInvoiceMonth }).where(eq(transactions.id, tx.id));
       updatedCount++;
     }
   }

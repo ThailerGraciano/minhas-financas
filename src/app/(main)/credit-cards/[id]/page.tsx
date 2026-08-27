@@ -1,19 +1,18 @@
-import { getCreditCard, getInvoiceSummary } from '@/app/actions/credit-cards';
-import { getAccounts } from '@/app/actions/accounts';
-import { CompetencyFilter } from '@/components/competency-filter';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, CreditCard as CreditCardIcon, CalendarClock } from 'lucide-react';
-import Link from 'next/link';
-import { format } from 'date-fns';
-import { notFound } from 'next/navigation';
-import { PayInvoiceDialog } from './pay-invoice-dialog';
-import { PrepayInvoiceDialog } from './prepay-invoice-dialog';
-import { AdjustInvoiceDialog } from './adjust-invoice-dialog';
-import { InvoiceTransactionList } from './invoice-transaction-list';
-import { getDefaultCompetencyMonth } from '@/lib/date-utils';
-import { ExportCSVButton } from './export-csv-button';
+import { getAccounts } from "@/app/actions/accounts";
+import { getCreditCard, getInvoiceSummary } from "@/app/actions/credit-cards";
+import { CompetencyFilter } from "@/components/competency-filter";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { getDefaultCompetencyMonth } from "@/lib/date-utils";
+import { ArrowLeft, CalendarClock, CreditCard as CreditCardIcon } from "lucide-react";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { AdjustInvoiceDialog } from "./adjust-invoice-dialog";
+import { ExportCSVButton } from "./export-csv-button";
+import { InvoiceTransactionList } from "./invoice-transaction-list";
+import { PayInvoiceDialog } from "./pay-invoice-dialog";
+import { PrepayInvoiceDialog } from "./prepay-invoice-dialog";
 
 export default async function CreditCardInvoicePage(props: {
   params: Promise<{ id: string }>;
@@ -38,24 +37,23 @@ export default async function CreditCardInvoicePage(props: {
 
   const summary = await getInvoiceSummary(id, currentMonth);
 
-  console.log("summary - ", summary)
+  console.log("summary - ", summary);
   const accounts = await getAccounts();
 
-  const progressPercentage = summary.total_amount > 0
-    ? Math.round((summary.paid_amount / summary.total_amount) * 100)
-    : 0;
+  const progressPercentage =
+    summary.total_amount > 0 ? Math.round((summary.paid_amount / summary.total_amount) * 100) : 0;
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
   };
 
   const formatDate = (dateStr: string) => {
-    const [, month, day] = dateStr.split('-');
+    const [, month, day] = dateStr.split("-");
     return `${day}/${month}`;
   };
 
   return (
-    <div className="container mx-auto p-4 md:p-8 space-y-6 max-w-5xl">
+    <div className="container mx-auto p-2 sm:p-4 md:p-8 space-y-6 max-w-5xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
@@ -73,11 +71,7 @@ export default async function CreditCardInvoicePage(props: {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2">
-          <AdjustInvoiceDialog
-            creditCardId={id}
-            competencyMonth={currentMonth}
-            totalAmount={summary.total_amount}
-          />
+          <AdjustInvoiceDialog creditCardId={id} competencyMonth={currentMonth} totalAmount={summary.total_amount} />
           <PrepayInvoiceDialog
             creditCardId={id}
             competencyMonth={currentMonth}
@@ -94,10 +88,7 @@ export default async function CreditCardInvoicePage(props: {
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-muted/30 rounded-lg border">
-        <CompetencyFilter
-          closingDay={card.closingDay}
-          defaultMonth={getDefaultCompetencyMonth(card.closingDay)}
-        />
+        <CompetencyFilter closingDay={card.closingDay} defaultMonth={getDefaultCompetencyMonth(card.closingDay)} />
       </div>
 
       {/* Visual Summary */}
@@ -139,11 +130,17 @@ export default async function CreditCardInvoicePage(props: {
               </div>
               <div className="min-w-0">
                 <p className="text-[10px] md:text-xs text-muted-foreground mb-1 truncate">Valor Pago</p>
-                <p className="text-sm md:text-xl font-bold text-green-500 truncate">{formatCurrency(summary.paid_amount)}</p>
+                <p className="text-sm md:text-xl font-bold text-green-500 truncate">
+                  {formatCurrency(summary.paid_amount)}
+                </p>
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] md:text-xs text-muted-foreground mb-1 truncate" title="Restante a Pagar">Restante</p>
-                <p className="text-sm md:text-xl font-bold text-red-500 truncate">{formatCurrency(summary.pending_amount)}</p>
+                <p className="text-[10px] md:text-xs text-muted-foreground mb-1 truncate" title="Restante a Pagar">
+                  Restante
+                </p>
+                <p className="text-sm md:text-xl font-bold text-red-500 truncate">
+                  {formatCurrency(summary.pending_amount)}
+                </p>
               </div>
             </div>
             <div className="space-y-2">
@@ -159,13 +156,9 @@ export default async function CreditCardInvoicePage(props: {
 
       {/* Expenses Table */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2 pb-0">
-          <CardTitle className="text-base md:text-lg truncate">Despesas da Fatura - {currentMonth}</CardTitle>
-          <ExportCSVButton
-            transactions={summary.transactions}
-            invoiceMonth={currentMonth}
-            cardName={card.name}
-          />
+        <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
+          <CardTitle className="text-sm md:text-lg shrink-0">Despesas da Fatura - {currentMonth}</CardTitle>
+          <ExportCSVButton transactions={summary.transactions} invoiceMonth={currentMonth} cardName={card.name} />
         </CardHeader>
         <CardContent className="p-2 sm:p-6 pt-0">
           {summary.transactions.length === 0 ? (

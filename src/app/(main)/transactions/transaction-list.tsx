@@ -180,26 +180,26 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
     switch (type) {
       case "income":
         return (
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-green-500/10 shrink-0">
-            <ArrowUpCircle className="w-6 h-6 text-green-500" />
+          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center bg-green-500/10 shrink-0">
+            <ArrowUpCircle className="w-4 h-4 sm:w-6 sm:h-6 text-green-500" />
           </div>
         );
       case "transfer":
         return (
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-blue-500/10 shrink-0">
-            <ArrowRightLeft className="w-6 h-6 text-blue-500" />
+          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center bg-blue-500/10 shrink-0">
+            <ArrowRightLeft className="w-4 h-4 sm:w-6 sm:h-6 text-blue-500" />
           </div>
         );
       case "credit_card_expense":
         return (
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-orange-500/10 shrink-0">
-            <CreditCard className="w-6 h-6 text-orange-500" />
+          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center bg-orange-500/10 shrink-0">
+            <CreditCard className="w-4 h-4 sm:w-6 sm:h-6 text-orange-500" />
           </div>
         );
       default:
         return (
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-destructive/10 shrink-0">
-            <ArrowDownCircle className="w-6 h-6 text-destructive" />
+          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center bg-destructive/10 shrink-0">
+            <ArrowDownCircle className="w-4 h-4 sm:w-6 sm:h-6 text-destructive" />
           </div>
         );
     }
@@ -345,10 +345,10 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
           {displayedTransactions.map((tx) => (
             <div
               key={tx.id}
-              className="group flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+              className="group flex items-center justify-between p-2 sm:p-3 rounded-xl hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 gap-1.5 sm:gap-4"
             >
               {/* Lado Esquerdo (Check, Ícone e Textos) */}
-              <div className="flex items-center gap-3 min-w-0 flex-[2] sm:flex-1">
+              <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-[2] sm:flex-1">
                 <button
                   type="button"
                   onClick={() => handleToggleStatus(tx)}
@@ -356,19 +356,19 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                   className="shrink-0 transition-colors"
                 >
                   {isPending && loadingId === tx.id ? (
-                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                    <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-muted-foreground" />
                   ) : tx.status === "paid" ? (
-                    <CheckCircle2 className="w-5 h-5 text-success" />
+                    <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-success" />
                   ) : tx.status === "partial" ? (
-                    <MinusCircle className="w-5 h-5 text-amber-500" />
+                    <MinusCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
                   ) : (
-                    <Circle className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+                    <Circle className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground hover:text-foreground" />
                   )}
                 </button>
                 {getIcon(tx.type)}
                 <div className="flex flex-col min-w-0">
-                  <span className="font-medium text-base truncate">{tx.description}</span>
-                  <span className="text-xs text-muted-foreground truncate">
+                  <span className="font-medium text-xs sm:text-base truncate leading-tight">{tx.description}</span>
+                  <span className="text-[9px] sm:text-xs text-muted-foreground truncate mt-0.5">
                     {getSource(tx)} • {tx.category?.name || "Geral"}
                   </span>
                 </div>
@@ -400,10 +400,10 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
               </div>
 
               {/* Lado Direito (Valores e Ações) */}
-              <div className="flex items-center gap-3 shrink-0 flex-1 justify-end">
+              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1 sm:gap-3 shrink-0 justify-end">
                 <div className="flex flex-col items-end">
                   <span
-                    className={`font-semibold ${
+                    className={`font-semibold text-xs sm:text-base ${
                       tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)"))
                         ? "text-green-500"
                         : "text-destructive"
@@ -416,33 +416,33 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                   </span>
 
                   {/* Somente visível no mobile onde o centro não aparece */}
-                  <span className="sm:hidden flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
+                  <span className="sm:hidden flex items-center gap-1 text-[9px] text-muted-foreground mt-0.5">
                     {format(parseISO(tx.date), "dd/MM")}
                     {(tx.status === "pending" || tx.status === "partial") && (
                       <button onClick={() => handleMarkAsPaid(tx)} className="text-amber-500 font-bold ml-1 uppercase">
-                        {tx.status === "partial" ? "Parcial" : "Pending"}
+                        {tx.status === "partial" ? "Parc." : "Pend."}
                       </button>
                     )}
                   </span>
                 </div>
 
                 {!tx.isGroup && (
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5 sm:gap-1">
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => setTransactionToEdit(tx)}
-                      className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                      className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-foreground"
                     >
-                      <Pencil className="w-4 h-4" />
+                      <Pencil className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => setTransactionToDelete(tx)}
-                      className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                      className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-foreground"
                     >
-                      <Trash className="w-4 h-4" />
+                      <Trash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </Button>
                   </div>
                 )}

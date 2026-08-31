@@ -194,21 +194,21 @@ export function TransactionFormDialog({
 
   const getSteps = () => {
     if (tab === "expense") {
-      const steps = [1, 2, 3, 4, 5];
-      if (paymentMethod === "account" && isPastOrToday) steps.push(6);
-      steps.push(7);
+      const steps = [1, 2, 3, 4];
+      if (paymentMethod === "account" && isPastOrToday) steps.push(5);
+      steps.push(6);
       return steps;
     }
     if (tab === "income") {
-      const steps = [1, 2, 3, 4, 5];
-      if (isPastOrToday) steps.push(6);
-      steps.push(7);
+      const steps = [1, 2, 3, 4];
+      if (isPastOrToday) steps.push(5);
+      steps.push(6);
       return steps;
     }
     if (tab === "transfer") {
-      return [1, 2, 3, 4, 7];
+      return [1, 2, 3, 4, 6];
     }
-    return [1, 7];
+    return [1, 6];
   };
 
   const stepsList = getSteps();
@@ -218,15 +218,15 @@ export function TransactionFormDialog({
 
   const handleNextStep = () => {
     if (tab === "expense") {
-      if (step === 1 && (!amount || !transactionDate)) return toast.error("Preencha o valor e a data");
-      if (step === 2 && !description.trim()) return toast.error("Preencha a descrição");
+      if (step === 1 && !description.trim()) return toast.error("Preencha a descrição");
+      if (step === 2 && (!amount || !transactionDate)) return toast.error("Preencha o valor e a data");
       if (step === 3 && !selectedCategoryId) return toast.error("Selecione uma categoria");
-      if (step === 4 && expenseType === "installment" && (!currentInstallment || !installmentTotal)) return toast.error("Preencha as parcelas");
-      if (step === 5) {
+      if (step === 4) {
+         if (expenseType === "installment" && (!currentInstallment || !installmentTotal)) return toast.error("Preencha as parcelas");
          if (paymentMethod === "account" && !accountId) return toast.error("Selecione uma conta");
          if (paymentMethod === "credit_card") {
            if (!selectedCreditCardId || !selectedInvoiceMonth) return toast.error("Selecione o cartão e a fatura");
-           // Validar fatura fechada ao avançar (para evitar surpresas no final)
+           // Validar fatura fechada ao avançar
            const card = formData?.creditCards?.find((c: CreditCard) => c.id === Number(selectedCreditCardId));
            if (card) {
              const [year, month] = selectedInvoiceMonth.split("-").map(Number);
@@ -242,14 +242,16 @@ export function TransactionFormDialog({
          }
       }
     } else if (tab === "income") {
-      if (step === 1 && (!amount || !transactionDate)) return toast.error("Preencha o valor e a data");
-      if (step === 2 && !description.trim()) return toast.error("Preencha a descrição");
+      if (step === 1 && !description.trim()) return toast.error("Preencha a descrição");
+      if (step === 2 && (!amount || !transactionDate)) return toast.error("Preencha o valor e a data");
       if (step === 3 && !selectedCategoryId) return toast.error("Selecione uma categoria");
-      if (step === 4 && expenseType === "installment" && (!currentInstallment || !installmentTotal)) return toast.error("Preencha as parcelas");
-      if (step === 5 && !accountIdIncome) return toast.error("Selecione a conta");
+      if (step === 4) {
+         if (expenseType === "installment" && (!currentInstallment || !installmentTotal)) return toast.error("Preencha as parcelas");
+         if (!accountIdIncome) return toast.error("Selecione a conta");
+      }
     } else if (tab === "transfer") {
-      if (step === 1 && (!amount || !transactionDate)) return toast.error("Preencha o valor e a data");
-      if (step === 2 && !description.trim()) return toast.error("Preencha a descrição");
+      if (step === 1 && !description.trim()) return toast.error("Preencha a descrição");
+      if (step === 2 && (!amount || !transactionDate)) return toast.error("Preencha o valor e a data");
       if (step === 3) {
         if (!accountIdTransferOrigin || !accountIdTransferDest) return toast.error("Selecione as contas");
         if (accountIdTransferOrigin === accountIdTransferDest) return toast.error("Contas de origem e destino devem ser diferentes");
@@ -428,7 +430,7 @@ export function TransactionFormDialog({
               </div>
             </>
           )}
-          {stepsList.includes(6) && (
+          {stepsList.includes(5) && (
             <div className="flex justify-between items-center bg-background p-2 rounded-md">
               <span className="text-muted-foreground">Situação:</span>
               <span className={`font-medium ${isPaid ? 'text-emerald-500' : 'text-orange-500'}`}>
@@ -485,20 +487,6 @@ export function TransactionFormDialog({
             <div className="min-h-[200px] sm:min-h-[280px] flex flex-col justify-center">
               {step === 1 && (
                 <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                  <h2 className="text-xl font-medium text-center mb-6">Qual o valor e a data?</h2>
-                  <div className="grid gap-3">
-                    <Label className="text-muted-foreground ml-1">Valor</Label>
-                    <CurrencyInput name="amount" value={amount} onValueChange={setAmount} className="h-14 text-2xl text-center font-semibold" autoFocus />
-                  </div>
-                  <div className="grid gap-3">
-                    <Label className="text-muted-foreground ml-1">Data</Label>
-                    <DatePicker id="date" name="date" value={transactionDate} onChange={setTransactionDate} />
-                  </div>
-                </div>
-              )}
-
-              {step === 2 && (
-                <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
                   <h2 className="text-xl font-medium text-center mb-6">Como deseja chamar?</h2>
                   <div className="grid gap-3">
                     <Label className="text-muted-foreground ml-1">Descrição</Label>
@@ -506,9 +494,37 @@ export function TransactionFormDialog({
                       name="description"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleNextStep(); }}
                       placeholder="Ex: Mercado, Salário..."
                       className="h-14 text-lg text-center"
                       autoFocus
+                    />
+                  </div>
+                </div>
+              )}
+
+              {step === 2 && (
+                <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                  <h2 className="text-xl font-medium text-center mb-6">Qual o valor e a data?</h2>
+                  <div className="grid gap-3">
+                    <Label className="text-muted-foreground ml-1">Valor</Label>
+                    <CurrencyInput 
+                      name="amount" 
+                      value={amount} 
+                      onValueChange={setAmount} 
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleNextStep(); }}
+                      className="h-14 text-2xl text-center font-semibold" 
+                      autoFocus 
+                    />
+                  </div>
+                  <div className="grid gap-3">
+                    <Label className="text-muted-foreground ml-1">Data</Label>
+                    <DatePicker 
+                      id="date" 
+                      name="date" 
+                      value={transactionDate} 
+                      onChange={setTransactionDate} 
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleNextStep(); }}
                     />
                   </div>
                 </div>
@@ -599,20 +615,25 @@ export function TransactionFormDialog({
 
               {step === 4 && (
                 <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                  <h2 className="text-xl font-medium text-center mb-6">Qual a recorrência?</h2>
-                  <div className="flex gap-4 p-4 rounded-xl bg-muted/20 border justify-center">
-                    <label className="flex flex-col items-center gap-2 cursor-pointer p-3 rounded-lg hover:bg-muted/50 transition-colors flex-1">
-                      <input type="radio" checked={expenseType === "single"} onChange={() => setExpenseType("single")} className="w-5 h-5 accent-primary" />
-                      <span className="font-medium text-sm">Única</span>
-                    </label>
-                    <label className="flex flex-col items-center gap-2 cursor-pointer p-3 rounded-lg hover:bg-muted/50 transition-colors flex-1">
-                      <input type="radio" checked={expenseType === "fixed"} onChange={() => setExpenseType("fixed")} className="w-5 h-5 accent-primary" />
-                      <span className="font-medium text-sm">Fixa</span>
-                    </label>
-                    <label className="flex flex-col items-center gap-2 cursor-pointer p-3 rounded-lg hover:bg-muted/50 transition-colors flex-1">
-                      <input type="radio" checked={expenseType === "installment"} onChange={() => setExpenseType("installment")} className="w-5 h-5 accent-primary" />
-                      <span className="font-medium text-sm">Parcelada</span>
-                    </label>
+                  <h2 className="text-xl font-medium text-center mb-6">Como isso vai funcionar?</h2>
+                  
+                  {/* Recorrência */}
+                  <div className="grid gap-3">
+                    <Label className="text-muted-foreground ml-1">Recorrência</Label>
+                    <div className="flex gap-4 justify-center">
+                      <label className={`flex flex-col items-center gap-3 cursor-pointer p-4 rounded-xl border-2 transition-all flex-1 ${expenseType === 'single' ? 'border-primary bg-primary/5' : 'border-transparent bg-muted/20 hover:bg-muted/50'}`}>
+                        <input type="radio" checked={expenseType === "single"} onChange={() => setExpenseType("single")} className="w-6 h-6 accent-primary" />
+                        <span className="font-semibold text-sm">Única</span>
+                      </label>
+                      <label className={`flex flex-col items-center gap-3 cursor-pointer p-4 rounded-xl border-2 transition-all flex-1 ${expenseType === 'fixed' ? 'border-primary bg-primary/5' : 'border-transparent bg-muted/20 hover:bg-muted/50'}`}>
+                        <input type="radio" checked={expenseType === "fixed"} onChange={() => setExpenseType("fixed")} className="w-6 h-6 accent-primary" />
+                        <span className="font-semibold text-sm">Fixa</span>
+                      </label>
+                      <label className={`flex flex-col items-center gap-3 cursor-pointer p-4 rounded-xl border-2 transition-all flex-1 ${expenseType === 'installment' ? 'border-primary bg-primary/5' : 'border-transparent bg-muted/20 hover:bg-muted/50'}`}>
+                        <input type="radio" checked={expenseType === "installment"} onChange={() => setExpenseType("installment")} className="w-6 h-6 accent-primary" />
+                        <span className="font-semibold text-sm">Parcelada</span>
+                      </label>
+                    </div>
                   </div>
 
                   {expenseType === "installment" && (
@@ -633,36 +654,86 @@ export function TransactionFormDialog({
                             O valor é o total da compra?
                           </Label>
                           <p className="text-sm text-muted-foreground">
-                            Ativo: Divide o valor pelas parcelas. Inativo: O valor é de cada parcela.
+                            Ativo: Divide o valor. Inativo: Valor de cada parcela.
                           </p>
                         </div>
                         <Switch checked={isTotalAmount} onCheckedChange={setIsTotalAmount} />
                       </div>
                     </div>
                   )}
-                </div>
-              )}
 
-              {step === 5 && tab === "expense" && (
-                <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                  <h2 className="text-xl font-medium text-center mb-6">Como isso foi pago?</h2>
-                  
-                  <div className="flex gap-4 p-4 rounded-xl bg-muted/20 border justify-center">
-                    <label className="flex flex-col items-center gap-2 cursor-pointer p-3 rounded-lg hover:bg-muted/50 transition-colors flex-1">
-                      <input type="radio" checked={paymentMethod === "account"} onChange={() => setPaymentMethod("account")} className="w-5 h-5 accent-primary" />
-                      <span className="font-medium">Conta</span>
-                    </label>
-                    <label className="flex flex-col items-center gap-2 cursor-pointer p-3 rounded-lg hover:bg-muted/50 transition-colors flex-1">
-                      <input type="radio" checked={paymentMethod === "credit_card"} onChange={() => setPaymentMethod("credit_card")} className="w-5 h-5 accent-primary" />
-                      <span className="font-medium">Cartão de Crédito</span>
-                    </label>
-                  </div>
+                  {/* Payment Method (Expense/Income) */}
+                  {tab === "expense" && (
+                    <>
+                      <div className="grid gap-3 mt-6 border-t pt-6">
+                        <Label className="text-muted-foreground ml-1">Forma de Pagamento</Label>
+                        <div className="flex gap-4 justify-center">
+                          <label className={`flex flex-col items-center gap-3 cursor-pointer p-4 rounded-xl border-2 transition-all flex-1 ${paymentMethod === 'account' ? 'border-primary bg-primary/5' : 'border-transparent bg-muted/20 hover:bg-muted/50'}`}>
+                            <input type="radio" checked={paymentMethod === "account"} onChange={() => setPaymentMethod("account")} className="w-6 h-6 accent-primary" />
+                            <span className="font-semibold">Conta</span>
+                          </label>
+                          <label className={`flex flex-col items-center gap-3 cursor-pointer p-4 rounded-xl border-2 transition-all flex-1 ${paymentMethod === 'credit_card' ? 'border-primary bg-primary/5' : 'border-transparent bg-muted/20 hover:bg-muted/50'}`}>
+                            <input type="radio" checked={paymentMethod === "credit_card"} onChange={() => setPaymentMethod("credit_card")} className="w-6 h-6 accent-primary" />
+                            <span className="font-semibold text-center">Cartão de Crédito</span>
+                          </label>
+                        </div>
+                      </div>
 
-                  {paymentMethod === "account" && (
-                    <div className="grid gap-3 animate-in fade-in">
-                      <Label className="text-muted-foreground ml-1">Selecione a Conta</Label>
-                      <Select value={accountId} onValueChange={setAccountId}>
-                        <SelectTrigger className="h-14 w-full rounded-xl text-lg">
+                      {paymentMethod === "account" && (
+                        <div className="grid gap-3 animate-in fade-in">
+                          <Label className="text-muted-foreground ml-1">Selecione a Conta</Label>
+                          <Select value={accountId} onValueChange={setAccountId}>
+                            <SelectTrigger className="h-14 w-full rounded-xl text-lg">
+                              <SelectValue placeholder="Selecione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {formData.accounts.map((a: Account) => (
+                                <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {paymentMethod === "credit_card" && (
+                        <div className="space-y-5 animate-in fade-in">
+                          <div className="grid gap-3">
+                            <Label className="text-muted-foreground ml-1">Cartão de Crédito</Label>
+                            <Select value={selectedCreditCardId} onValueChange={handleCreditCardChange}>
+                              <SelectTrigger className="h-14 w-full rounded-xl text-lg">
+                                <SelectValue placeholder="Selecione..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {formData.creditCards.map((c: CreditCard) => (
+                                  <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {selectedCreditCardId && invoiceOptions.length > 0 && (
+                            <div className="grid gap-3">
+                              <Label className="text-muted-foreground ml-1">Fatura</Label>
+                              <div className="flex flex-wrap gap-4 p-4 rounded-xl bg-muted/20 border max-h-48 overflow-y-auto">
+                                {invoiceOptions.map((opt) => (
+                                  <label key={opt.value} className={`flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap bg-background p-3 rounded-lg border-2 flex-1 justify-center transition-all ${selectedInvoiceMonth === opt.value ? 'border-primary' : 'border-transparent hover:border-primary/50'}`}>
+                                    <input type="radio" value={opt.value} checked={selectedInvoiceMonth === opt.value} onChange={() => setSelectedInvoiceMonth(opt.value)} className="w-5 h-5 accent-primary" /> 
+                                    <span className="font-semibold">{opt.label}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {tab === "income" && (
+                    <div className="grid gap-3 mt-6 border-t pt-6">
+                      <Label className="text-muted-foreground ml-1">Depositar na Conta</Label>
+                      <Select value={accountIdIncome} onValueChange={setAccountIdIncome}>
+                        <SelectTrigger className="h-14 w-full rounded-xl text-lg bg-muted/40">
                           <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -673,61 +744,10 @@ export function TransactionFormDialog({
                       </Select>
                     </div>
                   )}
-
-                  {paymentMethod === "credit_card" && (
-                    <div className="space-y-5 animate-in fade-in">
-                      <div className="grid gap-3">
-                        <Label className="text-muted-foreground ml-1">Cartão de Crédito</Label>
-                        <Select value={selectedCreditCardId} onValueChange={handleCreditCardChange}>
-                          <SelectTrigger className="h-14 w-full rounded-xl text-lg">
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {formData.creditCards.map((c: CreditCard) => (
-                              <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {selectedCreditCardId && invoiceOptions.length > 0 && (
-                        <div className="grid gap-3">
-                          <Label className="text-muted-foreground ml-1">Fatura</Label>
-                          <div className="flex flex-wrap gap-4 p-4 rounded-xl bg-muted/20 border max-h-48 overflow-y-auto">
-                            {invoiceOptions.map((opt) => (
-                              <label key={opt.value} className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap bg-background p-2 rounded-lg border flex-1 justify-center hover:border-primary transition-all">
-                                <input type="radio" value={opt.value} checked={selectedInvoiceMonth === opt.value} onChange={() => setSelectedInvoiceMonth(opt.value)} className="accent-primary" /> 
-                                <span className="font-medium">{opt.label}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
 
-              {step === 5 && tab === "income" && (
-                <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                  <h2 className="text-xl font-medium text-center mb-6">Onde vai entrar esse dinheiro?</h2>
-                  <div className="grid gap-3">
-                    <Label className="text-muted-foreground ml-1">Depositar na Conta</Label>
-                    <Select value={accountIdIncome} onValueChange={setAccountIdIncome}>
-                      <SelectTrigger className="h-14 w-full rounded-xl text-lg bg-muted/40">
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {formData.accounts.map((a: Account) => (
-                          <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              )}
-
-              {step === 6 && (
+              {step === 5 && (
                 <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
                   <h2 className="text-xl font-medium text-center mb-6">Qual a situação atual?</h2>
                   <div className="flex flex-col items-center justify-center p-8 rounded-xl border bg-muted/20 gap-6">
@@ -744,7 +764,7 @@ export function TransactionFormDialog({
                 </div>
               )}
 
-              {step === 7 && (
+              {step === 6 && (
                 <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
                   {renderSummary()}
                   {formError && <p className="text-sm text-destructive text-center">{formError}</p>}

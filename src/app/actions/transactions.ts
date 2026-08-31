@@ -314,6 +314,8 @@ export async function createTransaction(
         for (let i = 0; i < 12; i++) {
           const nextDate = addMonths(baseDate, i);
           const nextCompetency = addMonths(baseCompetency, i);
+          const nextCompetencyStr = format(nextCompetency, "yyyy-MM");
+          const invoiceMonthStr = txData.type === "credit_card_expense" ? nextCompetencyStr : null;
 
           if (isTransfer) {
             const status = i === 0 ? txData.status || "pending" : "pending";
@@ -324,7 +326,8 @@ export async function createTransaction(
                 userId,
                 description: `${txData.description} (Saída)`,
                 date: format(nextDate, "yyyy-MM-dd"),
-                competencyMonth: format(nextCompetency, "yyyy-MM"),
+                competencyMonth: nextCompetencyStr,
+                invoiceMonth: invoiceMonthStr,
                 status,
                 fixedTransactionId: fixedTx.id,
               })
@@ -337,7 +340,8 @@ export async function createTransaction(
               accountId: destinationAccountId,
               description: `${txData.description} (Entrada)`,
               date: format(nextDate, "yyyy-MM-dd"),
-              competencyMonth: format(nextCompetency, "yyyy-MM"),
+              competencyMonth: nextCompetencyStr,
+              invoiceMonth: invoiceMonthStr,
               status,
               fixedTransactionId: fixedTx.id,
               parentTransactionId: originTx.id,
@@ -349,7 +353,8 @@ export async function createTransaction(
               ...txData,
               userId,
               date: format(nextDate, "yyyy-MM-dd"),
-              competencyMonth: format(nextCompetency, "yyyy-MM"),
+              competencyMonth: nextCompetencyStr,
+              invoiceMonth: invoiceMonthStr,
               status,
               fixedTransactionId: fixedTx.id,
             });
@@ -459,6 +464,8 @@ export async function createTransaction(
         for (let i = currentInstallment + 1; i <= totalInstallments; i++) {
           const nextDate = addMonths(baseDate, i - currentInstallment);
           const nextCompetency = addMonths(baseCompetency, i - currentInstallment);
+          const nextCompetencyStr = format(nextCompetency, "yyyy-MM");
+          const invoiceMonthStr = txData.type === "credit_card_expense" ? nextCompetencyStr : null;
           const isLast = i === totalInstallments;
 
           if (isTransfer) {
@@ -470,7 +477,8 @@ export async function createTransaction(
                 userId,
                 amount: isLast ? lastParcelAmount : baseParcelAmount,
                 date: format(nextDate, "yyyy-MM-dd"),
-                competencyMonth: format(nextCompetency, "yyyy-MM"),
+                competencyMonth: nextCompetencyStr,
+                invoiceMonth: invoiceMonthStr,
                 status: "pending",
                 installmentCurrent: i,
                 installmentParentId: originParentId,
@@ -484,7 +492,8 @@ export async function createTransaction(
               userId,
               amount: isLast ? lastParcelAmount : baseParcelAmount,
               date: format(nextDate, "yyyy-MM-dd"),
-              competencyMonth: format(nextCompetency, "yyyy-MM"),
+              competencyMonth: nextCompetencyStr,
+              invoiceMonth: invoiceMonthStr,
               status: "pending",
               installmentCurrent: i,
               parentTransactionId: originTx.id,
@@ -497,7 +506,8 @@ export async function createTransaction(
               userId,
               amount: isLast ? lastParcelAmount : baseParcelAmount,
               date: format(nextDate, "yyyy-MM-dd"),
-              competencyMonth: format(nextCompetency, "yyyy-MM"),
+              competencyMonth: nextCompetencyStr,
+              invoiceMonth: invoiceMonthStr,
               status: "pending",
               installmentCurrent: i,
               installmentParentId: originParentId,

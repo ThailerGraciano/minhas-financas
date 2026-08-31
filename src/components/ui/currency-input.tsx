@@ -1,10 +1,12 @@
 "use client";
 
-import * as React from "react";
 import { cn } from "@/lib/utils";
+import * as React from "react";
 
-interface CurrencyInputProps
-  extends Omit<React.ComponentProps<"input">, "type" | "value" | "onChange" | "defaultValue"> {
+interface CurrencyInputProps extends Omit<
+  React.ComponentProps<"input">,
+  "type" | "value" | "onChange" | "defaultValue"
+> {
   /** The form field name — a hidden input with this name will hold the decimal value */
   name: string;
   /** Controlled decimal value (e.g. 12.50). If omitted, the component is uncontrolled. */
@@ -54,24 +56,20 @@ function CurrencyInput({
     }
   }, [controlledValue]);
 
-  const currentCents =
-    controlledValue !== undefined
-      ? Math.round(controlledValue * 100)
-      : cents;
+  const currentCents = controlledValue !== undefined ? Math.round(controlledValue * 100) : cents;
 
   const decimalValue = currentCents / 100;
 
   const displayValue = formatBRL(currentCents);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (props.onKeyDown) {
+      props.onKeyDown(e);
+      if (e.defaultPrevented) return;
+    }
+
     // Allow navigation / accessibility keys
-    if (
-      e.key === "Tab" ||
-      e.key === "Enter" ||
-      e.key === "Escape" ||
-      e.key === "ArrowLeft" ||
-      e.key === "ArrowRight"
-    ) {
+    if (e.key === "Tab" || e.key === "Enter" || e.key === "Escape" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
       return;
     }
 
@@ -105,10 +103,10 @@ function CurrencyInput({
     if (/^[0-9]$/.test(e.key)) {
       const isNegative = currentCents < 0 || Object.is(currentCents, -0);
       const base = Math.abs(currentCents);
-      
+
       // Prevent absurdly large values (max ~999.999.999,99)
       if (base > 9_999_999_999) return;
-      
+
       const next = (base * 10 + Number(e.key)) * (isNegative ? -1 : 1);
       updateValue(next);
     }
@@ -146,7 +144,7 @@ function CurrencyInput({
         data-slot="input"
         className={cn(
           "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
-          className
+          className,
         )}
         value={currentCents === 0 ? "" : displayValue}
         placeholder={placeholder ?? "R$ 0,00"}
@@ -155,9 +153,7 @@ function CurrencyInput({
         required={required}
         // Make required validation work: if cents is 0 the field is "empty"
         // The hidden input always has a value, so we rely on the visible input for validation
-        {...(required && currentCents === 0
-          ? { "aria-invalid": true as const }
-          : {})}
+        {...(required && currentCents === 0 ? { "aria-invalid": true as const } : {})}
       />
     </>
   );

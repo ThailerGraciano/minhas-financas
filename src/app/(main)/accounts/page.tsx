@@ -1,8 +1,8 @@
-import { getAccounts } from '@/app/actions/accounts';
-import { AccountsClientPage } from './accounts-client-page';
+import { getAccounts } from "@/app/actions/accounts";
+import { AccountsClientPage } from "./accounts-client-page";
 
 export const metadata = {
-  title: 'Contas | Minhas Finanças',
+  title: "Contas | Minhas Finanças",
 };
 
 export default async function AccountsPage() {
@@ -16,7 +16,7 @@ export default async function AccountsPage() {
   }));
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
+    <div className="container mx-auto px-0 py-4 md:p-8">
       <AccountsClientPage initialAccounts={mappedAccounts} />
     </div>
   );

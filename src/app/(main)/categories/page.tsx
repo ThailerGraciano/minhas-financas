@@ -1,6 +1,6 @@
-import { getCategories } from '@/app/actions/categories';
-import { AddCategoryDialog } from './client-components';
-import { CategoryTree, Category } from './category-tree';
+import { getCategories } from "@/app/actions/categories";
+import { AddCategoryDialog } from "./client-components";
+import { CategoryTree, Category } from "./category-tree";
 
 export default async function CategoriesPage() {
   const categories = await getCategories();
@@ -20,11 +20,11 @@ export default async function CategoriesPage() {
     }))
   }));
 
-  const expenseCategories = mappedCategories.filter((c) => c.type === 'expense');
-  const incomeCategories = mappedCategories.filter((c) => c.type === 'income');
+  const expenseCategories = mappedCategories.filter((c) => c.type === "expense");
+  const incomeCategories = mappedCategories.filter((c) => c.type === "income");
 
   return (
-    <div className="container mx-auto p-4 md:p-8 space-y-6">
+    <div className="container mx-auto px-0 py-4 md:p-8 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Categorias</h1>

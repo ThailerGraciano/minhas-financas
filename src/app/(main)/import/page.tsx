@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { importCSV } from "@/app/actions/import";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload, FileText, CheckCircle2, AlertCircle } from "lucide-react";
-import { importCSV } from "@/app/actions/import";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertCircle, CheckCircle2, FileText, Upload } from "lucide-react";
+import { useState } from "react";
 
 type ImportResult = {
   success: boolean;
@@ -63,16 +63,16 @@ export default function ImportPage() {
   };
 
   return (
-    <div className="container mx-auto p-4 max-w-3xl space-y-6 pb-24">
+    <div className="container mx-auto px-0 py-4 max-w-3xl space-y-6 pb-24">
       <div>
         <h1 className="text-3xl font-bold tracking-tight mb-2">Importar Transações</h1>
         <p className="text-muted-foreground">
           Faça o upload do seu arquivo CSV contendo os registros de despesas, receitas ou transferências.
         </p>
       </div>
-      
-      <Tabs 
-        value={activeTab} 
+
+      <Tabs
+        value={activeTab}
         onValueChange={(val) => {
           setActiveTab(val as "expense" | "income" | "transfer");
           setFile(null);
@@ -88,14 +88,19 @@ export default function ImportPage() {
 
         <Card className="border-border">
           <CardHeader>
-            <CardTitle>Upload de CSV - {activeTab === 'expense' ? 'Despesas' : activeTab === 'income' ? 'Receitas' : 'Transferências'}</CardTitle>
+            <CardTitle>
+              Upload de CSV -{" "}
+              {activeTab === "expense" ? "Despesas" : activeTab === "income" ? "Receitas" : "Transferências"}
+            </CardTitle>
             <CardDescription>
-              Selecione o arquivo CSV contendo suas {activeTab === 'expense' ? 'despesas' : activeTab === 'income' ? 'receitas' : 'transferências'} para importação.
+              Selecione o arquivo CSV contendo suas{" "}
+              {activeTab === "expense" ? "despesas" : activeTab === "income" ? "receitas" : "transferências"} para
+              importação.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="w-full">
-              <Label 
+              <Label
                 htmlFor="csv-file"
                 className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-muted-foreground/25 rounded-xl cursor-pointer bg-muted/20 hover:bg-muted/50 transition-colors"
               >
@@ -104,17 +109,9 @@ export default function ImportPage() {
                   <p className="mb-2 text-sm text-muted-foreground">
                     <span className="font-semibold text-foreground">Clique para selecionar</span> ou arraste e solte
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    Apenas arquivos .CSV são suportados
-                  </p>
+                  <p className="text-xs text-muted-foreground">Apenas arquivos .CSV são suportados</p>
                 </div>
-                <Input 
-                  id="csv-file" 
-                  type="file" 
-                  accept=".csv" 
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
+                <Input id="csv-file" type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
               </Label>
             </div>
 
@@ -130,17 +127,14 @@ export default function ImportPage() {
               </div>
             )}
 
-            <Button 
-              className="w-full h-11" 
-              onClick={handleImport} 
-              disabled={!file || isImporting}
-            >
+            <Button className="w-full h-11" onClick={handleImport} disabled={!file || isImporting}>
               {isImporting ? (
                 "Processando Importação..."
               ) : (
                 <>
                   <Upload className="w-4 h-4 mr-2" />
-                  Iniciar Importação de {activeTab === 'expense' ? 'Despesas' : activeTab === 'income' ? 'Receitas' : 'Transferências'}
+                  Iniciar Importação de{" "}
+                  {activeTab === "expense" ? "Despesas" : activeTab === "income" ? "Receitas" : "Transferências"}
                 </>
               )}
             </Button>
@@ -149,8 +143,10 @@ export default function ImportPage() {
       </Tabs>
 
       {importResult && (
-        <Card className={`overflow-hidden border-2 ${importResult.success ? 'border-green-500/30' : 'border-destructive/30'}`}>
-          <div className={`h-1.5 w-full ${importResult.success ? 'bg-green-500' : 'bg-destructive'}`} />
+        <Card
+          className={`overflow-hidden border-2 ${importResult.success ? "border-green-500/30" : "border-destructive/30"}`}
+        >
+          <div className={`h-1.5 w-full ${importResult.success ? "bg-green-500" : "bg-destructive"}`} />
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               {importResult.success ? (
@@ -184,12 +180,12 @@ export default function ImportPage() {
                     <div className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">
                       {importResult.result.skippedRows}
                     </div>
-                    <div className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-1">Ignoradas (já existiam)</div>
+                    <div className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-1">
+                      Ignoradas (já existiam)
+                    </div>
                   </div>
                   <div className="bg-destructive/10 rounded-xl p-4 border border-destructive/20">
-                    <div className="text-3xl font-bold text-destructive">
-                      {importResult.result.errorRows}
-                    </div>
+                    <div className="text-3xl font-bold text-destructive">{importResult.result.errorRows}</div>
                     <div className="text-xs text-destructive/80 mt-1">Erros</div>
                   </div>
                 </div>
@@ -202,7 +198,10 @@ export default function ImportPage() {
                     </h4>
                     <div className="max-h-[300px] overflow-y-auto space-y-2 rounded-lg border border-border p-1 bg-muted/30">
                       {importResult.result.errorsDetail.map((err, i) => (
-                        <div key={i} className="text-sm p-3 bg-background rounded-md border border-border flex flex-col gap-1">
+                        <div
+                          key={i}
+                          className="text-sm p-3 bg-background rounded-md border border-border flex flex-col gap-1"
+                        >
                           <span className="font-medium text-destructive">Linha {err.row}</span>
                           <span className="text-muted-foreground">{err.error}</span>
                         </div>

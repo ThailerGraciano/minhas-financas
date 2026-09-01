@@ -73,7 +73,7 @@ export function GlobalIncomeExpenseChart({ initialData, competencyMonth }: Globa
   const chartData = [data];
 
   return (
-    <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
+    <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">Comparativo Geral</h2>
         <div className="flex items-center space-x-2">

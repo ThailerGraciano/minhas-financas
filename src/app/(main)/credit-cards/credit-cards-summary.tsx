@@ -50,7 +50,7 @@ export function CreditCardsSummary({ cards, selectedMonth }: CreditCardsSummaryP
   return (
     <div className="grid grid-cols-1 gap-6 mt-8 mb-8">
       {/* Resumo das Faturas */}
-      <Card className="rounded-[2rem] border-transparent shadow-sm flex flex-col h-full overflow-hidden">
+      <Card className="rounded-none sm:rounded-[2rem] border-transparent shadow-sm flex flex-col h-full overflow-hidden">
         <CardHeader className="pb-2">
           <CardTitle className="text-xl font-bold">Resumo das Faturas</CardTitle>
         </CardHeader>
@@ -95,7 +95,7 @@ export function CreditCardsSummary({ cards, selectedMonth }: CreditCardsSummaryP
       {/* Gráfico de Categorias */}
       <div className="h-full">
         {isLoading ? (
-          <Card className="rounded-[2rem] border-transparent shadow-sm flex flex-col h-full w-full overflow-hidden">
+          <Card className="rounded-none sm:rounded-[2rem] border-transparent shadow-sm flex flex-col h-full w-full overflow-hidden">
             <CardHeader className="pb-2">
               <CardTitle className="text-xl font-bold">Gastos por Categoria</CardTitle>
             </CardHeader>

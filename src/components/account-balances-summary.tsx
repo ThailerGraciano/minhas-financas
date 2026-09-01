@@ -36,7 +36,7 @@ export function AccountBalancesSummary({ balances, totalBalance }: { balances: B
       {balances.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
           {balances.map((b) => (
-            <div key={b.type} className="bg-card rounded-[2rem] border-transparent shadow-sm flex flex-col justify-center p-4 md:p-6 space-y-3 md:space-y-4 min-w-0">
+            <div key={b.type} className="bg-card rounded-none sm:rounded-[2rem] border-transparent shadow-sm flex flex-col justify-center p-4 md:px-4 py-6 sm:px-4 py-6 sm:p-6 space-y-3 md:space-y-4 min-w-0">
               <div className="w-10 h-10 bg-background rounded-full flex items-center justify-center">
                 {getIcon(b.type)}
               </div>

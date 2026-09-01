@@ -70,7 +70,7 @@ export function MarketReceiptsList({ receipts }: MarketReceiptsListProps) {
 
   return (
     <>
-      <Card className="rounded-[2rem] border-transparent shadow-sm">
+      <Card className="rounded-none sm:rounded-[2rem] border-transparent shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-xl font-bold flex items-center gap-2">
             <ShoppingBag className="w-5 h-5 text-primary" />

@@ -48,7 +48,7 @@ export default async function PlanningPage(props: {
   const finalProjectedBalance = projection.length > 0 ? projection[projection.length - 1].projected_balance : 0;
 
   return (
-    <div className="container mx-auto p-4 md:p-8 space-y-6 max-w-6xl">
+    <div className="container mx-auto px-0 py-4 md:p-8 space-y-6 max-w-6xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">

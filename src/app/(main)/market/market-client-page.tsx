@@ -30,7 +30,7 @@ export function MarketClientPage({ closingDay, initialData }: { closingDay: numb
       {(data) => (
         <div className="space-y-6 mt-6 w-full min-w-0">
           <div className="grid gap-6 md:grid-cols-2 min-w-0">
-            <Card className="rounded-[2rem] border-transparent shadow-sm">
+            <Card className="rounded-none sm:rounded-[2rem] border-transparent shadow-sm">
               <CardContent className="p-6 flex flex-col space-y-4">
                 <div className="flex items-center gap-2">
                   <ShoppingCart className="h-5 w-5 text-primary" />
@@ -40,7 +40,7 @@ export function MarketClientPage({ closingDay, initialData }: { closingDay: numb
               </CardContent>
             </Card>
 
-            <Card className="rounded-[2rem] border-transparent shadow-sm">
+            <Card className="rounded-none sm:rounded-[2rem] border-transparent shadow-sm">
               <CardContent className="p-6 flex flex-col space-y-4">
                 <div className="flex items-center gap-2">
                   <PiggyBank className="h-5 w-5 text-green-500" />

@@ -34,7 +34,7 @@ export function DashboardClientPage({ closingDay, initialData }: { closingDay: n
           <AccountBalancesSummary balances={dashboard.balancesData.balancesByType} totalBalance={dashboard.balancesData.totalBalance} />
 
           {/* Gráfico de Evolução de Saldo */}
-          <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
+          <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
             <div className="flex flex-row items-center gap-2 mb-4">
               <TrendingUp className="h-5 w-5 text-primary" />
               <div>
@@ -62,7 +62,7 @@ export function DashboardClientPage({ closingDay, initialData }: { closingDay: n
           </div>
 
           {/* Gráfico de Parcelas */}
-          <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
+          <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
             <div className="flex flex-row items-center gap-2 mb-4">
               <Layers className="h-5 w-5 text-primary" />
               <div>
@@ -78,7 +78,7 @@ export function DashboardClientPage({ closingDay, initialData }: { closingDay: n
           </div>
 
           {/* Previsão de Gastos */}
-          <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
+          <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
             <div className="flex flex-row items-center gap-2 mb-4">
               <TrendingUp className="h-5 w-5 text-primary" />
               <div>
@@ -94,7 +94,7 @@ export function DashboardClientPage({ closingDay, initialData }: { closingDay: n
           </div>
 
           {/* Previsão por Categoria */}
-          <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
+          <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
             <div className="flex flex-row items-center gap-2 mb-4">
               <Grid3X3 className="h-5 w-5 text-primary" />
               <div>
@@ -111,7 +111,7 @@ export function DashboardClientPage({ closingDay, initialData }: { closingDay: n
 
           {/* Resumo do Mês */}
           <div className="grid gap-6 md:grid-cols-2">
-            <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm flex flex-col space-y-4">
+            <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm flex flex-col space-y-4">
               <div className="flex items-center gap-2">
                 <ArrowUpCircle className="h-5 w-5 text-green-500" />
                 <span className="text-sm font-medium text-muted-foreground">Receitas do Mês</span>
@@ -122,7 +122,7 @@ export function DashboardClientPage({ closingDay, initialData }: { closingDay: n
               </div>
             </div>
 
-            <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm flex flex-col space-y-4">
+            <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm flex flex-col space-y-4">
               <div className="flex items-center gap-2">
                 <ArrowDownCircle className="h-5 w-5 text-red-500" />
                 <span className="text-sm font-medium text-muted-foreground">Despesas do Mês</span>
@@ -147,7 +147,7 @@ export function DashboardClientPage({ closingDay, initialData }: { closingDay: n
           </div>
 
           {/* Mapa de Despesas */}
-          <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
+          <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
             <div className="flex flex-row items-center gap-2 mb-4">
               <Grid3X3 className="h-5 w-5 text-primary" />
               <div>
@@ -162,7 +162,7 @@ export function DashboardClientPage({ closingDay, initialData }: { closingDay: n
 
           {/* Contas e Faturas */}
           <div className="grid gap-6 md:grid-cols-2">
-            <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
+            <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
               <h2 className="text-xl font-bold mb-4">Saldos por Conta</h2>
               <div className="space-y-4">
                 {dashboard.data.accounts.map(acc => (
@@ -179,7 +179,7 @@ export function DashboardClientPage({ closingDay, initialData }: { closingDay: n
               </div>
             </div>
 
-            <div className="bg-card rounded-[2rem] p-6 border-transparent shadow-sm w-full min-w-0">
+            <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
               <h2 className="text-xl font-bold mb-4">Faturas Abertas</h2>
               <div className="space-y-4">
                 {dashboard.data.cardInvoices.map(invoice => (

@@ -65,7 +65,7 @@ export function CreditCardList({ cards, selectedMonth }: { cards: CreditCardType
   return (
     <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mt-4">
       {cards.map((card) => (
-        <div key={card.id} className="bg-card rounded-[2rem] border-transparent shadow-sm transition-all hover:shadow-md flex flex-col p-5 md:p-6 min-w-0">
+        <div key={card.id} className="bg-card rounded-none sm:rounded-[2rem] border-transparent shadow-sm transition-all hover:shadow-md flex flex-col p-5 md:px-4 py-6 sm:px-4 py-6 sm:p-6 min-w-0">
           <div className="flex flex-row items-center justify-between pb-4">
             <h3 className="text-lg font-bold truncate mr-2">{card.name}</h3>
             <div className="flex items-center gap-2">

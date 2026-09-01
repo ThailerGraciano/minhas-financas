@@ -61,7 +61,7 @@ export function MarketAllItemsList({ items }: MarketAllItemsListProps) {
   }, [items, sortKey, sortOrder]);
 
   return (
-    <Card className="rounded-[2rem] border-transparent shadow-sm w-full min-w-0">
+    <Card className="rounded-none sm:rounded-[2rem] border-transparent shadow-sm w-full min-w-0">
       <CardHeader className="flex flex-row items-center gap-2 pb-4">
         <List className="h-5 w-5 text-primary" />
         <div>

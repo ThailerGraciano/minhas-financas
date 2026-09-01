@@ -44,11 +44,11 @@ export async function BalanceAllocator({ projectedBalance, competencyMonth }: Ba
       
       <CardContent>
         {distributableAmount <= 0 ? (
-          <div className="bg-muted/30 border border-dashed rounded-lg p-6 text-center text-muted-foreground text-sm">
+          <div className="bg-muted/30 border border-dashed rounded-lg px-4 py-6 sm:p-6 text-center text-muted-foreground text-sm">
             Não há saldo projetado suficiente para distribuição após reter o valor base de {formatBRL(baseKeepAmount)}.
           </div>
         ) : rules.length === 0 ? (
-          <div className="bg-muted/30 border border-dashed rounded-lg p-6 text-center text-muted-foreground text-sm">
+          <div className="bg-muted/30 border border-dashed rounded-lg px-4 py-6 sm:p-6 text-center text-muted-foreground text-sm">
             Nenhuma regra configurada. O valor excedente permanecerá na conta.
           </div>
         ) : (

@@ -48,7 +48,7 @@ export function TopMarketItemsChart({ data }: TopMarketItemsChartProps) {
 
   if (data.length === 0) {
     return (
-      <Card className="rounded-[2rem] border-transparent shadow-sm flex flex-col h-full w-full overflow-hidden">
+      <Card className="rounded-none sm:rounded-[2rem] border-transparent shadow-sm flex flex-col h-full w-full overflow-hidden">
         <CardHeader className="pb-2">
           <CardTitle className="text-xl font-bold">Produtos Mais Caros</CardTitle>
         </CardHeader>
@@ -60,7 +60,7 @@ export function TopMarketItemsChart({ data }: TopMarketItemsChartProps) {
   }
 
   return (
-    <Card className="rounded-[2rem] border-transparent shadow-sm flex flex-col h-full w-full min-w-0 overflow-hidden">
+    <Card className="rounded-none sm:rounded-[2rem] border-transparent shadow-sm flex flex-col h-full w-full min-w-0 overflow-hidden">
       <CardHeader className="pb-2">
         <CardTitle className="text-xl font-bold">Produtos Mais Caros</CardTitle>
       </CardHeader>

@@ -6,8 +6,7 @@ import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip } from "@/components/ui/chart";
 
 const COLORS = [
-  "hsl(var(--primary))", // Laranja padrão do tema
-  "var(--primary)", // Laranja padrão do tema
+  "hsl(24, 100%, 50%)", // Laranja padrão do tema
   "hsl(217, 91%, 60%)", // Azul (Blue)
   "hsl(142, 71%, 45%)", // Verde (Green)
   "hsl(283, 39%, 53%)", // Roxo (Purple)

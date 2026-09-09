@@ -426,26 +426,28 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                   </span>
                 </div>
 
-                {!tx.isGroup && (
-                  <div className="flex items-center gap-0.5 sm:gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setTransactionToEdit(tx)}
-                      className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-foreground"
-                    >
-                      <Pencil className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setTransactionToDelete(tx)}
-                      className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-foreground"
-                    >
-                      <Trash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    </Button>
-                  </div>
-                )}
+                <div className="flex items-center gap-0.5 sm:gap-1 w-[50px] sm:w-[68px] justify-end shrink-0">
+                  {!tx.isGroup && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setTransactionToEdit(tx)}
+                        className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-foreground"
+                      >
+                        <Pencil className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setTransactionToDelete(tx)}
+                        className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-foreground"
+                      >
+                        <Trash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           ))}

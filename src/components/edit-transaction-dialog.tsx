@@ -53,6 +53,8 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("");
   const [amount, setAmount] = useState<number>(0);
+  const [description, setDescription] = useState("");
+  const [date, setDate] = useState("");
   const [originalAmount, setOriginalAmount] = useState<number>(0);
   const [updateFuture, setUpdateFuture] = useState(false);
 
@@ -74,6 +76,8 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedCategoryId(transaction.categoryId ? String(transaction.categoryId) : "");
       setSelectedSubcategoryId(transaction.subcategoryId ? String(transaction.subcategoryId) : "");
+      setDescription(transaction.description);
+      setDate(transaction.date.substring(0, 10));
       setAmount(Number(transaction.amount));
       setOriginalAmount(Number(transaction.amount));
       setUpdateFuture(false);
@@ -145,6 +149,29 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
     return options;
   }, [selectedAccountId, formData?.creditCards, transaction?.type, transaction?.competencyMonth, transaction?.date]);
 
+  
+  const hasChanges = useMemo(() => {
+    if (!transaction || !fullTransaction) return false;
+    const origDesc = transaction.description;
+    const origDate = transaction.date.substring(0, 10);
+    const origAmount = Number(transaction.amount);
+    const origCat = transaction.categoryId ? String(transaction.categoryId) : "";
+    const origSubCat = transaction.subcategoryId ? String(transaction.subcategoryId) : "";
+    const origAcc = fullTransaction.accountId ? String(fullTransaction.accountId) :
+             fullTransaction.creditCardId ? `cc-${fullTransaction.creditCardId}` : "";
+    const origDestAcc = fullTransaction.destinationAccountId ? String(fullTransaction.destinationAccountId) : "";
+
+    return (
+      description !== origDesc ||
+      date !== origDate ||
+      amount !== origAmount ||
+      selectedCategoryId !== origCat ||
+      selectedSubcategoryId !== origSubCat ||
+      selectedAccountId !== origAcc ||
+      selectedDestinationAccountId !== origDestAcc
+    );
+  }, [description, date, amount, selectedCategoryId, selectedSubcategoryId, selectedAccountId, selectedDestinationAccountId, transaction, fullTransaction]);
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!transaction) return;
@@ -215,7 +242,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
           <form onSubmit={handleSubmit} className="mt-4 space-y-4">
             <div className="grid gap-2">
               <Label htmlFor="description">Descrição</Label>
-              <Input id="description" name="description" defaultValue={transaction.description} required />
+              <Input id="description" name="description" value={description} onChange={e => setDescription(e.target.value)} required />
             </div>
 
             {transaction.type === 'transfer' ? (
@@ -295,20 +322,20 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="date">Data</Label>
-                <DatePicker id="date" name="date" defaultValue={transaction.date.substring(0, 10)} required />
+                <DatePicker id="date" name="date" value={date} onChange={setDate} required />
               </div>
             </div>
 
-            {(fullTransaction?.installmentTotal || fullTransaction?.fixedTransactionId) && amount !== originalAmount ? (
+            {(fullTransaction?.installmentTotal || fullTransaction?.fixedTransactionId) && hasChanges ? (
               <div className="flex flex-row items-center justify-between rounded-lg border p-4 bg-background animate-in fade-in slide-in-from-bottom-2">
                 <div className="space-y-0.5">
                   <Label className="text-sm cursor-pointer" onClick={() => setUpdateFuture(!updateFuture)}>
-                    Alterar o valor das próximas também?
+                    Aplicar alterações às próximas também?
                   </Label>
                   <p className="text-xs text-muted-foreground">
                     {fullTransaction.fixedTransactionId
-                      ? "O novo valor será aplicado a todas as ocorrências futuras."
-                      : "O novo valor será aplicado a todas as parcelas seguintes."}
+                      ? "As modificações serão refletidas em todas as ocorrências futuras."
+                      : "As modificações serão refletidas em todas as parcelas seguintes."}
                   </p>
                 </div>
                 <Switch checked={updateFuture} onCheckedChange={setUpdateFuture} />

@@ -1,27 +1,39 @@
-'use server';
+"use server";
 
-import { 
-  getDashboardData, 
-  getBalancesByType, 
-  getBalanceEvolutionData, 
-  getInstallmentsChartData, 
-  getIncomeVsExpenseData, 
+import {
+  getBalanceEvolutionData,
+  getBalancesByType,
+  getCategoryForecastData,
+  getDashboardData,
   getExpenseTreemapData,
   getExpensesForecastData,
-  getCategoryForecastData
-} from './dashboard';
+  getIncomeVsExpenseData,
+  getInstallmentsChartData,
+} from "./dashboard";
 
 export async function getDashboardFullData(month: string) {
-  // Executando as consultas sequencialmente para evitar sobrecarregar o pool de conexões (Supabase/Postgres)
-  // que estava gerando erros de "Failed query" por excesso de concorrência.
-  const data = await getDashboardData(month);
-  const balancesData = await getBalancesByType();
-  const evolutionData = await getBalanceEvolutionData();
-  const installmentsData = await getInstallmentsChartData();
-  const incomeVsExpenseData = await getIncomeVsExpenseData(month);
-  const treemapData = await getExpenseTreemapData(month);
-  const forecastData = await getExpensesForecastData();
-  const categoryForecastData = await getCategoryForecastData();
+  // Executando em lotes (batches) para melhorar a performance em relação à execução 100% sequencial,
+  // mas sem sobrecarregar o pool de conexões (Supabase/Postgres) como um Promise.all único faria.
+
+  // Lote 1: Dados críticos / visão geral
+  const [data, balancesData, evolutionData] = await Promise.all([
+    getDashboardData(month),
+    getBalancesByType(),
+    getBalanceEvolutionData(),
+  ]);
+
+  // Lote 2: Gráficos e agrupamentos
+  const [installmentsData, incomeVsExpenseData, treemapData] = await Promise.all([
+    getInstallmentsChartData(),
+    getIncomeVsExpenseData(month),
+    getExpenseTreemapData(month),
+  ]);
+
+  // Lote 3: Previsões e estimativas
+  const [forecastData, categoryForecastData] = await Promise.all([
+    getExpensesForecastData(),
+    getCategoryForecastData(),
+  ]);
 
   return {
     data,
@@ -31,6 +43,6 @@ export async function getDashboardFullData(month: string) {
     incomeVsExpenseData,
     treemapData,
     forecastData,
-    categoryForecastData
+    categoryForecastData,
   };
 }

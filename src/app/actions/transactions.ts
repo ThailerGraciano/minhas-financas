@@ -3,7 +3,7 @@
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { accounts, creditCards, fixedTransactions, settings, transactions } from "@/db/schema";
-import { buildGlobalCompetencyCondition } from "@/lib/competency-utils";
+import { buildGlobalCompetencyCondition, getTargetInvoiceMonth } from "@/lib/competency-utils";
 import { addMonths, endOfMonth, format, getDate, parseISO, subMonths } from "date-fns";
 import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -120,7 +120,8 @@ export async function getTransactions(month?: string, accountId?: number) {
 
   const userCards = await db.query.creditCards.findMany({
     where: eq(creditCards.userId, userId),
-    columns: { id: true, dueDay: true },
+    
+    columns: { id: true, dueDay: true, closingDay: true },
   });
 
   const condition = buildGlobalCompetencyCondition(currentMonth, closingDay, userId, userCards);
@@ -173,7 +174,16 @@ export async function getTransactions(month?: string, accountId?: number) {
       const dayNum = parseInt(dayStr, 10);
 
       let targetMonthDate = new Date(monthDate);
-      if (dayNum > closingDay) {
+      let closingDayToUse = closingDay;
+      let targetInvoiceMonth = ft.type === "credit_card_expense" ? currentMonth : null;
+
+      if (ft.type === "credit_card_expense" && ft.creditCard) {
+        targetInvoiceMonth = getTargetInvoiceMonth(currentMonth, closingDay, ft.creditCard.dueDay);
+        targetMonthDate = parseISO(`${targetInvoiceMonth}-01`);
+        closingDayToUse = ft.creditCard.closingDay;
+      }
+
+      if (dayNum > closingDayToUse) {
         targetMonthDate = subMonths(targetMonthDate, 1);
       }
 
@@ -197,7 +207,7 @@ export async function getTransactions(month?: string, accountId?: number) {
         description: ft.type === "transfer" ? `${ft.description} (Saída)` : ft.description,
         date: dateStr,
         competencyMonth: currentMonth,
-        invoiceMonth: ft.type === "credit_card_expense" ? currentMonth : null,
+        invoiceMonth: targetInvoiceMonth,
         status: "pending",
         isFixed: false,
         fixedTransactionId: ft.id,
@@ -1346,7 +1356,7 @@ export async function updateTransaction(
         }
 
         if (oldTx.fixedTransactionId) {
-          const updateFixed: any = {};
+          const updateFixed: Record<string, unknown> = {};
           if (data.amount !== undefined) updateFixed.amount = data.amount;
           if (data.description !== undefined) updateFixed.description = data.description.replace(/\s*\(Saída\)|\s*\(Entrada\)/g, "");
           if (data.categoryId !== undefined) updateFixed.categoryId = data.categoryId;

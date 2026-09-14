@@ -29,7 +29,7 @@ export function buildGlobalCompetencyCondition(
   currentMonth: string,
   globalClosingDay: number,
   userId: string,
-  userCards: { id: number; dueDay: number }[]
+  userCards: { id: number; dueDay: number; closingDay: number }[]
 ): SQL {
   const currentMonthDate = parseISO(`${currentMonth}-01`);
   const prevMonthDate = subMonths(currentMonthDate, 1);
@@ -56,16 +56,10 @@ export function buildGlobalCompetencyCondition(
   const ccConditions: SQL[] = [];
   for (const card of userCards) {
     const targetInvoiceMonth = getTargetInvoiceMonth(currentMonth, globalClosingDay, card.dueDay);
+    
     ccConditions.push(
       and(
-        eq(transactions.creditCardId, card.id),
-        or(
-          eq(transactions.invoiceMonth, targetInvoiceMonth),
-          and(
-            isNull(transactions.invoiceMonth),
-            eq(transactions.competencyMonth, targetInvoiceMonth)
-          )
-        )
+        eq(transactions.creditCardId, card.id), getInvoiceCondition(targetInvoiceMonth, card.closingDay)
       )!
     );
   }
@@ -90,7 +84,7 @@ export function buildCreditCardCompetencyCondition(
   currentMonth: string,
   globalClosingDay: number,
   userId: string,
-  userCards: { id: number; dueDay: number }[]
+  userCards: { id: number; dueDay: number; closingDay: number }[]
 ): SQL {
   if (!userCards || userCards.length === 0) {
     return eq(transactions.id, -1);
@@ -102,13 +96,7 @@ export function buildCreditCardCompetencyCondition(
     ccConditions.push(
       and(
         eq(transactions.creditCardId, card.id),
-        or(
-          eq(transactions.invoiceMonth, currentMonth),
-          and(
-            isNull(transactions.invoiceMonth),
-            eq(transactions.competencyMonth, currentMonth)
-          )
-        )
+        getInvoiceCondition(currentMonth, card.closingDay)
       )!
     );
   }
@@ -117,6 +105,29 @@ export function buildCreditCardCompetencyCondition(
     eq(transactions.userId, userId),
     eq(transactions.type, 'credit_card_expense'),
     or(...ccConditions)
+  )!;
+}
+
+/**
+ * Retorna a condição que localiza transações pertencentes à fatura `targetInvoiceMonth`
+ * de um cartão, baseando-se no `invoiceMonth` explícito ou no intervalo de datas do ciclo da fatura.
+ */
+export function getInvoiceCondition(targetInvoiceMonth: string, cardClosingDay: number): SQL {
+  const targetMonthDate = parseISO(`${targetInvoiceMonth}-01`);
+  const targetPrevMonthDate = subMonths(targetMonthDate, 1);
+  const cardCycleEndDay = Math.min(cardClosingDay, endOfMonth(targetMonthDate).getDate());
+  const cardCycleStartDay = Math.min(cardClosingDay + 1, endOfMonth(targetPrevMonthDate).getDate());
+  
+  const cardEndDateStr = format(targetMonthDate, `yyyy-MM-${String(cardCycleEndDay).padStart(2, '0')}`);
+  const cardStartDateStr = format(targetPrevMonthDate, `yyyy-MM-${String(cardCycleStartDay).padStart(2, '0')}`);
+
+  return or(
+    eq(transactions.invoiceMonth, targetInvoiceMonth),
+    and(
+      isNull(transactions.invoiceMonth),
+      gte(transactions.date, cardStartDateStr),
+      lte(transactions.date, cardEndDateStr)
+    )
   )!;
 }
 

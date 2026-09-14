@@ -48,6 +48,7 @@ export type TransactionWithRelations = {
   parentTransactionId: number | null;
   fixedTransactionId?: string | null;
   competencyMonth?: string;
+  invoiceMonth?: string | null;
   accountId?: number | null;
   creditCardId?: number | null;
   categoryId?: number;
@@ -227,19 +228,20 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
       const grouped = new Map<string, TransactionWithRelations & { _pendingCount: number; _paidCount: number }>();
       const otherTxs: TransactionWithRelations[] = [];
 
-      filteredTxs.forEach((tx) => {
-        if (tx.type === "credit_card_expense" && tx.creditCardId && tx.competencyMonth) {
-          const groupKey = `${tx.creditCardId}-${tx.competencyMonth}`;
+            filteredTxs.forEach((tx) => {
+        if (tx.type === "credit_card_expense" && tx.creditCardId) {
+          const groupKey = `${tx.creditCardId}`;
           if (!grouped.has(groupKey)) {
             let groupDate = tx.date;
 
             const cardDueDay = tx.creditCard?.dueDay;
             if (cardDueDay) {
-              groupDate = `${tx.competencyMonth}-${String(cardDueDay).padStart(2, "0")}`;
+              const invoiceMonthToUse = tx.invoiceMonth || tx.competencyMonth || "";
+              groupDate = `${invoiceMonthToUse}-${String(cardDueDay).padStart(2, "0")}`;
             }
 
             grouped.set(groupKey, {
-              id: -(tx.creditCardId * 10000 + parseInt(tx.competencyMonth.replace("-", ""))), // id virtual determinístico
+              id: -(tx.creditCardId * 10000 + parseInt((tx.invoiceMonth || tx.competencyMonth || "0").replace("-", ""))), // id virtual determinístico
               isGroup: true,
               type: "expense",
               description: `Fatura: ${tx.creditCard?.name || "Cartão"}`,
@@ -252,6 +254,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
               parentTransactionId: null,
               creditCardId: tx.creditCardId,
               competencyMonth: tx.competencyMonth,
+              invoiceMonth: tx.invoiceMonth,
               creditCard: tx.creditCard,
               category: { id: 0, name: "Fatura" },
               _pendingCount: 0,

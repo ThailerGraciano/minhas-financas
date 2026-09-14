@@ -452,7 +452,8 @@ export async function getExpenseTreemapData(competencyMonth: string): Promise<Tr
   const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
   const closingDay = appSettings?.closingDay || 25;
   const userCards = await db
-    .select({ id: creditCards.id, dueDay: creditCards.dueDay })
+    
+    .select({ id: creditCards.id, dueDay: creditCards.dueDay, closingDay: creditCards.closingDay })
     .from(creditCards)
     .where(eq(creditCards.userId, userId));
   const condition = buildGlobalCompetencyCondition(competencyMonth, closingDay, userId, userCards);

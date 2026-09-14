@@ -3,7 +3,7 @@
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { accounts, categories, creditCards, settings, subcategories, transactions } from "@/db/schema";
-import { buildCreditCardCompetencyCondition } from "@/lib/competency-utils";
+import { buildCreditCardCompetencyCondition, getInvoiceCondition } from "@/lib/competency-utils";
 import { format } from "date-fns";
 import { and, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -85,11 +85,14 @@ export async function getInvoiceSummary(creditCardId: string | number, competenc
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
   const parsedId = Number(creditCardId);
+  const card = await db.query.creditCards.findFirst({ where: (c, { eq }) => eq(c.id, parsedId) });
+  if (!card) throw new Error("Cartão não encontrado");
   const cardTransactions = await db.query.transactions.findMany({
     where: (t, { eq, ne, and, or, isNull }) =>
       and(
         eq(t.creditCardId, parsedId),
         or(eq(t.invoiceMonth, competencyMonth), and(isNull(t.invoiceMonth), eq(t.competencyMonth, competencyMonth))),
+        getInvoiceCondition(competencyMonth, card.closingDay),
         eq(t.type, "credit_card_expense"),
         ne(t.status, "ignored"),
         eq(t.userId, userId),
@@ -133,6 +136,8 @@ export async function payFullInvoice(
   const userId = session.user.id;
   const parsedCardId = Number(creditCardId);
   const parsedAccountId = Number(accountId);
+  const card = await db.query.creditCards.findFirst({ where: (c, { eq }) => eq(c.id, parsedCardId) });
+  if (!card) throw new Error("Cartão não encontrado");
 
   try {
     const result = await db.transaction(async (tx) => {
@@ -147,6 +152,7 @@ export async function payFullInvoice(
               eq(transactions.invoiceMonth, competencyMonth),
               and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth)),
             ),
+            getInvoiceCondition(competencyMonth, card.closingDay),
             eq(transactions.type, "credit_card_expense"),
             eq(transactions.userId, userId),
           ),
@@ -174,6 +180,7 @@ export async function payFullInvoice(
               eq(transactions.invoiceMonth, competencyMonth),
               and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth)),
             ),
+            getInvoiceCondition(competencyMonth, card.closingDay),
             eq(transactions.type, "credit_card_expense"),
             eq(transactions.status, "pending"),
             eq(transactions.userId, userId),
@@ -271,6 +278,8 @@ export async function prepayInvoice(
   const parsedCardId = Number(creditCardId);
   const parsedAccountId = Number(accountId);
 
+  const card = await db.query.creditCards.findFirst({ where: (c, { eq }) => eq(c.id, parsedCardId) });
+  if (!card) throw new Error("Cartão não encontrado");
   try {
     const result = await db.transaction(async (tx) => {
       // 1. Get pending amount to ensure they don't prepay more than owed
@@ -284,6 +293,7 @@ export async function prepayInvoice(
               eq(transactions.invoiceMonth, competencyMonth),
               and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth)),
             ),
+            getInvoiceCondition(competencyMonth, card.closingDay),
             eq(transactions.type, "credit_card_expense"),
             eq(transactions.userId, userId),
           ),
@@ -421,6 +431,7 @@ export async function getCreditCardsWithSummary(competencyMonth: string) {
               eq(transactions.invoiceMonth, competencyMonth),
               and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth)),
             ),
+            getInvoiceCondition(competencyMonth, card.closingDay),
             eq(transactions.type, "credit_card_expense"),
             ne(transactions.status, "ignored"),
             eq(transactions.userId, userId),
@@ -470,6 +481,8 @@ export async function adjustInvoice(
   const userId = session.user.id;
   const parsedCardId = Number(creditCardId);
 
+  const card = await db.query.creditCards.findFirst({ where: (c, { eq }) => eq(c.id, parsedCardId) });
+  if (!card) throw new Error("Cartão não encontrado");
   try {
     const result = await db.transaction(async (tx) => {
       // 1. Calculate current invoice total (same logic as getInvoiceSummary)
@@ -483,6 +496,7 @@ export async function adjustInvoice(
               eq(transactions.invoiceMonth, competencyMonth),
               and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth)),
             ),
+            getInvoiceCondition(competencyMonth, card.closingDay),
             eq(transactions.type, "credit_card_expense"),
             ne(transactions.status, "ignored"),
             eq(transactions.userId, userId),
@@ -632,7 +646,8 @@ export async function getCreditCardsCategorySummary(competencyMonth: string) {
   const closingDay = appSettings?.closingDay || 25;
 
   const userCards = await db
-    .select({ id: creditCards.id, dueDay: creditCards.dueDay })
+    
+    .select({ id: creditCards.id, dueDay: creditCards.dueDay, closingDay: creditCards.closingDay })
     .from(creditCards)
     .where(eq(creditCards.userId, userId));
   const condition = buildCreditCardCompetencyCondition(competencyMonth, closingDay, userId, userCards);
@@ -684,6 +699,8 @@ export async function revertInvoicePayment(
   const userId = session.user.id;
   const parsedCardId = Number(creditCardId);
 
+  const card = await db.query.creditCards.findFirst({ where: (c, { eq }) => eq(c.id, parsedCardId) });
+  if (!card) throw new Error("Cartão não encontrado");
   try {
     const result = await db.transaction(async (tx) => {
       // 1. Mark expenses as pending
@@ -697,6 +714,7 @@ export async function revertInvoicePayment(
               eq(transactions.invoiceMonth, competencyMonth),
               and(isNull(transactions.invoiceMonth), eq(transactions.competencyMonth, competencyMonth)),
             ),
+            getInvoiceCondition(competencyMonth, card.closingDay),
             eq(transactions.type, "credit_card_expense"),
             eq(transactions.status, "paid"),
             eq(transactions.userId, userId),

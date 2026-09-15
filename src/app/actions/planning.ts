@@ -214,6 +214,7 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
         observations: null,
         paidAt: null,
         importHash: null,
+        loanId: null,
         category: {
           id: ft.categoryId,
           name: "Virtual",

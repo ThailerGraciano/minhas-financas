@@ -88,7 +88,6 @@ export const transactions = pgTable('transactions', {
   paidAt: timestamp('paid_at'),
   importHash: varchar('import_hash', { length: 255 }).unique(),
   invoiceMonth: varchar('invoice_month', { length: 7 }),
-  loanId: uuid('loan_id').references(() => loans.id, { onDelete: 'cascade' }),
 });
 
 export const importLogs = pgTable('import_logs', {
@@ -147,17 +146,6 @@ export const batchLogs = pgTable('batch_logs', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const loans = pgTable('loans', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').references(() => users.id).notNull(),
-  name: varchar('name', { length: 255 }).notNull(),
-  type: varchar('type', { length: 50 }).notNull(), // bank, personal
-  totalAmount: numeric('total_amount', { precision: 12, scale: 2 }).notNull(),
-  interestRate: numeric('interest_rate', { precision: 5, scale: 2 }).default('0').notNull(),
-  installments: integer('installments').notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   settings: many(settings),
@@ -170,7 +158,6 @@ export const usersRelations = relations(users, ({ many }) => ({
   transactions: many(transactions),
   marketReceipts: many(marketReceipts),
   batchLogs: many(batchLogs),
-  loans: many(loans),
 }));
 
 export const settingsRelations = relations(settings, ({ one }) => ({
@@ -208,14 +195,6 @@ export const creditCardsRelations = relations(creditCards, ({ one }) => ({
   }),
 }));
 
-export const loansRelations = relations(loans, ({ one, many }) => ({
-  user: one(users, {
-    fields: [loans.userId],
-    references: [users.id],
-  }),
-  transactions: many(transactions),
-}));
-
 export const transactionsRelations = relations(transactions, ({ one }) => ({
   user: one(users, {
     fields: [transactions.userId],
@@ -248,10 +227,6 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
   fixedTransaction: one(fixedTransactions, {
     fields: [transactions.fixedTransactionId],
     references: [fixedTransactions.id],
-  }),
-  loan: one(loans, {
-    fields: [transactions.loanId],
-    references: [loans.id],
   }),
 }));
 

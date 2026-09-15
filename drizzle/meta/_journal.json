@@ -64,6 +64,13 @@
       "when": 1787161104917,
       "tag": "0008_batch_logs",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789425012525,
+      "tag": "0009_perfect_tigra",
+      "breakpoints": true
     }
   ]
 }

@@ -218,6 +218,7 @@ export async function getTransactions(month?: string, accountId?: number) {
         observations: null,
         paidAt: null,
         importHash: null,
+        loanId: null,
         account: ft.account,
         category: ft.category,
         creditCard: ft.creditCard,

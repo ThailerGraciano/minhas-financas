@@ -1,19 +1,15 @@
 "use client";
 
+import { HandCoins, Landmark, Percent, TrendingDown } from "lucide-react";
+import { useState } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import { Landmark, HandCoins, TrendingDown, Percent } from "lucide-react";
 
 import { getLoansPageData } from "@/app/actions/loans";
+import { LoanDetailsDialog } from "@/components/loan-details-dialog";
 import { LoanFormDialog } from "@/components/loan-form-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip } from "@/components/ui/chart";
 import { Progress } from "@/components/ui/progress";
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartLegend,
-  ChartLegendContent,
-} from "@/components/ui/chart";
 
 type LoansPageData = Awaited<ReturnType<typeof getLoansPageData>>;
 
@@ -66,7 +62,10 @@ const AmortizationTooltip = ({ active, payload, label }: CustomTooltipProps) => 
 };
 
 export function LoansClientPage({ data }: { data: LoansPageData }) {
-  const { loans, bankDebtTotal, personalDebtTotal, amortizationData } = data;
+  const { loans, bankDebtTotal, personalDebtTotal, amortizationData, closingDay } = data;
+  const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
+
+  const selectedLoan = loans.find((l) => l.id === selectedLoanId) || null;
 
   const hasLoans = loans.length > 0;
 
@@ -79,9 +78,7 @@ export function LoansClientPage({ data }: { data: LoansPageData }) {
             <Landmark className="w-8 h-8 text-primary" />
             Empréstimos
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Gerencie seus empréstimos e acompanhe a amortização
-          </p>
+          <p className="text-muted-foreground text-sm mt-1">Gerencie seus empréstimos e acompanhe a amortização</p>
         </div>
         <LoanFormDialog />
       </div>
@@ -94,9 +91,7 @@ export function LoansClientPage({ data }: { data: LoansPageData }) {
             <Landmark className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-500">
-              {formatCurrency(bankDebtTotal)}
-            </div>
+            <div className="text-2xl font-bold text-red-500">{formatCurrency(bankDebtTotal)}</div>
             <p className="text-xs text-muted-foreground mt-1">Instituições financeiras</p>
           </CardContent>
         </Card>
@@ -107,9 +102,7 @@ export function LoansClientPage({ data }: { data: LoansPageData }) {
             <HandCoins className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-500">
-              {formatCurrency(personalDebtTotal)}
-            </div>
+            <div className="text-2xl font-bold text-orange-500">{formatCurrency(personalDebtTotal)}</div>
             <p className="text-xs text-muted-foreground mt-1">Empréstimos pessoais</p>
           </CardContent>
         </Card>
@@ -121,15 +114,17 @@ export function LoansClientPage({ data }: { data: LoansPageData }) {
           <h2 className="text-xl font-bold">Contratos</h2>
           <div className="grid gap-4 md:grid-cols-2">
             {loans.map((loan) => (
-              <Card key={loan.id}>
+              <Card
+                key={loan.id}
+                className="cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => setSelectedLoanId(loan.id)}
+              >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base font-semibold truncate">{loan.name}</CardTitle>
                     <span
                       className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        loan.type === "bank"
-                          ? "bg-red-500/10 text-red-500"
-                          : "bg-orange-500/10 text-orange-500"
+                        loan.type === "bank" ? "bg-red-500/10 text-red-500" : "bg-orange-500/10 text-orange-500"
                       }`}
                     >
                       {loan.type === "bank" ? "Financeira" : "Pessoal"}
@@ -224,18 +219,9 @@ export function LoansClientPage({ data }: { data: LoansPageData }) {
                 }
                 width={80}
               />
-              <ChartTooltip
-                cursor={{ fill: "var(--muted)", opacity: 0.1 }}
-                content={<AmortizationTooltip />}
-              />
+              <ChartTooltip cursor={{ fill: "var(--muted)", opacity: 0.1 }} content={<AmortizationTooltip />} />
               <ChartLegend content={<ChartLegendContent />} />
-              <Area
-                type="monotone"
-                dataKey="Dívida Externa"
-                stackId="a"
-                stroke="#ef4444"
-                fill="url(#fillBankDebt)"
-              />
+              <Area type="monotone" dataKey="Dívida Externa" stackId="a" stroke="#ef4444" fill="url(#fillBankDebt)" />
               <Area
                 type="monotone"
                 dataKey="Dívida Interna"
@@ -247,7 +233,13 @@ export function LoansClientPage({ data }: { data: LoansPageData }) {
           </ChartContainer>
         </div>
       )}
+
+      <LoanDetailsDialog
+        open={!!selectedLoan}
+        onOpenChange={(open) => !open && setSelectedLoanId(null)}
+        loan={selectedLoan}
+        closingDay={closingDay}
+      />
     </div>
   );
 }
-

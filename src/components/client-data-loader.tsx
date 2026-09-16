@@ -10,7 +10,7 @@ interface ClientDataLoaderProps<T> {
   initialData: T;
   fetchAction: (month: string) => Promise<T>;
   children: (data: T, selectedMonth: string, isLoading: boolean) => ReactNode;
-  headerContent?: ReactNode;
+  headerContent?: ReactNode | ((data: T, selectedMonth: string, isLoading: boolean) => ReactNode);
   initialMonth?: string;
 }
 
@@ -69,7 +69,13 @@ export function ClientDataLoader<T>({
   return (
     <>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        {headerContent ? <div className="flex-1 w-full">{headerContent}</div> : <div />}
+        {typeof headerContent === "function" ? (
+          <div className="flex-1 w-full">{headerContent(data, selectedMonth, isLoading)}</div>
+        ) : headerContent ? (
+          <div className="flex-1 w-full">{headerContent}</div>
+        ) : (
+          <div />
+        )}
         <div className="flex items-center gap-4 shrink-0">
           <CompetencyFilter 
             closingDay={closingDay} 

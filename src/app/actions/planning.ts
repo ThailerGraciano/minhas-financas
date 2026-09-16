@@ -5,8 +5,9 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { accounts, creditCards, fixedTransactions, settings, transactions } from "@/db/schema";
 import { getDefaultCompetencyMonth } from "@/lib/date-utils";
-import { addDays, differenceInDays, format, lastDayOfMonth, parseISO } from "date-fns";
-import { and, asc, eq, gte, inArray, lte, ne, or, SQL } from "drizzle-orm";
+import { getTargetInvoiceMonth } from "@/lib/competency-utils";
+import { addDays, addMonths, differenceInDays, format, lastDayOfMonth, parseISO } from "date-fns";
+import { and, asc, eq, gte, inArray, isNotNull, lte, ne, or, sql, SQL } from "drizzle-orm";
 
 export async function getProjectedCashFlow(accountId?: string, reqCompetencyMonth?: string) {
   const session = await auth();
@@ -152,6 +153,41 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
     }
   }
 
+  // Deduplicação de cartão de crédito: buscar fixedTransactionIds de despesas de cartão no ciclo
+  const ccFixedTxs = await db
+    .select({
+      fixedTransactionId: transactions.fixedTransactionId,
+      date: transactions.date,
+      invoiceMonth: transactions.invoiceMonth,
+      competencyMonth: transactions.competencyMonth,
+      creditCardId: transactions.creditCardId,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        eq(transactions.type, "credit_card_expense"),
+        isNotNull(transactions.fixedTransactionId),
+      ),
+    );
+
+  const targetInvoiceMonths = new Set<string>([competencyMonth]);
+  for (const card of userCards) {
+    targetInvoiceMonths.add(getTargetInvoiceMonth(competencyMonth, closingDay, card.dueDay));
+  }
+
+  for (const tx of ccFixedTxs) {
+    if (tx.fixedTransactionId) {
+      if (
+        (tx.date >= targetStartDateStr && tx.date <= targetEndDateStr) ||
+        tx.competencyMonth === competencyMonth ||
+        (tx.invoiceMonth && targetInvoiceMonths.has(tx.invoiceMonth))
+      ) {
+        materializedFixedIds.add(tx.fixedTransactionId);
+      }
+    }
+  }
+
   // 2.2 Geração das Virtuais
   const activeFixed = await db
     .select()
@@ -189,8 +225,21 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
       cursor.setMonth(cursor.getMonth() + 1);
     }
 
+    const card = ft.creditCardId ? userCards.find((c) => c.id === ft.creditCardId) : undefined;
+    const cardClosingDay = card?.closingDay ?? closingDay;
+
     while (cursor <= targetEndDate) {
       const virtDateStr = format(cursor, "yyyy-MM-dd");
+
+      let virtInvoiceMonth: string | null = null;
+      if (ft.type === "credit_card_expense") {
+        if (cursor.getDate() > cardClosingDay) {
+          virtInvoiceMonth = format(addMonths(cursor, 1), "yyyy-MM");
+        } else {
+          virtInvoiceMonth = format(cursor, "yyyy-MM");
+        }
+      }
+
       virtualTxs.push({
         id: -Math.floor(Math.random() * 1000000), // virtual id
         type: ft.type,
@@ -204,7 +253,7 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
         userId: ft.userId,
         status: "pending",
         competencyMonth: format(cursor, "yyyy-MM"),
-        invoiceMonth: ft.type === "credit_card_expense" ? format(cursor, "yyyy-MM") : null,
+        invoiceMonth: virtInvoiceMonth,
         isFixed: false,
         fixedTransactionId: ft.id,
         installmentCurrent: null,
@@ -265,6 +314,43 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
         creditCard: true 
       }
     });
+
+    // Identificar faturas que já foram pagas no banco de dados para evitar projeções fantasmas
+    const paidInvoiceTransfers = await db
+      .select({
+        creditCardId: transactions.creditCardId,
+        competencyMonth: transactions.competencyMonth,
+        description: transactions.description,
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.userId, userId),
+          eq(transactions.type, "transfer"),
+          eq(transactions.status, "paid"),
+          or(
+            isNotNull(transactions.creditCardId),
+            sql`${transactions.description} LIKE 'Pagamento de Fatura%'`,
+            sql`${transactions.description} LIKE 'Adiantamento de Fatura%'`,
+          ),
+        ),
+      );
+
+    const paidInvoiceKeys = new Set<string>();
+    for (const pit of paidInvoiceTransfers) {
+      if (pit.creditCardId && pit.competencyMonth) {
+        paidInvoiceKeys.add(`${pit.creditCardId}-${pit.competencyMonth}`);
+      }
+    }
+
+    // Contabilizar quantas transações REAIS pendentes existem por fatura
+    const realPendingCountByGroup = new Map<string, number>();
+    for (const tx of dbPendingCCTxs) {
+      if (!tx.creditCardId) continue;
+      const invMonth = tx.invoiceMonth || tx.competencyMonth || tx.date.substring(0, 7);
+      const groupKey = `${tx.creditCardId}-${invMonth}`;
+      realPendingCountByGroup.set(groupKey, (realPendingCountByGroup.get(groupKey) || 0) + 1);
+    }
     
     pendingCCTxs.push(...dbPendingCCTxs);
 
@@ -275,11 +361,23 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
       
       const invMonth = tx.invoiceMonth || tx.competencyMonth || tx.date.substring(0, 7);
       const groupKey = `${tx.creditCardId}-${invMonth}`;
+
+      // Se a fatura já foi paga e não há novas transações reais pendentes no banco, ignorar projeção
+      const realPendingCount = realPendingCountByGroup.get(groupKey) || 0;
+      if (paidInvoiceKeys.has(groupKey) && realPendingCount === 0) {
+        continue;
+      }
       
       if (!ccGroups.has(groupKey)) {
         const card = tx.creditCard || userCards.find((c) => c.id === tx.creditCardId);
         const dueDay = card?.dueDay || 10;
         const paymentDate = `${invMonth}-${String(dueDay).padStart(2, "0")}`;
+
+        // Se a data de vencimento da fatura já passou e não há nenhuma transação REAL pendente no banco,
+        // não devemos projetar uma dívida fantasma retroativa baseada em virtuais
+        if (paymentDate < startProjectionDateStr && realPendingCount === 0) {
+          continue;
+        }
         
         ccGroups.set(groupKey, {
           ...tx,
@@ -298,6 +396,7 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
           observations: null,
           paidAt: null,
           importHash: null,
+          loanId: null,
           category: {
             id: 0,
             name: "Fatura",
@@ -309,8 +408,10 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
         });
       }
       
-      const group = ccGroups.get(groupKey)!;
-      group.amount = String(Number(group.amount) + Number(tx.amount));
+      const group = ccGroups.get(groupKey);
+      if (group) {
+        group.amount = String(Number(group.amount) + Number(tx.amount));
+      }
     }
 
     // Apenas inserir a fatura projetada se sua data de vencimento cair dentro da nossa janela de interesse

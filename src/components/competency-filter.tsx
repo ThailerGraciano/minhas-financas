@@ -2,7 +2,7 @@
 
 import { addMonths, format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, Clock } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -129,9 +129,12 @@ export function CompetencyFilter({ closingDay, value, defaultMonth, onChange }: 
         </Button>
       </div>
 
-      <span className="text-xs text-muted-foreground hidden sm:inline">
-        Ciclo: dia {cycleStart} ao dia {cycleEnd}
-      </span>
+      <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/50 bg-muted/40 text-xs text-muted-foreground whitespace-nowrap">
+        <Clock className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+        <span>
+          Ciclo: <strong className="font-semibold text-foreground/90">dia {cycleStart} ao dia {cycleEnd}</strong>
+        </span>
+      </div>
     </div>
   );
 }

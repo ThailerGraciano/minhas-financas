@@ -16,6 +16,7 @@ export type CreateLoanInput = {
   interestRate: number; // default 0
   installments: number;
   date: string; // Data inicial, YYYY-MM-DD
+  alreadyReceived?: boolean;
 
   // Se bank
   bankIncomeAccountId?: number; // Onde cai o dinheiro
@@ -116,33 +117,38 @@ export async function createLoan(input: CreateLoanInput) {
     const rate = input.interestRate / 100;
 
     if (input.type === "bank") {
-      if (!input.bankIncomeAccountId || !input.categoryId) {
+      if (!input.categoryId) {
         throw new Error("Missing required fields for bank loan");
+      }
+      if (!input.alreadyReceived && !input.bankIncomeAccountId) {
+        throw new Error("Missing bankIncomeAccountId for bank loan");
       }
 
       const parsedDate = parseISO(input.date);
       const competencyMonth = getCompetencyMonth(parsedDate, closingDay);
 
-      // Entrada na conta destino
-      await tx
-        .insert(transactions)
-        .values({
-          userId,
-          loanId: loan.id,
-          type: "income",
-          status: "paid",
-          amount: principal.toString(),
-          description: `Empréstimo: ${input.name}`,
-          date: input.date,
-          competencyMonth,
-          accountId: input.bankIncomeAccountId,
-          categoryId: input.categoryId,
-          subcategoryId: input.subcategoryId || null,
-          paidAt: new Date(),
-        })
-        .returning();
+      // Entrada na conta destino (apenas se não foi recebido previamente)
+      if (!input.alreadyReceived && input.bankIncomeAccountId) {
+        await tx
+          .insert(transactions)
+          .values({
+            userId,
+            loanId: loan.id,
+            type: "income",
+            status: "paid",
+            amount: principal.toString(),
+            description: `Empréstimo: ${input.name}`,
+            date: input.date,
+            competencyMonth,
+            accountId: input.bankIncomeAccountId,
+            categoryId: input.categoryId,
+            subcategoryId: input.subcategoryId || null,
+            paidAt: new Date(),
+          })
+          .returning();
 
-      await applyBalanceDelta(tx, input.bankIncomeAccountId, principal, "income", "paid");
+        await applyBalanceDelta(tx, input.bankIncomeAccountId, principal, "income", "paid");
+      }
 
       const installmentBase = principal / input.installments;
       const installmentValue = rate > 0 ? installmentBase * (1 + rate) : installmentBase;
@@ -196,46 +202,49 @@ export async function createLoan(input: CreateLoanInput) {
       const competencyMonth = getCompetencyMonth(parsedDate, closingDay);
       const transferCategoryId = await getTransferCategoryId(tx, userId);
 
-      // Saída da Reserva
-      const [transferOut] = await tx
-        .insert(transactions)
-        .values({
-          userId,
-          loanId: loan.id,
-          type: "transfer",
-          status: "paid",
-          amount: principal.toString(),
-          description: `Empréstimo concedido: ${input.name} (Saída)`,
-          date: input.date,
-          competencyMonth,
-          accountId: input.reserveAccountId,
-          categoryId: transferCategoryId,
-          paidAt: new Date(),
-        })
-        .returning();
+      // Apenas realiza a transferência inicial se NÃO foi recebido previamente
+      if (!input.alreadyReceived) {
+        // Saída da Reserva
+        const [transferOut] = await tx
+          .insert(transactions)
+          .values({
+            userId,
+            loanId: loan.id,
+            type: "transfer",
+            status: "paid",
+            amount: principal.toString(),
+            description: `Empréstimo concedido: ${input.name} (Saída)`,
+            date: input.date,
+            competencyMonth,
+            accountId: input.reserveAccountId,
+            categoryId: transferCategoryId,
+            paidAt: new Date(),
+          })
+          .returning();
 
-      await applyBalanceDelta(tx, input.reserveAccountId, principal, "transfer", "paid", null);
+        await applyBalanceDelta(tx, input.reserveAccountId, principal, "transfer", "paid", null);
 
-      // Entrada na Corrente
-      const [transferIn] = await tx
-        .insert(transactions)
-        .values({
-          userId,
-          loanId: loan.id,
-          type: "transfer",
-          status: "paid",
-          amount: principal.toString(),
-          description: `Empréstimo concedido: ${input.name} (Entrada)`,
-          date: input.date,
-          competencyMonth,
-          accountId: input.checkingAccountId,
-          categoryId: transferCategoryId,
-          parentTransactionId: transferOut.id,
-          paidAt: new Date(),
-        })
-        .returning();
+        // Entrada na Corrente
+        await tx
+          .insert(transactions)
+          .values({
+            userId,
+            loanId: loan.id,
+            type: "transfer",
+            status: "paid",
+            amount: principal.toString(),
+            description: `Empréstimo concedido: ${input.name} (Entrada)`,
+            date: input.date,
+            competencyMonth,
+            accountId: input.checkingAccountId,
+            categoryId: transferCategoryId,
+            parentTransactionId: transferOut.id,
+            paidAt: new Date(),
+          })
+          .returning();
 
-      await applyBalanceDelta(tx, input.checkingAccountId, principal, "transfer", "paid", transferOut.id);
+        await applyBalanceDelta(tx, input.checkingAccountId, principal, "transfer", "paid", transferOut.id);
+      }
 
       const installmentBase = principal / input.installments;
       const installmentValue = rate > 0 ? installmentBase * (1 + rate) : installmentBase;

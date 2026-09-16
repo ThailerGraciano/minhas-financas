@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CurrencyInput } from "@/components/ui/currency-input";
+import { Switch } from "@/components/ui/switch";
 
 type FormData = NonNullable<Awaited<ReturnType<typeof getTransactionFormData>>>;
 
@@ -30,6 +31,7 @@ const loanSchema = z.object({
   installments: z.number().min(1, "Mínimo 1 parcela"),
   interestRate: z.number().min(0, "Taxa não pode ser negativa"),
   installmentAmount: z.number().optional(),
+  alreadyReceived: z.boolean(),
   
   // Bank fields
   categoryId: z.string().optional(),
@@ -45,7 +47,9 @@ const loanSchema = z.object({
 }).superRefine((data, ctx) => {
   if (data.type === 'bank') {
     if (!data.categoryId) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["categoryId"], message: "Obrigatório" });
-    if (!data.bankIncomeAccountId) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bankIncomeAccountId"], message: "Obrigatório" });
+    if (!data.alreadyReceived && !data.bankIncomeAccountId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bankIncomeAccountId"], message: "Obrigatório" });
+    }
     
     if (data.bankPaymentMethod === 'account' && !data.bankExpenseAccountId) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bankExpenseAccountId"], message: "Obrigatório" });
@@ -85,6 +89,7 @@ export function LoanFormDialog({ trigger }: { trigger?: React.ReactNode }) {
       interestRate: 0,
       installments: 1,
       installmentAmount: 0,
+      alreadyReceived: false,
       bankPaymentMethod: 'account',
     }
   });
@@ -95,6 +100,7 @@ export function LoanFormDialog({ trigger }: { trigger?: React.ReactNode }) {
   const watchedInstallments = watch('installments') || 1;
   const watchedRate = watch('interestRate') || 0;
   const watchedInstallmentAmount = watch('installmentAmount') || 0;
+  const watchedAlreadyReceived = watch('alreadyReceived');
 
   const effectiveInstallment = watchedInstallmentAmount > 0 
     ? watchedInstallmentAmount 
@@ -102,6 +108,23 @@ export function LoanFormDialog({ trigger }: { trigger?: React.ReactNode }) {
 
   const totalToPay = effectiveInstallment * (watchedInstallments || 1);
   const totalInterest = Math.max(0, totalToPay - watchedAmount);
+
+  const categories = useMemo(() => {
+    if (!formDataCache?.categories) return [];
+    const targetType = watchedAlreadyReceived ? 'expense' : 'income';
+    const filtered = formDataCache.categories.filter((c) => c.type === targetType);
+    return filtered.length > 0 ? filtered : formDataCache.categories.filter((c) => c.type !== 'transfer');
+  }, [formDataCache, watchedAlreadyReceived]);
+
+  useEffect(() => {
+    const currentCatId = getValues('categoryId');
+    if (currentCatId && categories.length > 0) {
+      const exists = categories.some((c) => c.id.toString() === currentCatId);
+      if (!exists) {
+        setValue('categoryId', '');
+      }
+    }
+  }, [watchedAlreadyReceived, categories, getValues, setValue]);
 
   const onSubmit = async (data: LoanFormValues) => {
     setIsPending(true);
@@ -113,6 +136,7 @@ export function LoanFormDialog({ trigger }: { trigger?: React.ReactNode }) {
         totalAmount: data.totalAmount,
         installments: data.installments,
         interestRate: data.interestRate,
+        alreadyReceived: data.alreadyReceived,
         categoryId: data.categoryId ? Number(data.categoryId) : undefined,
         bankIncomeAccountId: data.bankIncomeAccountId ? Number(data.bankIncomeAccountId) : undefined,
         bankExpenseAccountId: data.bankExpenseAccountId ? Number(data.bankExpenseAccountId) : undefined,
@@ -140,7 +164,6 @@ export function LoanFormDialog({ trigger }: { trigger?: React.ReactNode }) {
     };
   });
 
-  const categories = formDataCache?.categories.filter((c) => c.type === 'income') || [];
   const accounts = formDataCache?.accounts || [];
   const creditCards = formDataCache?.creditCards || [];
 
@@ -318,10 +341,37 @@ export function LoanFormDialog({ trigger }: { trigger?: React.ReactNode }) {
             </div>
           )}
 
+          {/* Switch de valor já recebido */}
+          <div className="flex items-center justify-between rounded-xl border bg-card p-3.5 shadow-xs">
+            <div className="space-y-0.5 pr-4">
+              <Label htmlFor="already-received" className="text-sm font-medium cursor-pointer">
+                Valor já foi recebido?
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {selectedType === 'bank'
+                  ? "Não cria transação de receita (apenas as parcelas a pagar)."
+                  : "Não transfere os fundos agora (apenas as parcelas de devolução)."}
+              </p>
+            </div>
+            <Controller
+              name="alreadyReceived"
+              control={control}
+              render={({ field }) => (
+                <Switch
+                  id="already-received"
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              )}
+            />
+          </div>
+
           {selectedType === 'bank' && (
             <div className="space-y-4 border-t pt-4">
               <div className="space-y-2">
-                <Label>Categoria (Receita)</Label>
+                <Label>
+                  {watchedAlreadyReceived ? "Categoria da Despesa (Parcelas)" : "Categoria (Receita)"}
+                </Label>
                 <Controller
                   name="categoryId"
                   control={control}
@@ -341,26 +391,28 @@ export function LoanFormDialog({ trigger }: { trigger?: React.ReactNode }) {
                 {errors.categoryId && <p className="text-sm text-destructive">{errors.categoryId.message}</p>}
               </div>
 
-              <div className="space-y-2">
-                <Label>Conta Destino (Onde cai o dinheiro)</Label>
-                <Controller
-                  name="bankIncomeAccountId"
-                  control={control}
-                  render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a conta" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {accounts.map((a) => (
-                          <SelectItem key={a.id} value={a.id.toString()}>{a.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.bankIncomeAccountId && <p className="text-sm text-destructive">{errors.bankIncomeAccountId.message}</p>}
-              </div>
+              {!watchedAlreadyReceived && (
+                <div className="space-y-2">
+                  <Label>Conta Destino (Onde cai o dinheiro)</Label>
+                  <Controller
+                    name="bankIncomeAccountId"
+                    control={control}
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a conta" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accounts.map((a) => (
+                            <SelectItem key={a.id} value={a.id.toString()}>{a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.bankIncomeAccountId && <p className="text-sm text-destructive">{errors.bankIncomeAccountId.message}</p>}
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>Método de Pagamento das Parcelas</Label>
@@ -452,14 +504,18 @@ export function LoanFormDialog({ trigger }: { trigger?: React.ReactNode }) {
           {selectedType === 'personal' && (
             <div className="space-y-4 border-t pt-4">
               <div className="space-y-2">
-                <Label>Conta de Origem (Ex: Reserva)</Label>
+                <Label>
+                  {watchedAlreadyReceived
+                    ? "Conta da Reserva (Que receberá as devoluções)"
+                    : "Conta de Origem (Ex: Reserva)"}
+                </Label>
                 <Controller
                   name="reserveAccountId"
                   control={control}
                   render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
-                        <SelectValue placeholder="De onde sai o dinheiro" />
+                        <SelectValue placeholder={watchedAlreadyReceived ? "Conta que receberá o retorno" : "De onde sai o dinheiro"} />
                       </SelectTrigger>
                       <SelectContent>
                         {accounts.map((a) => (
@@ -473,14 +529,18 @@ export function LoanFormDialog({ trigger }: { trigger?: React.ReactNode }) {
               </div>
 
               <div className="space-y-2">
-                <Label>Conta de Destino (Ex: Corrente)</Label>
+                <Label>
+                  {watchedAlreadyReceived
+                    ? "Conta Pagadora (De onde sairão as devoluções)"
+                    : "Conta de Destino (Ex: Corrente)"}
+                </Label>
                 <Controller
                   name="checkingAccountId"
                   control={control}
                   render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Para onde vai" />
+                        <SelectValue placeholder={watchedAlreadyReceived ? "Conta que pagará as devoluções" : "Para onde vai"} />
                       </SelectTrigger>
                       <SelectContent>
                         {accounts.map((a) => (

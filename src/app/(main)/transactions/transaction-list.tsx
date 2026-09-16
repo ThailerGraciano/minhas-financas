@@ -18,6 +18,7 @@ import {
 import { useMemo, useState, useTransition } from "react";
 
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
@@ -33,7 +34,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash } from "lucide-react";
+import { Pencil, Trash, Filter } from "lucide-react";
 
 export type TransactionWithRelations = {
   id: number;
@@ -216,10 +217,31 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
     return "Geral";
   };
 
+  const [selectedCategory, setSelectedCategory] = useState<string>("Todas");
+
+  const categoriesData = useMemo(() => {
+    const map = new Map<string, number>();
+    let total = 0;
+    transactions.forEach((tx) => {
+      const catName = tx.category?.name || "Sem Categoria";
+      map.set(catName, (map.get(catName) || 0) + 1);
+      total++;
+    });
+    return {
+      total,
+      list: Array.from(map.entries()).sort((a, b) => b[1] - a[1]),
+    };
+  }, [transactions]);
+
   const displayedTransactions = useMemo(() => {
     let filteredTxs = transactions;
+    
+    if (selectedCategory !== "Todas") {
+      filteredTxs = filteredTxs.filter((tx) => (tx.category?.name || "Sem Categoria") === selectedCategory);
+    }
+    
     if (showOnlyPending) {
-      filteredTxs = transactions.filter((tx) => tx.status === "pending");
+      filteredTxs = filteredTxs.filter((tx) => tx.status === "pending");
     }
 
     let processedTxs = filteredTxs;
@@ -299,18 +321,88 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
       }
       return 0;
     });
-  }, [transactions, groupCreditCards, showOnlyPending, sortBy]);
+  }, [transactions, groupCreditCards, showOnlyPending, sortBy, selectedCategory]);
+
+  const groupedTransactions = useMemo(() => {
+    const groups: Record<string, TransactionWithRelations[]> = {};
+    const order: string[] = [];
+    
+    displayedTransactions.forEach((tx) => {
+      const dateKey = tx.date.split("T")[0];
+      if (!groups[dateKey]) {
+        groups[dateKey] = [];
+        order.push(dateKey);
+      }
+      groups[dateKey].push(tx);
+    });
+
+    return order.map((date) => ({
+      date,
+      transactions: groups[date],
+    }));
+  }, [displayedTransactions]);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 py-3 px-4 md:px-6 rounded-2xl md:rounded-full border-transparent bg-card shadow-sm mb-6">
-        <div className="flex flex-wrap items-center gap-4">
+      {/* 1. Chips de Categoria */}
+      <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide">
+        <Button
+          variant={selectedCategory === "Todas" ? "default" : "outline"}
+          className={`rounded-full shrink-0 ${
+            selectedCategory === "Todas" ? "bg-orange-500 hover:bg-orange-600 text-white" : ""
+          }`}
+          onClick={() => setSelectedCategory("Todas")}
+        >
+          Todas ({categoriesData.total})
+        </Button>
+        {categoriesData.list.map(([catName, count]) => (
+          <Button
+            key={catName}
+            variant={selectedCategory === catName ? "default" : "outline"}
+            className={`rounded-full shrink-0 ${
+              selectedCategory === catName ? "bg-orange-500 hover:bg-orange-600 text-white" : ""
+            }`}
+            onClick={() => setSelectedCategory(catName)}
+          >
+            {catName} ({count})
+          </Button>
+        ))}
+      </div>
+
+      {/* 2. Controles (Toggles, Ordenação e Filtro) */}
+      <div className="flex flex-col gap-4 py-3 px-4 md:px-6 rounded-2xl md:rounded-xl border border-transparent bg-card shadow-sm mb-6">
+        <div className="flex items-center justify-between gap-4 w-full flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="show-only-pending"
+              checked={showOnlyPending}
+              onCheckedChange={setShowOnlyPending}
+              className="scale-75 origin-left"
+            />
+            <Label htmlFor="show-only-pending" className="text-sm font-medium cursor-pointer">
+              Apenas pendentes
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="group-cc"
+              checked={groupCreditCards}
+              onCheckedChange={setGroupCreditCards}
+              className="scale-75 origin-right"
+            />
+            <Label htmlFor="group-cc" className="text-sm font-medium cursor-pointer">
+              Agrupar faturas
+            </Label>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between w-full pt-3 border-t border-border/50 gap-4 flex-wrap sm:flex-nowrap">
           <div className="flex items-center gap-2">
             <Label htmlFor="sort-by" className="text-sm font-medium text-muted-foreground whitespace-nowrap">
               Ordenar por:
             </Label>
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger id="sort-by" className="w-[180px] h-9 bg-background rounded-full border-transparent">
+              <SelectTrigger id="sort-by" className="w-[140px] sm:w-[180px] h-9 bg-background rounded-full border-transparent">
                 <SelectValue placeholder="Ordenar por" />
               </SelectTrigger>
               <SelectContent>
@@ -321,21 +413,11 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
               </SelectContent>
             </Select>
           </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-4 sm:gap-6">
-          <div className="flex items-center gap-2">
-            <Switch id="show-only-pending" checked={showOnlyPending} onCheckedChange={setShowOnlyPending} />
-            <Label htmlFor="show-only-pending" className="text-sm font-medium cursor-pointer">
-              Apenas não pagas
-            </Label>
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch id="group-cc" checked={groupCreditCards} onCheckedChange={setGroupCreditCards} />
-            <Label htmlFor="group-cc" className="text-sm font-medium cursor-pointer">
-              Agrupar faturas de cartão
-            </Label>
-          </div>
+          
+          <Button variant="outline" size="sm" className="gap-2 rounded-full whitespace-nowrap">
+            <Filter className="w-4 h-4" />
+            Filtros
+          </Button>
         </div>
       </div>
 
@@ -344,113 +426,108 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
           Nenhuma transação encontrada para este período.
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
-          {displayedTransactions.map((tx) => (
-            <div
-              key={tx.id}
-              className="group flex items-center justify-between p-2 sm:p-3 rounded-xl hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 gap-1.5 sm:gap-4"
-            >
-              {/* Lado Esquerdo (Check, Ícone e Textos) */}
-              <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-[2] sm:flex-1">
-                <button
-                  type="button"
-                  onClick={() => handleToggleStatus(tx)}
-                  disabled={isPending && loadingId === tx.id}
-                  className="shrink-0 transition-colors"
-                >
-                  {isPending && loadingId === tx.id ? (
-                    <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-muted-foreground" />
-                  ) : tx.status === "paid" ? (
-                    <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-success" />
-                  ) : tx.status === "partial" ? (
-                    <MinusCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
-                  ) : (
-                    <Circle className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground hover:text-foreground" />
-                  )}
-                </button>
-                {getIcon(tx.type)}
-                <div className="flex flex-col min-w-0">
-                  <span className="font-medium text-xs sm:text-base truncate leading-tight">{tx.description}</span>
-                  <span className="text-[9px] sm:text-xs text-muted-foreground truncate mt-0.5">
-                    {getSource(tx)} • {tx.category?.name || "Geral"}
-                  </span>
-                </div>
-              </div>
 
-              {/* Centro (Data/Status) */}
-              <div className="hidden sm:flex flex-col items-center justify-center flex-1">
-                <span className="text-sm text-muted-foreground">
-                  {format(parseISO(tx.date), "dd 'de' MMM", { locale: ptBR })}
-                </span>
-                <button
-                  onClick={() => handleMarkAsPaid(tx)}
-                  disabled={loadingId === tx.id}
-                  className={`mt-1 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full transition-colors ${
-                    tx.status === "pending" || tx.status === "partial"
-                      ? "bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
-                      : "bg-green-500/10 text-green-500 hover:bg-green-500/20 group-hover:opacity-100"
-                  }`}
-                  title={tx.status === "paid" ? "Desfazer pagamento" : "Marcar como pago"}
-                >
-                  {loadingId === tx.id
-                    ? "..."
-                    : tx.status === "pending"
-                      ? "Pendente"
-                      : tx.status === "partial"
-                        ? "Parcial"
-                        : "Pago"}
-                </button>
-              </div>
-
-              {/* Lado Direito (Valores e Ações) */}
-              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1 sm:gap-3 shrink-0 justify-end">
-                <div className="flex flex-col items-end">
-                  <span
-                    className={`font-semibold text-xs sm:text-base ${
-                      tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)"))
-                        ? "text-green-500"
-                        : "text-destructive"
-                    }`}
+        <div className="flex flex-col gap-6">
+          {groupedTransactions.map((group) => (
+            <div key={group.date} className="flex flex-col gap-2">
+              <h3 className="text-xs font-semibold uppercase text-muted-foreground px-2">
+                {format(parseISO(group.date), "dd 'de' MMMM", { locale: ptBR })}
+              </h3>
+              <div className="flex flex-col gap-2">
+                {group.transactions.map((tx) => (
+                  <div
+                    key={tx.id}
+                    className="group relative flex items-center justify-between p-3 sm:p-4 rounded-2xl bg-card hover:bg-muted/50 border border-border/50 shadow-sm transition-colors gap-3 sm:gap-4"
                   >
-                    {tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)"))
-                      ? "+"
-                      : "-"}
-                    {formatCurrency(tx.amount)}
-                  </span>
-
-                  {/* Somente visível no mobile onde o centro não aparece */}
-                  <span className="sm:hidden flex items-center gap-1 text-[9px] text-muted-foreground mt-0.5">
-                    {format(parseISO(tx.date), "dd/MM")}
-                    {(tx.status === "pending" || tx.status === "partial") && (
-                      <button onClick={() => handleMarkAsPaid(tx)} className="text-amber-500 font-bold ml-1 uppercase">
-                        {tx.status === "partial" ? "Parc." : "Pend."}
+                    {/* Esquerda (Ícone e Textos) */}
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStatus(tx)}
+                        disabled={isPending && loadingId === tx.id}
+                        className="shrink-0 transition-colors"
+                        title={tx.status === "paid" ? "Desfazer pagamento" : "Marcar como pago"}
+                      >
+                        {isPending && loadingId === tx.id ? (
+                          <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-muted-foreground" />
+                        ) : tx.status === "paid" ? (
+                          <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
+                        ) : tx.status === "partial" ? (
+                          <MinusCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
+                        ) : (
+                          <Circle className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground hover:text-foreground" />
+                        )}
                       </button>
-                    )}
-                  </span>
-                </div>
+                      {getIcon(tx.type)}
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-medium text-sm sm:text-base truncate leading-tight">{tx.description}</span>
+                        <span className="text-xs text-muted-foreground truncate mt-0.5">
+                          {getSource(tx)} • {tx.category?.name || "Geral"}
+                        </span>
+                      </div>
+                    </div>
 
-                <div className="flex items-center gap-0.5 sm:gap-1 w-[50px] sm:w-[68px] justify-end shrink-0">
-                  {!tx.isGroup && (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setTransactionToEdit(tx)}
-                        className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-foreground"
-                      >
-                        <Pencil className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setTransactionToDelete(tx)}
-                        className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-foreground"
-                      >
-                        <Trash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      </Button>
-                    </>
-                  )}
-                </div>
+                    {/* Direita (Valores, Badge e Ações) */}
+                    <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+                      <div className="flex flex-col items-end gap-1.5">
+                        <span
+                          className={`font-semibold text-sm sm:text-base ${
+                            tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)"))
+                              ? "text-emerald-500"
+                              : "text-rose-500"
+                          }`}
+                        >
+                          {tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)"))
+                            ? "+"
+                            : "-"}
+                          {formatCurrency(tx.amount)}
+                        </span>
+
+                        <button 
+                          onClick={() => handleMarkAsPaid(tx)}
+                          disabled={loadingId === tx.id}
+                          className="transition-opacity hover:opacity-80"
+                        >
+                          {tx.status === "paid" ? (
+                            <Badge className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 uppercase font-bold text-[10px] border-0 h-5 px-1.5 cursor-pointer">
+                              {tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)")) ? "Recebido" : "Pago"}
+                            </Badge>
+                          ) : tx.status === "partial" ? (
+                            <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/30 uppercase font-bold px-1.5 h-5 bg-transparent cursor-pointer">
+                              Parcial
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/30 uppercase font-bold px-1.5 h-5 bg-transparent cursor-pointer">
+                              Pendente
+                            </Badge>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Ações (Edit/Delete) */}
+                      {!tx.isGroup && (
+                        <div className="flex items-center gap-0.5 sm:gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setTransactionToEdit(tx)}
+                            className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-foreground"
+                          >
+                            <Pencil className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setTransactionToDelete(tx)}
+                            className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           ))}

@@ -23,7 +23,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { transactions } from "@/db/schema";
 import { addMonths, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Plus, Loader2, ChevronRight, ChevronLeft, ReceiptText, Check } from "lucide-react";
+import { SelectableCard } from "@/components/ui/selectable-card";
+import { Plus, Loader2, ChevronRight, ChevronLeft, ReceiptText, Check, Zap, RefreshCw, Calendar, Landmark, CreditCard as CreditCardIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -342,20 +343,6 @@ export function TransactionFormDialog({
     }
   };
 
-  const renderStepIndicator = () => {
-    return (
-      <div className="flex items-center justify-center gap-2 mb-6 mt-2">
-        {stepsList.map((s, idx) => (
-          <div key={s} className="flex items-center">
-            <div className={`h-2.5 w-2.5 rounded-full transition-all ${idx <= currentIndex ? 'bg-primary scale-110' : 'bg-muted'}`} />
-            {idx < stepsList.length - 1 && (
-              <div className={`h-[2px] w-4 mx-1 transition-all ${idx < currentIndex ? 'bg-primary' : 'bg-muted'}`} />
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  };
 
   const renderSummary = () => {
     return (
@@ -443,6 +430,15 @@ export function TransactionFormDialog({
     );
   };
 
+  const stepNames: Record<number, string> = {
+    1: "Identificação",
+    2: "Valor e Data",
+    3: "Categoria",
+    4: "Configuração",
+    5: "Situação",
+    6: "Resumo"
+  };
+
   return (
     <Dialog open={open} onOpenChange={(val) => {
       setOpen(val);
@@ -457,32 +453,55 @@ export function TransactionFormDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px] max-h-[95dvh] overflow-y-auto p-3 sm:p-6">
-        <DialogHeader>
-          <DialogTitle>Nova Transação</DialogTitle>
+      <DialogContent className="sm:max-w-[500px] max-h-[95dvh] overflow-y-auto p-3 sm:p-6 bg-background">
+        <DialogHeader className="mb-2">
+          {/* Indicador de Progresso Dinâmico */}
+          <div className="flex flex-col gap-2">
+            <span className="text-xs text-primary font-bold uppercase tracking-wider">
+              Passo {currentIndex + 1} de {stepsList.length} • {stepNames[step]}
+            </span>
+            <div className="h-1 bg-white/10 rounded-full w-full overflow-hidden">
+              <div 
+                className="h-full bg-primary transition-all duration-300" 
+                style={{ width: `${((currentIndex + 1) / stepsList.length) * 100}%` }}
+              />
+            </div>
+          </div>
+          <DialogTitle className="sr-only">Nova Transação</DialogTitle>
           <DialogDescription className="sr-only">
             Preencha os detalhes para registrar uma nova transação financeira.
           </DialogDescription>
         </DialogHeader>
 
         {open && formData ? (
-          <div className="w-full">
-            <Tabs
-              value={tab}
-              onValueChange={(val) => {
-                setTab(val);
-                resetState();
-              }}
-              className="w-full mb-4"
-            >
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="expense" disabled={step > 1}>Despesa</TabsTrigger>
-                <TabsTrigger value="income" disabled={step > 1}>Receita</TabsTrigger>
-                <TabsTrigger value="transfer" disabled={step > 1}>Transferência</TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            {renderStepIndicator()}
+          <div className="w-full flex flex-col h-full">
+            {/* Segmented Control - Seletor de Tipo */}
+            <div className="bg-[#1A1A22] p-1 rounded-xl flex w-full mb-6">
+              <button
+                className={`flex-1 rounded-lg text-sm font-medium transition-all py-2 flex items-center justify-center gap-2 ${tab === 'expense' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={() => { setTab('expense'); resetState(); }}
+                disabled={step > 1}
+              >
+                {tab === 'expense' && <div className="w-2 h-2 rounded-full bg-rose-500" />}
+                Despesa
+              </button>
+              <button
+                className={`flex-1 rounded-lg text-sm font-medium transition-all py-2 flex items-center justify-center gap-2 ${tab === 'income' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={() => { setTab('income'); resetState(); }}
+                disabled={step > 1}
+              >
+                {tab === 'income' && <div className="w-2 h-2 rounded-full bg-emerald-500" />}
+                Receita
+              </button>
+              <button
+                className={`flex-1 rounded-lg text-sm font-medium transition-all py-2 flex items-center justify-center gap-2 ${tab === 'transfer' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={() => { setTab('transfer'); resetState(); }}
+                disabled={step > 1}
+              >
+                {tab === 'transfer' && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+                Transferência
+              </button>
+            </div>
 
             <div className="min-h-[200px] sm:min-h-[280px] flex flex-col justify-center">
               {step === 1 && (
@@ -620,19 +639,28 @@ export function TransactionFormDialog({
                   {/* Recorrência */}
                   <div className="grid gap-3">
                     <Label className="text-muted-foreground ml-1">Recorrência</Label>
-                    <div className="flex gap-4 justify-center">
-                      <label className={`flex flex-col items-center gap-3 cursor-pointer p-4 rounded-xl border-2 transition-all flex-1 ${expenseType === 'single' ? 'border-primary bg-primary/5' : 'border-transparent bg-muted/20 hover:bg-muted/50'}`}>
-                        <input type="radio" checked={expenseType === "single"} onChange={() => setExpenseType("single")} className="w-6 h-6 accent-primary" />
-                        <span className="font-semibold text-sm">Única</span>
-                      </label>
-                      <label className={`flex flex-col items-center gap-3 cursor-pointer p-4 rounded-xl border-2 transition-all flex-1 ${expenseType === 'fixed' ? 'border-primary bg-primary/5' : 'border-transparent bg-muted/20 hover:bg-muted/50'}`}>
-                        <input type="radio" checked={expenseType === "fixed"} onChange={() => setExpenseType("fixed")} className="w-6 h-6 accent-primary" />
-                        <span className="font-semibold text-sm">Fixa</span>
-                      </label>
-                      <label className={`flex flex-col items-center gap-3 cursor-pointer p-4 rounded-xl border-2 transition-all flex-1 ${expenseType === 'installment' ? 'border-primary bg-primary/5' : 'border-transparent bg-muted/20 hover:bg-muted/50'}`}>
-                        <input type="radio" checked={expenseType === "installment"} onChange={() => setExpenseType("installment")} className="w-6 h-6 accent-primary" />
-                        <span className="font-semibold text-sm">Parcelada</span>
-                      </label>
+                    <div className="grid grid-cols-3 gap-3">
+                      <SelectableCard
+                        icon={<Zap className="w-5 h-5" />}
+                        title="Única"
+                        subtitle="Sem repetições"
+                        selected={expenseType === "single"}
+                        onClick={() => setExpenseType("single")}
+                      />
+                      <SelectableCard
+                        icon={<RefreshCw className="w-5 h-5" />}
+                        title="Fixa"
+                        subtitle="Mensal"
+                        selected={expenseType === "fixed"}
+                        onClick={() => setExpenseType("fixed")}
+                      />
+                      <SelectableCard
+                        icon={<Calendar className="w-5 h-5" />}
+                        title="Parcelada"
+                        subtitle="Dividir valor"
+                        selected={expenseType === "installment"}
+                        onClick={() => setExpenseType("installment")}
+                      />
                     </div>
                   </div>
 
@@ -662,20 +690,28 @@ export function TransactionFormDialog({
                     </div>
                   )}
 
-                  {/* Payment Method (Expense/Income) */}
+                  {/* Payment Method (Expense) */}
                   {tab === "expense" && (
                     <>
-                      <div className="grid gap-3 mt-6 border-t pt-6">
+                      <div className="grid gap-3 mt-6 border-t pt-6 border-white/5">
                         <Label className="text-muted-foreground ml-1">Forma de Pagamento</Label>
-                        <div className="flex gap-4 justify-center">
-                          <label className={`flex flex-col items-center gap-3 cursor-pointer p-4 rounded-xl border-2 transition-all flex-1 ${paymentMethod === 'account' ? 'border-primary bg-primary/5' : 'border-transparent bg-muted/20 hover:bg-muted/50'}`}>
-                            <input type="radio" checked={paymentMethod === "account"} onChange={() => setPaymentMethod("account")} className="w-6 h-6 accent-primary" />
-                            <span className="font-semibold">Conta</span>
-                          </label>
-                          <label className={`flex flex-col items-center gap-3 cursor-pointer p-4 rounded-xl border-2 transition-all flex-1 ${paymentMethod === 'credit_card' ? 'border-primary bg-primary/5' : 'border-transparent bg-muted/20 hover:bg-muted/50'}`}>
-                            <input type="radio" checked={paymentMethod === "credit_card"} onChange={() => setPaymentMethod("credit_card")} className="w-6 h-6 accent-primary" />
-                            <span className="font-semibold text-center">Cartão de Crédito</span>
-                          </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <SelectableCard
+                            icon={<Landmark className="w-5 h-5" />}
+                            title="Conta"
+                            subtitle="Saldo à vista"
+                            selected={paymentMethod === "account"}
+                            onClick={() => setPaymentMethod("account")}
+                            layout="horizontal"
+                          />
+                          <SelectableCard
+                            icon={<CreditCardIcon className="w-5 h-5" />}
+                            title="Crédito"
+                            subtitle="Fatura"
+                            selected={paymentMethod === "credit_card"}
+                            onClick={() => setPaymentMethod("credit_card")}
+                            layout="horizontal"
+                          />
                         </div>
                       </div>
 
@@ -698,14 +734,26 @@ export function TransactionFormDialog({
                       {paymentMethod === "credit_card" && (
                         <div className="space-y-5 animate-in fade-in">
                           <div className="grid gap-3">
-                            <Label className="text-muted-foreground ml-1">Cartão de Crédito</Label>
+                            <div className="flex justify-between items-end">
+                              <Label className="text-muted-foreground ml-1">Cartão de Crédito</Label>
+                              {selectedCreditCardId && formData.creditCards.find((c: CreditCard) => c.id === Number(selectedCreditCardId)) && (
+                                <span className="text-xs text-primary font-medium">
+                                  Limite Disp.: R$ {Number(formData.creditCards.find((c: CreditCard) => c.id === Number(selectedCreditCardId))?.creditLimit).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </span>
+                              )}
+                            </div>
                             <Select value={selectedCreditCardId} onValueChange={handleCreditCardChange}>
-                              <SelectTrigger className="h-14 w-full rounded-xl text-lg">
-                                <SelectValue placeholder="Selecione..." />
+                              <SelectTrigger className="h-16 w-full rounded-xl px-4 flex items-center justify-between">
+                                <SelectValue placeholder="Selecione o cartão..." />
                               </SelectTrigger>
                               <SelectContent>
                                 {formData.creditCards.map((c: CreditCard) => (
-                                  <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                                  <SelectItem key={c.id} value={String(c.id)}>
+                                    <div className="flex flex-col text-left">
+                                      <span className="text-sm font-medium">{c.name}</span>
+                                      <span className="text-xs text-muted-foreground">Vence dia {c.dueDay}</span>
+                                    </div>
+                                  </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
@@ -713,13 +761,23 @@ export function TransactionFormDialog({
 
                           {selectedCreditCardId && invoiceOptions.length > 0 && (
                             <div className="grid gap-3">
-                              <Label className="text-muted-foreground ml-1">Fatura</Label>
-                              <div className="flex flex-wrap gap-4 p-4 rounded-xl bg-muted/20 border max-h-48 overflow-y-auto">
-                                {invoiceOptions.map((opt) => (
-                                  <label key={opt.value} className={`flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap bg-background p-3 rounded-lg border-2 flex-1 justify-center transition-all ${selectedInvoiceMonth === opt.value ? 'border-primary' : 'border-transparent hover:border-primary/50'}`}>
-                                    <input type="radio" value={opt.value} checked={selectedInvoiceMonth === opt.value} onChange={() => setSelectedInvoiceMonth(opt.value)} className="w-5 h-5 accent-primary" /> 
-                                    <span className="font-semibold">{opt.label}</span>
-                                  </label>
+                              <div className="flex justify-between items-end">
+                                <Label className="text-muted-foreground ml-1">Fatura</Label>
+                                <span className="text-xs text-muted-foreground">
+                                  Fecha dia {formData.creditCards.find((c: CreditCard) => c.id === Number(selectedCreditCardId))?.closingDay}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-2">
+                                {invoiceOptions.slice(3, 7).map((opt) => ( // Show only the most relevant ones (e.g., current and next 3)
+                                  <SelectableCard
+                                    key={opt.value}
+                                    title={opt.label}
+                                    subtitle={`Vencimento em ${opt.value}`}
+                                    selected={selectedInvoiceMonth === opt.value}
+                                    onClick={() => setSelectedInvoiceMonth(opt.value)}
+                                    layout="horizontal"
+                                    className="p-3"
+                                  />
                                 ))}
                               </div>
                             </div>
@@ -772,21 +830,21 @@ export function TransactionFormDialog({
               )}
             </div>
 
-            <div className="pt-4 sm:pt-8 flex flex-wrap justify-between gap-2 sm:gap-3 mt-3 sm:mt-4 border-t">
-              <Button type="button" variant="outline" onClick={handlePrevStep} isLoading={isPending} disabled={isFirstStep || isPending} className="min-w-[100px] sm:w-32">
+            <div className="pt-4 sm:pt-8 flex flex-wrap justify-between gap-2 sm:gap-3 mt-3 sm:mt-4">
+              <Button type="button" variant="ghost" onClick={handlePrevStep} isLoading={isPending} disabled={isFirstStep || isPending} className="min-w-[100px] sm:w-32">
                 <ChevronLeft className="mr-1 sm:mr-2 h-4 w-4" /> Voltar
               </Button>
               
               {!isLastStep ? (
-                <Button type="button" onClick={handleNextStep} className="min-w-[100px] sm:w-32 bg-primary">
+                <Button type="button" onClick={handleNextStep} className="min-w-[100px] sm:w-32 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-full">
                   Próximo <ChevronRight className="ml-1 sm:ml-2 h-4 w-4" />
                 </Button>
               ) : (
                 <div className="flex flex-wrap gap-2 justify-end">
-                  <Button type="button" variant="secondary" onClick={() => handleSubmit("save-and-continue")} isLoading={isPending} disabled={isPending} className="text-xs sm:text-sm px-2 sm:px-4">
+                  <Button type="button" variant="secondary" onClick={() => handleSubmit("save-and-continue")} isLoading={isPending} disabled={isPending} className="text-xs sm:text-sm px-2 sm:px-4 rounded-full">
                     <><Plus className="mr-1 sm:mr-2 h-4 w-4" /> Adicionar Outra</>
                   </Button>
-                  <Button type="button" onClick={() => handleSubmit("save-and-close")} isLoading={isPending} disabled={isPending} className="bg-primary text-primary-foreground hover:brightness-110 border-none text-xs sm:text-sm px-2 sm:px-4">
+                  <Button type="button" onClick={() => handleSubmit("save-and-close")} isLoading={isPending} disabled={isPending} className="bg-primary text-primary-foreground hover:brightness-110 font-semibold rounded-full border-none text-xs sm:text-sm px-2 sm:px-4">
                     <><Check className="mr-1 sm:mr-2 h-4 w-4" /> Finalizar</>
                   </Button>
                 </div>

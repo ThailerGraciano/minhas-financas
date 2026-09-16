@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CalendarDays, ArrowDownCircle, ArrowUpCircle, TrendingUp, TrendingDown } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { DaySelectorCarousel } from "@/components/day-selector-carousel";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { ArrowDownRight, ArrowUpRight, CalendarDays, TrendingDown, TrendingUp } from "lucide-react";
+import { useMemo, useState } from "react";
 
-type ForecastTransaction = {
+export type ForecastTransaction = {
   id: number | string;
   type: string;
   description: string;
@@ -19,7 +19,7 @@ type ForecastTransaction = {
   parentTransactionId?: number | null;
 };
 
-type DayProjection = {
+export type DayProjection = {
   date: string;
   total_expenses: number;
   total_incomes: number;
@@ -28,179 +28,172 @@ type DayProjection = {
 };
 
 export function DayByDayForecast({ projection }: { projection: DayProjection[] }) {
-  const [selectedDay, setSelectedDay] = useState<DayProjection | null>(null);
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+
+  // Inicializa com hoje se estiver na projeção, senão o primeiro dia
+  const initialDate = useMemo(() => {
+    const hasToday = projection.some((p) => p.date === todayStr);
+    if (hasToday) return todayStr;
+    return projection[0]?.date || todayStr;
+  }, [projection, todayStr]);
+
+  const [selectedDate, setSelectedDate] = useState<string>(initialDate);
+
+  const activeDay = useMemo(() => {
+    return (
+      projection.find((p) => p.date === selectedDate) ||
+      projection[0] || {
+        date: selectedDate,
+        total_expenses: 0,
+        total_incomes: 0,
+        projected_balance: 0,
+        transactions_of_the_day: [],
+      }
+    );
+  }, [projection, selectedDate]);
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
   };
 
-  const formatDay = (dateStr: string) => {
-    return format(parseISO(dateStr), "dd/MM", { locale: ptBR });
-  };
-
-  const formatDayFull = (dateStr: string) => {
-    return format(parseISO(dateStr), "dd 'de' MMMM, EEEE", { locale: ptBR });
-  };
+  const activeDateFormatted = useMemo(() => {
+    try {
+      const parsed = parseISO(activeDay.date);
+      const dayFormatted = format(parsed, "dd 'de' MMMM", { locale: ptBR });
+      const weekDayFormatted = format(parsed, "EEEE", { locale: ptBR });
+      const capitalizedDay = dayFormatted.charAt(0).toUpperCase() + dayFormatted.slice(1);
+      const capitalizedWeek = weekDayFormatted.charAt(0).toUpperCase() + weekDayFormatted.slice(1);
+      return `${capitalizedDay}, ${capitalizedWeek}`;
+    } catch {
+      return activeDay.date;
+    }
+  }, [activeDay.date]);
 
   return (
-    <>
-      <Card className="flex flex-col h-[600px]">
-        <CardHeader>
-          <CardTitle className="text-lg font-medium flex items-center gap-2">
-            <CalendarDays className="w-5 h-5 text-muted-foreground" />
-            Previsão Dia a Dia
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex-1 overflow-y-auto pr-2 space-y-3">
-          {projection.filter(day => day.total_expenses > 0 || day.total_incomes > 0).length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground text-sm border rounded-xl border-dashed">
-              Nenhuma movimentação prevista.
+    <Card className="rounded-[1.5rem] sm:rounded-[2rem] border-white/10 shadow-sm bg-card overflow-hidden flex flex-col">
+      <CardHeader className="pb-3 pt-5 px-5 sm:px-6">
+        <CardTitle className="text-lg font-bold flex items-center gap-2 text-foreground">
+          <CalendarDays className="w-5 h-5 text-primary" />
+          Previsão Dia a Dia
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent className="px-4 sm:px-6 pb-6 pt-0 space-y-4 flex-1 flex flex-col">
+        {/* Carrossel Horizontal de Dias */}
+        <DaySelectorCarousel days={projection} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+
+        {/* Card de Resumo do Dia Selecionado */}
+        <div className="bg-muted/20 border border-white/10 rounded-2xl p-4 sm:p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Resumo do Dia
+              </span>
+              <span className="text-xs text-foreground font-bold">• {activeDateFormatted}</span>
             </div>
-          ) : (
-            projection.filter(day => day.total_expenses > 0 || day.total_incomes > 0).map((day) => {
-              const hasExpenses = day.total_expenses > 0;
-              const hasIncomes = day.total_incomes > 0;
-              const isNegativeBalance = day.projected_balance < 0;
+            <span className="text-[11px] text-muted-foreground bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
+              {activeDay.transactions_of_the_day.length}{" "}
+              {activeDay.transactions_of_the_day.length === 1 ? "lançamento" : "lançamentos"}
+            </span>
+          </div>
 
-              return (
-                <div
-                  key={day.date}
-                  onClick={() => setSelectedDay(day)}
-                  className="group p-2 md:p-3 border rounded-xl bg-card hover:bg-muted/40 transition-all flex items-center gap-2 md:gap-4 text-sm cursor-pointer hover:border-primary/40 hover:shadow-sm"
-                >
-                  {/* Esquerda: Data Destaque */}
-                  <div className="flex flex-col items-center justify-center bg-muted/50 rounded-lg p-1.5 md:p-2 w-12 h-12 md:w-16 md:h-16 flex-shrink-0 group-hover:bg-primary/10 transition-colors">
-                    <span className="text-lg md:text-xl font-bold text-foreground">{format(parseISO(day.date), "dd")}</span>
-                    <span className="text-[10px] md:text-xs text-muted-foreground uppercase">{format(parseISO(day.date), "MMM", { locale: ptBR })}</span>
-                  </div>
-
-                  {/* Centro: Movimentações */}
-                  <div className="flex flex-1 flex-col justify-center gap-1 min-w-0">
-                    <div className="flex items-center gap-1 md:gap-1.5 truncate">
-                      <TrendingDown className={`w-3 h-3 md:w-4 md:h-4 shrink-0 ${hasExpenses ? 'text-red-500' : 'text-muted-foreground/40'}`} />
-                      <span className={`font-medium text-xs md:text-sm truncate ${hasExpenses ? 'text-red-500' : 'text-muted-foreground'}`}>
-                        {formatCurrency(day.total_expenses)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 md:gap-1.5 truncate">
-                      <TrendingUp className={`w-3 h-3 md:w-4 md:h-4 shrink-0 ${hasIncomes ? 'text-green-600' : 'text-muted-foreground/40'}`} />
-                      <span className={`font-medium text-xs md:text-sm truncate ${hasIncomes ? 'text-green-600' : 'text-muted-foreground'}`}>
-                        {formatCurrency(day.total_incomes)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Direita: Saldo */}
-                  <div className="flex flex-col items-end justify-center shrink-0">
-                    <span className="text-[9px] md:text-[10px] uppercase font-semibold tracking-wider text-muted-foreground mb-0.5 md:mb-1">Saldo Previsto</span>
-                    <span className={`text-sm md:text-lg font-bold truncate max-w-[90px] sm:max-w-none ${isNegativeBalance ? "text-red-500" : "text-primary"}`}>
-                      {formatCurrency(day.projected_balance)}
-                    </span>
-                  </div>
-                </div>
-              );
-            }))}
-        </CardContent>
-      </Card>
-
-      {/* Day Detail Modal */}
-      <Dialog open={!!selectedDay} onOpenChange={(open) => !open && setSelectedDay(null)}>
-        <DialogContent className="sm:max-w-[550px]">
-          {selectedDay && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <CalendarDays className="w-5 h-5 text-primary" />
-                  {formatDayFull(selectedDay.date)}
-                </DialogTitle>
-                <DialogDescription className="sr-only">
-                  Resumo financeiro do dia selecionado.
-                </DialogDescription>
-              </DialogHeader>
-
-              {/* Summary Cards */}
-              <div className="grid grid-cols-3 gap-3 mt-2">
-                <div className="rounded-lg border p-3 text-center">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <ArrowDownCircle className="w-4 h-4 text-red-500" />
-                    <span className="text-xs text-muted-foreground">Despesas</span>
-                  </div>
-                  <span className="font-bold text-red-500 text-sm">
-                    {formatCurrency(selectedDay.total_expenses)}
-                  </span>
-                </div>
-                <div className="rounded-lg border p-3 text-center">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <ArrowUpCircle className="w-4 h-4 text-green-600" />
-                    <span className="text-xs text-muted-foreground">Receitas</span>
-                  </div>
-                  <span className="font-bold text-green-600 text-sm">
-                    {formatCurrency(selectedDay.total_incomes)}
-                  </span>
-                </div>
-                <div className="rounded-lg border p-3 text-center">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <TrendingUp className="w-4 h-4 text-primary" />
-                    <span className="text-xs text-muted-foreground">Saldo</span>
-                  </div>
-                  <span className={`font-bold text-sm ${selectedDay.projected_balance >= 0 ? 'text-primary' : 'text-red-500'}`}>
-                    {formatCurrency(selectedDay.projected_balance)}
-                  </span>
-                </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
+            {/* Saídas */}
+            <div className="flex items-center gap-3 bg-card/60 p-3 rounded-xl border border-white/5">
+              <div className="w-9 h-9 rounded-full bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-500 shrink-0">
+                <TrendingDown className="w-4 h-4" />
               </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Saídas</span>
+                <span className="text-base sm:text-lg font-bold text-rose-500 truncate tabular-nums">
+                  {formatCurrency(activeDay.total_expenses)}
+                </span>
+              </div>
+            </div>
 
-              {/* Transactions List */}
-              <div className="mt-4 max-h-[350px] overflow-y-auto">
-                {selectedDay.transactions_of_the_day.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground text-sm border rounded-lg border-dashed">
-                    Nenhuma movimentação neste dia.
-                  </div>
-                ) : (
-                  <Table className="table-fixed w-full">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[50%] px-2">Descrição</TableHead>
-                        <TableHead className="w-[20%] px-1">
-                          <span className="md:hidden">Cat.</span>
-                          <span className="hidden md:inline">Categoria</span>
-                        </TableHead>
-                        <TableHead className="w-[30%] text-right px-2">Valor</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedDay.transactions_of_the_day.map((tx) => {
-                        const isIncome = tx.type === 'income' || (tx.type === 'transfer' && !!tx.parentTransactionId);
-                        const isTransfer = tx.type === 'transfer';
-                        return (
-                          <TableRow key={tx.id}>
-                            <TableCell className="overflow-hidden px-2 py-3">
-                              <div className="flex flex-col min-w-0">
-                                <span className="font-medium text-xs md:text-sm truncate block">
-                                  {isTransfer && <span className="inline-block bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 text-[9px] uppercase px-1 rounded mr-1">Transf</span>}
-                                  {tx.description}
-                                </span>
-                                <span className="text-[10px] md:text-xs text-muted-foreground truncate block">
-                                  {tx.account?.name || tx.creditCard?.name || 'Geral'}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-[10px] md:text-xs text-muted-foreground truncate px-1 py-3">
-                              {tx.category?.name || '-'}
-                            </TableCell>
-                            <TableCell className={`text-right font-bold truncate px-2 py-3 text-xs md:text-sm ${isIncome ? 'text-green-600' : 'text-red-500'}`}>
-                              {isIncome ? '+' : '-'}{formatCurrency(Number(tx.amount))}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+            {/* Entradas */}
+            <div className="flex items-center gap-3 bg-card/60 p-3 rounded-xl border border-white/5">
+              <div className="w-9 h-9 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-500 shrink-0">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Entradas</span>
+                <span className="text-base sm:text-lg font-bold text-emerald-500 truncate tabular-nums">
+                  {formatCurrency(activeDay.total_incomes)}
+                </span>
+              </div>
+            </div>
+
+            {/* SALDO PREVISTO */}
+            <div className="flex flex-col sm:items-end justify-center bg-card/60 sm:bg-transparent p-3 sm:p-0 rounded-xl border border-white/5 sm:border-0">
+              <span className="text-[10px] sm:text-[11px] uppercase font-bold tracking-wider text-muted-foreground">
+                SALDO PREVISTO
+              </span>
+              <span
+                className={cn(
+                  "text-xl sm:text-2xl font-black tracking-tight tabular-nums mt-0.5",
+                  activeDay.projected_balance >= 0 ? "text-primary" : "text-rose-500",
                 )}
+              >
+                {formatCurrency(activeDay.projected_balance)}
+              </span>
+            </div>
+          </div>
+
+          {/* Lançamentos do Dia Selecionado */}
+          <div className="space-y-2 pt-2">
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
+              Movimentações deste dia
+            </span>
+
+            {activeDay.transactions_of_the_day.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground text-xs border border-dashed border-white/10 rounded-xl bg-card/40">
+                Nenhuma movimentação prevista para este dia.
               </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
+            ) : (
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {activeDay.transactions_of_the_day.map((tx) => {
+                  const isIncome = tx.type === "income" || (tx.type === "transfer" && !!tx.parentTransactionId);
+
+                  return (
+                    <div
+                      key={tx.id}
+                      className="p-2.5 rounded-xl bg-card/80 border border-white/5 flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className={cn(
+                            "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+                            isIncome ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500",
+                          )}
+                        >
+                          {isIncome ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-semibold text-foreground truncate">{tx.description}</span>
+                          <span className="text-[10px] text-muted-foreground truncate">
+                            {tx.account?.name || tx.creditCard?.name || "Conta"} • {tx.category?.name || "Geral"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <span
+                        className={cn(
+                          "font-bold tabular-nums shrink-0",
+                          isIncome ? "text-emerald-500" : "text-rose-500",
+                        )}
+                      >
+                        {isIncome ? "+" : "-"}
+                        {formatCurrency(Number(tx.amount))}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

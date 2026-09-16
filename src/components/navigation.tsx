@@ -2,7 +2,6 @@
 
 import LogoIcon from "@/assets/logo.png";
 import { ModeToggle } from "@/components/mode-toggle";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import {
   ChevronLeft,
@@ -13,7 +12,6 @@ import {
   Home,
   Landmark,
   LogOut,
-  MoreHorizontal,
   PieChart,
   Receipt,
   Settings,
@@ -25,7 +23,6 @@ import { signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
 import { useSidebar } from "./sidebar-provider";
 
 const navItems = [
@@ -43,11 +40,7 @@ const navItems = [
 
 export function Navigation() {
   const pathname = usePathname();
-  const [isOpen, setIsOpen] = useState(false);
   const { isCollapsed, toggle } = useSidebar();
-
-  const mainMobileItems = navItems.slice(0, 4);
-  const moreMobileItems = navItems.slice(4);
 
   return (
     <>
@@ -147,75 +140,7 @@ export function Navigation() {
         </div>
       </header>
 
-      {/* Mobile Bottom Nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 w-full h-16 bg-background border-t border-white/5 flex items-center justify-around px-2 z-40">
-        {mainMobileItems.map((item) => {
-          const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={cn(
-                "flex flex-col items-center justify-center w-full h-full gap-1 text-[10px] font-medium transition-colors",
-                isActive ? "text-primary" : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <item.icon className={cn("w-5 h-5 transition-transform", isActive && "scale-110")} />
-              {item.name}
-            </Link>
-          );
-        })}
-
-        {/* More Menu (Sheet) */}
-        <Sheet open={isOpen} onOpenChange={setIsOpen}>
-          <SheetTrigger asChild>
-            <button className="flex flex-col items-center justify-center w-full h-full gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors">
-              <MoreHorizontal className="w-5 h-5" />
-              Mais
-            </button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="p-0 border-t border-white/5 rounded-t-2xl">
-            <SheetHeader className="p-4 border-b border-white/5 text-left">
-              <SheetTitle>Menu</SheetTitle>
-            </SheetHeader>
-            <div className="p-4 flex flex-col gap-1 max-h-[60vh] overflow-y-auto">
-              {moreMobileItems.map((item) => {
-                const isActive = pathname.startsWith(item.href);
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    onClick={() => setIsOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200",
-                      isActive
-                        ? "bg-white/5 text-white border-l-4 border-primary rounded-l-none"
-                        : "text-muted-foreground hover:bg-white/5 hover:text-white",
-                    )}
-                  >
-                    <item.icon className="w-5 h-5 shrink-0" />
-                    {item.name}
-                  </Link>
-                );
-              })}
-              <div className="my-2 border-t border-white/5" />
-              <Link
-                href="/settings"
-                onClick={() => setIsOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-all duration-200",
-                  pathname.startsWith("/settings")
-                    ? "bg-white/5 text-white border-l-4 border-primary rounded-l-none"
-                    : "text-muted-foreground hover:bg-white/5 hover:text-white",
-                )}
-              >
-                <Settings className="w-5 h-5 shrink-0" />
-                Configurações
-              </Link>
-            </div>
-          </SheetContent>
-        </Sheet>
-      </nav>
+      {/* Mobile Bottom Nav removido a favor do BottomNavigationBar global */}
     </>
   );
 }

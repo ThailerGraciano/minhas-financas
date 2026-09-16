@@ -183,7 +183,7 @@ export function LoansClientPage({ data }: { data: LoansPageData }) {
 
       {/* Amortization Chart */}
       {amortizationData.length > 0 && (
-        <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
+        <div className="bg-card rounded-3xl sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
           <div className="flex flex-row items-center gap-2 mb-4">
             <TrendingDown className="h-5 w-5 text-primary" />
             <div>

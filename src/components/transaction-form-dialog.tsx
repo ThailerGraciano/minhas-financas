@@ -18,13 +18,23 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SelectableCard } from "@/components/ui/selectable-card";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { transactions } from "@/db/schema";
 import { addMonths, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { SelectableCard } from "@/components/ui/selectable-card";
-import { Plus, Loader2, ChevronRight, ChevronLeft, ReceiptText, Check, Zap, RefreshCw, Calendar, Landmark, CreditCard as CreditCardIcon } from "lucide-react";
+import {
+  Calendar,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  CreditCard as CreditCardIcon,
+  Landmark,
+  Plus,
+  ReceiptText,
+  RefreshCw,
+  Zap,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -223,41 +233,45 @@ export function TransactionFormDialog({
       if (step === 2 && (!amount || !transactionDate)) return toast.error("Preencha o valor e a data");
       if (step === 3 && !selectedCategoryId) return toast.error("Selecione uma categoria");
       if (step === 4) {
-         if (expenseType === "installment" && (!currentInstallment || !installmentTotal)) return toast.error("Preencha as parcelas");
-         if (paymentMethod === "account" && !accountId) return toast.error("Selecione uma conta");
-         if (paymentMethod === "credit_card") {
-           if (!selectedCreditCardId || !selectedInvoiceMonth) return toast.error("Selecione o cartão e a fatura");
-           // Validar fatura fechada ao avançar
-           const card = formData?.creditCards?.find((c: CreditCard) => c.id === Number(selectedCreditCardId));
-           if (card) {
-             const [year, month] = selectedInvoiceMonth.split("-").map(Number);
-             const closingDate = new Date(year, month - 1, card.closingDay);
-             const today = new Date();
-             today.setHours(0, 0, 0, 0);
-             if (today >= closingDate) {
-               if (!window.confirm("Esta fatura já está fechada. Deseja realmente incluir uma despesa nela?")) {
-                 return;
-               }
-             }
-           }
-         }
+        if (expenseType === "installment" && (!currentInstallment || !installmentTotal))
+          return toast.error("Preencha as parcelas");
+        if (paymentMethod === "account" && !accountId) return toast.error("Selecione uma conta");
+        if (paymentMethod === "credit_card") {
+          if (!selectedCreditCardId || !selectedInvoiceMonth) return toast.error("Selecione o cartão e a fatura");
+          // Validar fatura fechada ao avançar
+          const card = formData?.creditCards?.find((c: CreditCard) => c.id === Number(selectedCreditCardId));
+          if (card) {
+            const [year, month] = selectedInvoiceMonth.split("-").map(Number);
+            const closingDate = new Date(year, month - 1, card.closingDay);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (today >= closingDate) {
+              if (!window.confirm("Esta fatura já está fechada. Deseja realmente incluir uma despesa nela?")) {
+                return;
+              }
+            }
+          }
+        }
       }
     } else if (tab === "income") {
       if (step === 1 && !description.trim()) return toast.error("Preencha a descrição");
       if (step === 2 && (!amount || !transactionDate)) return toast.error("Preencha o valor e a data");
       if (step === 3 && !selectedCategoryId) return toast.error("Selecione uma categoria");
       if (step === 4) {
-         if (expenseType === "installment" && (!currentInstallment || !installmentTotal)) return toast.error("Preencha as parcelas");
-         if (!accountIdIncome) return toast.error("Selecione a conta");
+        if (expenseType === "installment" && (!currentInstallment || !installmentTotal))
+          return toast.error("Preencha as parcelas");
+        if (!accountIdIncome) return toast.error("Selecione a conta");
       }
     } else if (tab === "transfer") {
       if (step === 1 && !description.trim()) return toast.error("Preencha a descrição");
       if (step === 2 && (!amount || !transactionDate)) return toast.error("Preencha o valor e a data");
       if (step === 3) {
         if (!accountIdTransferOrigin || !accountIdTransferDest) return toast.error("Selecione as contas");
-        if (accountIdTransferOrigin === accountIdTransferDest) return toast.error("Contas de origem e destino devem ser diferentes");
+        if (accountIdTransferOrigin === accountIdTransferDest)
+          return toast.error("Contas de origem e destino devem ser diferentes");
       }
-      if (step === 4 && expenseType === "installment" && (!currentInstallment || !installmentTotal)) return toast.error("Preencha as parcelas");
+      if (step === 4 && expenseType === "installment" && (!currentInstallment || !installmentTotal))
+        return toast.error("Preencha as parcelas");
     }
 
     setStep(stepsList[currentIndex + 1]);
@@ -343,22 +357,25 @@ export function TransactionFormDialog({
     }
   };
 
-
   const renderSummary = () => {
     return (
       <div className="bg-muted/30 border rounded-xl p-3 sm:p-6 space-y-3 sm:space-y-4 shadow-sm relative overflow-hidden animate-in fade-in slide-in-from-bottom-2">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-primary/50" />
-        
+
         <div className="flex flex-col items-center justify-center border-b pb-3 sm:pb-4 mb-3 sm:mb-4 border-dashed">
           <ReceiptText className="h-6 w-6 sm:h-8 sm:w-8 text-primary mb-1 sm:mb-2 opacity-80" />
           <h3 className="font-semibold text-base sm:text-lg">Resumo da Transação</h3>
-          <p className="text-xs sm:text-sm text-muted-foreground uppercase tracking-widest">{tab === 'expense' ? 'Despesa' : tab === 'income' ? 'Receita' : 'Transferência'}</p>
+          <p className="text-xs sm:text-sm text-muted-foreground uppercase tracking-widest">
+            {tab === "expense" ? "Despesa" : tab === "income" ? "Receita" : "Transferência"}
+          </p>
         </div>
 
         <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
           <div className="flex justify-between items-center bg-background p-2 rounded-md">
             <span className="text-muted-foreground">Valor:</span>
-            <span className="font-medium text-base sm:text-lg text-primary">R$ {amount?.toFixed(2).replace('.', ',')}</span>
+            <span className="font-medium text-base sm:text-lg text-primary">
+              R$ {amount?.toFixed(2).replace(".", ",")}
+            </span>
           </div>
           <div className="flex justify-between items-center bg-background p-2 rounded-md">
             <span className="text-muted-foreground">Data:</span>
@@ -368,51 +385,56 @@ export function TransactionFormDialog({
             <span className="text-muted-foreground">Descrição:</span>
             <span className="font-medium text-right max-w-[60%] truncate">{description}</span>
           </div>
-          {tab !== 'transfer' && (
+          {tab !== "transfer" && (
             <div className="flex justify-between items-center bg-background p-2 rounded-md">
               <span className="text-muted-foreground">Categoria:</span>
               <span className="font-medium text-right max-w-[60%] truncate">
-                {formData?.categories.find(c => c.id === Number(selectedCategoryId))?.name}
-                {selectedSubcategoryId && ` - ${activeSubcategories.find(s => s.id === Number(selectedSubcategoryId))?.name}`}
+                {formData?.categories.find((c) => c.id === Number(selectedCategoryId))?.name}
+                {selectedSubcategoryId &&
+                  ` - ${activeSubcategories.find((s) => s.id === Number(selectedSubcategoryId))?.name}`}
               </span>
             </div>
           )}
           <div className="flex justify-between items-center bg-background p-2 rounded-md">
             <span className="text-muted-foreground">Tipo:</span>
             <span className="font-medium">
-              {expenseType === 'single' ? 'Única' : expenseType === 'fixed' ? 'Fixa' : `Parcelada (${currentInstallment}/${installmentTotal})`}
+              {expenseType === "single"
+                ? "Única"
+                : expenseType === "fixed"
+                  ? "Fixa"
+                  : `Parcelada (${currentInstallment}/${installmentTotal})`}
             </span>
           </div>
-          {tab === 'expense' && (
+          {tab === "expense" && (
             <div className="flex justify-between items-center bg-background p-2 rounded-md">
               <span className="text-muted-foreground">Pagamento:</span>
               <span className="font-medium text-right max-w-[60%] truncate">
-                {paymentMethod === 'account' 
-                  ? formData?.accounts.find(a => a.id === Number(accountId))?.name 
-                  : `Cartão: ${formData?.creditCards.find(c => c.id === Number(selectedCreditCardId))?.name} (${selectedInvoiceMonth})`}
+                {paymentMethod === "account"
+                  ? formData?.accounts.find((a) => a.id === Number(accountId))?.name
+                  : `Cartão: ${formData?.creditCards.find((c) => c.id === Number(selectedCreditCardId))?.name} (${selectedInvoiceMonth})`}
               </span>
             </div>
           )}
-          {tab === 'income' && (
+          {tab === "income" && (
             <div className="flex justify-between items-center bg-background p-2 rounded-md">
               <span className="text-muted-foreground">Conta:</span>
               <span className="font-medium">
-                {formData?.accounts.find(a => a.id === Number(accountIdIncome))?.name}
+                {formData?.accounts.find((a) => a.id === Number(accountIdIncome))?.name}
               </span>
             </div>
           )}
-          {tab === 'transfer' && (
+          {tab === "transfer" && (
             <>
               <div className="flex justify-between items-center bg-background p-2 rounded-md">
                 <span className="text-muted-foreground">Origem:</span>
                 <span className="font-medium">
-                  {formData?.accounts.find(a => a.id === Number(accountIdTransferOrigin))?.name}
+                  {formData?.accounts.find((a) => a.id === Number(accountIdTransferOrigin))?.name}
                 </span>
               </div>
               <div className="flex justify-between items-center bg-background p-2 rounded-md">
                 <span className="text-muted-foreground">Destino:</span>
                 <span className="font-medium">
-                  {formData?.accounts.find(a => a.id === Number(accountIdTransferDest))?.name}
+                  {formData?.accounts.find((a) => a.id === Number(accountIdTransferDest))?.name}
                 </span>
               </div>
             </>
@@ -420,8 +442,8 @@ export function TransactionFormDialog({
           {stepsList.includes(5) && (
             <div className="flex justify-between items-center bg-background p-2 rounded-md">
               <span className="text-muted-foreground">Situação:</span>
-              <span className={`font-medium ${isPaid ? 'text-emerald-500' : 'text-orange-500'}`}>
-                {isPaid ? (tab === 'expense' ? 'Pago' : 'Recebido') : 'Pendente'}
+              <span className={`font-medium ${isPaid ? "text-emerald-500" : "text-orange-500"}`}>
+                {isPaid ? (tab === "expense" ? "Pago" : "Recebido") : "Pendente"}
               </span>
             </div>
           )}
@@ -436,14 +458,17 @@ export function TransactionFormDialog({
     3: "Categoria",
     4: "Configuração",
     5: "Situação",
-    6: "Resumo"
+    6: "Resumo",
   };
 
   return (
-    <Dialog open={open} onOpenChange={(val) => {
-      setOpen(val);
-      if (!val) resetState();
-    }}>
+    <Dialog
+      open={open}
+      onOpenChange={(val) => {
+        setOpen(val);
+        if (!val) resetState();
+      }}
+    >
       <DialogTrigger asChild>
         {trigger ? (
           trigger
@@ -461,8 +486,8 @@ export function TransactionFormDialog({
               Passo {currentIndex + 1} de {stepsList.length} • {stepNames[step]}
             </span>
             <div className="h-1 bg-white/10 rounded-full w-full overflow-hidden">
-              <div 
-                className="h-full bg-primary transition-all duration-300" 
+              <div
+                className="h-full bg-primary transition-all duration-300"
                 style={{ width: `${((currentIndex + 1) / stepsList.length) * 100}%` }}
               />
             </div>
@@ -478,27 +503,36 @@ export function TransactionFormDialog({
             {/* Segmented Control - Seletor de Tipo */}
             <div className="bg-[#1A1A22] p-1 rounded-xl flex w-full mb-6">
               <button
-                className={`flex-1 rounded-lg text-sm font-medium transition-all py-2 flex items-center justify-center gap-2 ${tab === 'expense' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                onClick={() => { setTab('expense'); resetState(); }}
+                className={`flex-1 rounded-lg text-sm font-medium transition-all py-2 flex items-center justify-center gap-2 ${tab === "expense" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => {
+                  setTab("expense");
+                  resetState();
+                }}
                 disabled={step > 1}
               >
-                {tab === 'expense' && <div className="w-2 h-2 rounded-full bg-rose-500" />}
+                {tab === "expense" && <div className="w-2 h-2 rounded-full bg-rose-500" />}
                 Despesa
               </button>
               <button
-                className={`flex-1 rounded-lg text-sm font-medium transition-all py-2 flex items-center justify-center gap-2 ${tab === 'income' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                onClick={() => { setTab('income'); resetState(); }}
+                className={`flex-1 rounded-lg text-sm font-medium transition-all py-2 flex items-center justify-center gap-2 ${tab === "income" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => {
+                  setTab("income");
+                  resetState();
+                }}
                 disabled={step > 1}
               >
-                {tab === 'income' && <div className="w-2 h-2 rounded-full bg-emerald-500" />}
+                {tab === "income" && <div className="w-2 h-2 rounded-full bg-emerald-500" />}
                 Receita
               </button>
               <button
-                className={`flex-1 rounded-lg text-sm font-medium transition-all py-2 flex items-center justify-center gap-2 ${tab === 'transfer' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                onClick={() => { setTab('transfer'); resetState(); }}
+                className={`flex-1 rounded-lg text-sm font-medium transition-all py-2 flex items-center justify-center gap-2 ${tab === "transfer" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => {
+                  setTab("transfer");
+                  resetState();
+                }}
                 disabled={step > 1}
               >
-                {tab === 'transfer' && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+                {tab === "transfer" && <div className="w-2 h-2 rounded-full bg-blue-500" />}
                 Transferência
               </button>
             </div>
@@ -513,7 +547,9 @@ export function TransactionFormDialog({
                       name="description"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleNextStep(); }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleNextStep();
+                      }}
                       placeholder="Ex: Mercado, Salário..."
                       className="h-14 text-lg text-center"
                       autoFocus
@@ -527,23 +563,27 @@ export function TransactionFormDialog({
                   <h2 className="text-xl font-medium text-center mb-6">Qual o valor e a data?</h2>
                   <div className="grid gap-3">
                     <Label className="text-muted-foreground ml-1">Valor</Label>
-                    <CurrencyInput 
-                      name="amount" 
-                      value={amount} 
-                      onValueChange={setAmount} 
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleNextStep(); }}
-                      className="h-14 text-2xl text-center font-semibold" 
-                      autoFocus 
+                    <CurrencyInput
+                      name="amount"
+                      value={amount}
+                      onValueChange={setAmount}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleNextStep();
+                      }}
+                      className="h-14 text-2xl text-center font-semibold"
+                      autoFocus
                     />
                   </div>
                   <div className="grid gap-3">
                     <Label className="text-muted-foreground ml-1">Data</Label>
-                    <DatePicker 
-                      id="date" 
-                      name="date" 
-                      value={transactionDate} 
-                      onChange={setTransactionDate} 
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleNextStep(); }}
+                    <DatePicker
+                      id="date"
+                      name="date"
+                      value={transactionDate}
+                      onChange={setTransactionDate}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleNextStep();
+                      }}
                     />
                   </div>
                 </div>
@@ -571,28 +611,42 @@ export function TransactionFormDialog({
                             ))}
                           </SelectContent>
                         </Select>
-                        <QuickCategoryDialog type={tab === "income" ? "income" : "expense"} onSuccess={handleCategoryCreated} />
+                        <QuickCategoryDialog
+                          type={tab === "income" ? "income" : "expense"}
+                          onSuccess={handleCategoryCreated}
+                        />
                       </div>
                     </div>
                     <div className="grid gap-3">
                       <Label className="text-muted-foreground ml-1">Subcategoria</Label>
                       <div className="flex gap-2">
-                        <Select value={selectedSubcategoryId} onValueChange={setSelectedSubcategoryId} disabled={!selectedCategoryId}>
+                        <Select
+                          value={selectedSubcategoryId}
+                          onValueChange={setSelectedSubcategoryId}
+                          disabled={!selectedCategoryId}
+                        >
                           <SelectTrigger className="flex h-14 w-full rounded-xl border-transparent bg-muted/40 px-4 text-lg hover:bg-muted/60 transition-all outline-none focus-visible:border-primary/50 focus-visible:ring-4 focus-visible:ring-primary/10 disabled:opacity-50">
-                            <SelectValue placeholder={activeSubcategories.length === 0 ? "Nenhuma subcategoria" : "Selecione..."} />
+                            <SelectValue
+                              placeholder={activeSubcategories.length === 0 ? "Nenhuma subcategoria" : "Selecione..."}
+                            />
                           </SelectTrigger>
                           <SelectContent>
                             {activeSubcategories.map((sc: Subcategory) => (
-                              <SelectItem key={sc.id} value={String(sc.id)}>{sc.name}</SelectItem>
+                              <SelectItem key={sc.id} value={String(sc.id)}>
+                                {sc.name}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                         <QuickCategoryDialog
                           type={tab === "income" ? "income" : "expense"}
-                          onSuccess={(catId, subCatId) => { handleCategoryCreated(catId, subCatId); setSelectedSubcategoryId(subCatId); }}
+                          onSuccess={(catId, subCatId) => {
+                            handleCategoryCreated(catId, subCatId);
+                            setSelectedSubcategoryId(subCatId);
+                          }}
                           isSubcategoryMode={true}
                           parentCategoryId={selectedCategoryId}
-                          parentCategoryName={filteredCategories.find(c => String(c.id) === selectedCategoryId)?.name}
+                          parentCategoryName={filteredCategories.find((c) => String(c.id) === selectedCategoryId)?.name}
                         />
                       </div>
                     </div>
@@ -611,7 +665,9 @@ export function TransactionFormDialog({
                       </SelectTrigger>
                       <SelectContent>
                         {formData.accounts.map((a: Account) => (
-                          <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                          <SelectItem key={a.id} value={String(a.id)}>
+                            {a.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -624,7 +680,9 @@ export function TransactionFormDialog({
                       </SelectTrigger>
                       <SelectContent>
                         {formData.accounts.map((a: Account) => (
-                          <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                          <SelectItem key={a.id} value={String(a.id)}>
+                            {a.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -635,7 +693,7 @@ export function TransactionFormDialog({
               {step === 4 && (
                 <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
                   <h2 className="text-xl font-medium text-center mb-6">Como isso vai funcionar?</h2>
-                  
+
                   {/* Recorrência */}
                   <div className="grid gap-3">
                     <Label className="text-muted-foreground ml-1">Recorrência</Label>
@@ -669,11 +727,23 @@ export function TransactionFormDialog({
                       <div className="grid grid-cols-2 gap-5">
                         <div className="grid gap-3">
                           <Label className="text-muted-foreground ml-1">Parcela Atual/Inicial</Label>
-                          <Input type="number" min="1" value={currentInstallment} onChange={e => setCurrentInstallment(e.target.value)} className="h-12 text-center text-lg" />
+                          <Input
+                            type="number"
+                            min="1"
+                            value={currentInstallment}
+                            onChange={(e) => setCurrentInstallment(e.target.value)}
+                            className="h-12 text-center text-lg"
+                          />
                         </div>
                         <div className="grid gap-3">
                           <Label className="text-muted-foreground ml-1">Total de Parcelas</Label>
-                          <Input type="number" min="2" value={installmentTotal} onChange={e => setInstallmentTotal(e.target.value)} className="h-12 text-center text-lg" />
+                          <Input
+                            type="number"
+                            min="2"
+                            value={installmentTotal}
+                            onChange={(e) => setInstallmentTotal(e.target.value)}
+                            className="h-12 text-center text-lg"
+                          />
                         </div>
                       </div>
                       <div className="flex flex-row items-center justify-between rounded-lg border p-4 bg-background">
@@ -724,7 +794,9 @@ export function TransactionFormDialog({
                             </SelectTrigger>
                             <SelectContent>
                               {formData.accounts.map((a: Account) => (
-                                <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                                <SelectItem key={a.id} value={String(a.id)}>
+                                  {a.name}
+                                </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -736,22 +808,34 @@ export function TransactionFormDialog({
                           <div className="grid gap-3">
                             <div className="flex justify-between items-end">
                               <Label className="text-muted-foreground ml-1">Cartão de Crédito</Label>
-                              {selectedCreditCardId && formData.creditCards.find((c: CreditCard) => c.id === Number(selectedCreditCardId)) && (
-                                <span className="text-xs text-primary font-medium">
-                                  Limite Disp.: R$ {Number(formData.creditCards.find((c: CreditCard) => c.id === Number(selectedCreditCardId))?.creditLimit).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </span>
-                              )}
+                              {selectedCreditCardId &&
+                                formData.creditCards.find((c: CreditCard) => c.id === Number(selectedCreditCardId)) && (
+                                  <span className="text-xs text-primary font-medium">
+                                    Limite Disp.: R${" "}
+                                    {Number(
+                                      formData.creditCards.find(
+                                        (c: CreditCard) => c.id === Number(selectedCreditCardId),
+                                      )?.creditLimit,
+                                    ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                  </span>
+                                )}
                             </div>
                             <Select value={selectedCreditCardId} onValueChange={handleCreditCardChange}>
-                              <SelectTrigger className="h-16 w-full rounded-xl px-4 flex items-center justify-between">
+                              <SelectTrigger className="h-16 w-full rounded-xl px-4 py-3 flex items-center justify-between">
                                 <SelectValue placeholder="Selecione o cartão..." />
                               </SelectTrigger>
                               <SelectContent>
                                 {formData.creditCards.map((c: CreditCard) => (
-                                  <SelectItem key={c.id} value={String(c.id)}>
-                                    <div className="flex flex-col text-left">
-                                      <span className="text-sm font-medium">{c.name}</span>
-                                      <span className="text-xs text-muted-foreground">Vence dia {c.dueDay}</span>
+                                  <SelectItem
+                                    key={c.id}
+                                    value={String(c.id)}
+                                    className="py-2.5 px-3 cursor-pointer rounded-lg my-0.5"
+                                  >
+                                    <div className="flex flex-col text-left gap-1 py-0.5">
+                                      <span className="text-sm font-medium leading-tight">{c.name}</span>
+                                      <span className="text-xs text-muted-foreground leading-tight">
+                                        Vence dia {c.dueDay}
+                                      </span>
                                     </div>
                                   </SelectItem>
                                 ))}
@@ -764,21 +848,29 @@ export function TransactionFormDialog({
                               <div className="flex justify-between items-end">
                                 <Label className="text-muted-foreground ml-1">Fatura</Label>
                                 <span className="text-xs text-muted-foreground">
-                                  Fecha dia {formData.creditCards.find((c: CreditCard) => c.id === Number(selectedCreditCardId))?.closingDay}
+                                  Fecha dia{" "}
+                                  {
+                                    formData.creditCards.find((c: CreditCard) => c.id === Number(selectedCreditCardId))
+                                      ?.closingDay
+                                  }
                                 </span>
                               </div>
                               <div className="grid grid-cols-2 gap-3 max-h-48 overflow-y-auto pr-2">
-                                {invoiceOptions.slice(3, 7).map((opt) => ( // Show only the most relevant ones (e.g., current and next 3)
-                                  <SelectableCard
-                                    key={opt.value}
-                                    title={opt.label}
-                                    subtitle={`Vencimento em ${opt.value}`}
-                                    selected={selectedInvoiceMonth === opt.value}
-                                    onClick={() => setSelectedInvoiceMonth(opt.value)}
-                                    layout="horizontal"
-                                    className="p-3"
-                                  />
-                                ))}
+                                {invoiceOptions.slice(3, 7).map(
+                                  (
+                                    opt, // Show only the most relevant ones (e.g., current and next 3)
+                                  ) => (
+                                    <SelectableCard
+                                      key={opt.value}
+                                      title={opt.label}
+                                      subtitle={`Vencimento em ${opt.value}`}
+                                      selected={selectedInvoiceMonth === opt.value}
+                                      onClick={() => setSelectedInvoiceMonth(opt.value)}
+                                      layout="horizontal"
+                                      className="p-3"
+                                    />
+                                  ),
+                                )}
                               </div>
                             </div>
                           )}
@@ -796,7 +888,9 @@ export function TransactionFormDialog({
                         </SelectTrigger>
                         <SelectContent>
                           {formData.accounts.map((a: Account) => (
-                            <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                            <SelectItem key={a.id} value={String(a.id)}>
+                              {a.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -814,8 +908,10 @@ export function TransactionFormDialog({
                     </Label>
                     <Switch checked={isPaid} onCheckedChange={setIsPaid} className="scale-150" />
                     <p className="text-muted-foreground text-center max-w-sm mt-4">
-                      {isPaid 
-                        ? (tab === "expense" ? "Marcado como Pago. O valor será deduzido do saldo." : "Marcado como Recebido. O valor será adicionado ao saldo.")
+                      {isPaid
+                        ? tab === "expense"
+                          ? "Marcado como Pago. O valor será deduzido do saldo."
+                          : "Marcado como Recebido. O valor será adicionado ao saldo."
                         : "Marcado como Pendente. Não afetará o saldo atual da conta ainda."}
                     </p>
                   </div>
@@ -831,21 +927,49 @@ export function TransactionFormDialog({
             </div>
 
             <div className="pt-4 sm:pt-8 flex flex-wrap justify-between gap-2 sm:gap-3 mt-3 sm:mt-4">
-              <Button type="button" variant="ghost" onClick={handlePrevStep} isLoading={isPending} disabled={isFirstStep || isPending} className="min-w-[100px] sm:w-32">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={handlePrevStep}
+                isLoading={isPending}
+                disabled={isFirstStep || isPending}
+                className="min-w-[100px] sm:w-32"
+              >
                 <ChevronLeft className="mr-1 sm:mr-2 h-4 w-4" /> Voltar
               </Button>
-              
+
               {!isLastStep ? (
-                <Button type="button" onClick={handleNextStep} className="min-w-[100px] sm:w-32 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-full">
+                <Button
+                  type="button"
+                  onClick={handleNextStep}
+                  className="min-w-[100px] sm:w-32 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-full"
+                >
                   Próximo <ChevronRight className="ml-1 sm:ml-2 h-4 w-4" />
                 </Button>
               ) : (
                 <div className="flex flex-wrap gap-2 justify-end">
-                  <Button type="button" variant="secondary" onClick={() => handleSubmit("save-and-continue")} isLoading={isPending} disabled={isPending} className="text-xs sm:text-sm px-2 sm:px-4 rounded-full">
-                    <><Plus className="mr-1 sm:mr-2 h-4 w-4" /> Adicionar Outra</>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => handleSubmit("save-and-continue")}
+                    isLoading={isPending}
+                    disabled={isPending}
+                    className="text-xs sm:text-sm px-2 sm:px-4 rounded-full"
+                  >
+                    <>
+                      <Plus className="mr-1 sm:mr-2 h-4 w-4" /> Adicionar Outra
+                    </>
                   </Button>
-                  <Button type="button" onClick={() => handleSubmit("save-and-close")} isLoading={isPending} disabled={isPending} className="bg-primary text-primary-foreground hover:brightness-110 font-semibold rounded-full border-none text-xs sm:text-sm px-2 sm:px-4">
-                    <><Check className="mr-1 sm:mr-2 h-4 w-4" /> Finalizar</>
+                  <Button
+                    type="button"
+                    onClick={() => handleSubmit("save-and-close")}
+                    isLoading={isPending}
+                    disabled={isPending}
+                    className="bg-primary text-primary-foreground hover:brightness-110 font-semibold rounded-full border-none text-xs sm:text-sm px-2 sm:px-4"
+                  >
+                    <>
+                      <Check className="mr-1 sm:mr-2 h-4 w-4" /> Finalizar
+                    </>
                   </Button>
                 </div>
               )}

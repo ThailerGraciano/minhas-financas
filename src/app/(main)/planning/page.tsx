@@ -40,7 +40,7 @@ export default async function PlanningPage(props: {
   const competencyMonth = month || currentCompMonth;
 
   const accounts = await getAccounts();
-  const { projection, overdueTransactions } = await getProjectedCashFlow(accountId, competencyMonth);
+  const { chartData, projection, overdueTransactions } = await getProjectedCashFlow(accountId, competencyMonth);
 
   // Extract all transactions from projection to show in Payment Manager
   const allUpcomingTransactions = projection.flatMap((p) => p.transactions_of_the_day);
@@ -71,7 +71,7 @@ export default async function PlanningPage(props: {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <PlanningChart data={projection} />
+          <PlanningChart data={chartData} />
         </CardContent>
       </Card>
 

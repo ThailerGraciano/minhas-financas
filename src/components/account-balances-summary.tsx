@@ -1,70 +1,87 @@
-import { Archive, Landmark, PiggyBank, Wallet } from "lucide-react";
+"use client";
 
-type BalanceSummary = {
-  type: string;
-  label: string;
-  total: number;
-};
+import { CreditCard, Eye, EyeOff, HandCoins, MoreHorizontal, Send } from "lucide-react";
+import { useState } from "react";
 
-export function AccountBalancesSummary({
-  balances,
-  totalBalance,
-}: {
-  balances: BalanceSummary[];
-  totalBalance: number;
-}) {
+export function AccountBalancesSummary({ totalBalance }: { totalBalance: number }) {
+  const [showBalance, setShowBalance] = useState(true);
+
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-  };
-
-  const getIcon = (type: string) => {
-    switch (type) {
-      case "savings":
-        return <PiggyBank className="w-5 h-5 text-blue-500" />;
-      case "wallet":
-        return <Wallet className="w-5 h-5 text-green-500" />;
-      case "stash":
-        return <Archive className="w-5 h-5 text-amber-500" />;
-      default:
-        return <Landmark className="w-5 h-5 text-purple-500" />;
-    }
+    return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
   };
 
   return (
-    <div className="space-y-4">
+    <div className="bg-card rounded-[2rem] border-transparent shadow-sm flex flex-col p-6 space-y-8 relative overflow-hidden">
+      {/* Background Glow */}
+      <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+
       {/* Saldo Total Geral */}
-      <div className="py-6 flex flex-col space-y-2">
-        <span className="text-sm font-medium text-muted-foreground">Saldo Total Geral</span>
-        <span className="text-5xl md:text-6xl font-bold text-foreground tracking-tight">
-          <span className="text-muted-foreground text-3xl md:text-4xl mr-2">R$</span>
-          {new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(totalBalance)}
-        </span>
+      <div className="flex flex-col space-y-3 relative z-10">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            Saldo Total Geral
+            <button
+              onClick={() => setShowBalance(!showBalance)}
+              className="text-muted-foreground hover:text-foreground transition-colors ml-1"
+            >
+              {showBalance ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+            </button>
+          </div>
+          <div className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 text-xs font-bold tracking-wide">
+            +12.4%
+          </div>
+        </div>
+
+        <div className="text-5xl md:text-6xl font-black text-foreground tracking-tighter">
+          {showBalance ? (
+            <>
+              <span className="text-muted-foreground text-3xl md:text-4xl mr-2 font-bold tracking-normal">R$</span>
+              {formatCurrency(totalBalance)}
+            </>
+          ) : (
+            <span className="tracking-widest">••••••</span>
+          )}
+        </div>
       </div>
 
-      {/* Grid de mini-cards */}
-      {balances.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          {balances.map((b) => (
-            <div
-              key={b.type}
-              className="bg-card rounded-none sm:rounded-[2rem] border-transparent shadow-sm flex flex-col justify-center p-4 md:px-4 py-6 sm:px-4 py-6 sm:p-6 space-y-3 md:space-y-4 min-w-0"
-            >
-              <div className="w-10 h-10 bg-background rounded-full flex items-center justify-center">
-                {getIcon(b.type)}
-              </div>
-              <div className="flex flex-col space-y-1">
-                <span className="text-sm font-medium text-muted-foreground truncate">{b.label}</span>
-                <span className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground truncate">
-                  <span className="text-muted-foreground text-sm mr-1">R$</span>
-                  {new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-                    b.total,
-                  )}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Quick Actions */}
+      <div className="grid grid-cols-4 gap-3 relative z-10">
+        <button className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl hover:bg-white/5 transition-colors group">
+          <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:scale-105 transition-transform">
+            <Send className="w-5 h-5" />
+          </div>
+          <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+            Transferir
+          </span>
+        </button>
+
+        <button className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl hover:bg-white/5 transition-colors group">
+          <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:scale-105 transition-transform">
+            <HandCoins className="w-5 h-5" />
+          </div>
+          <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+            Depositar
+          </span>
+        </button>
+
+        <button className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl hover:bg-white/5 transition-colors group">
+          <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:scale-105 transition-transform">
+            <CreditCard className="w-5 h-5" />
+          </div>
+          <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+            Pagar
+          </span>
+        </button>
+
+        <button className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl hover:bg-white/5 transition-colors group">
+          <div className="w-12 h-12 rounded-full bg-white/5 text-muted-foreground flex items-center justify-center group-hover:scale-105 transition-transform">
+            <MoreHorizontal className="w-5 h-5" />
+          </div>
+          <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+            Mais
+          </span>
+        </button>
+      </div>
     </div>
   );
 }

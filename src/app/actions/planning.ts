@@ -4,10 +4,10 @@ import { getHistoricalBalance } from "@/app/actions/accounts";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { accounts, creditCards, fixedTransactions, settings, transactions } from "@/db/schema";
-import { getDefaultCompetencyMonth } from "@/lib/date-utils";
 import { getTargetInvoiceMonth } from "@/lib/competency-utils";
+import { getDefaultCompetencyMonth } from "@/lib/date-utils";
 import { addDays, addMonths, differenceInDays, format, lastDayOfMonth, parseISO } from "date-fns";
-import { and, asc, eq, gte, inArray, isNotNull, lte, ne, or, sql, SQL } from "drizzle-orm";
+import { and, asc, eq, gt, gte, inArray, isNotNull, lte, ne, or, sql, SQL } from "drizzle-orm";
 
 export async function getProjectedCashFlow(accountId?: string, reqCompetencyMonth?: string) {
   const session = await auth();
@@ -288,7 +288,7 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
   // 2.5 Buscar e agrupar faturas de cartão de crédito pendentes
   const processedTxs: typeof finalPendingTxs = [];
   const pendingCCTxs: typeof finalPendingTxs = [];
-  
+
   // Extrair as virtuais de cartão de crédito de finalPendingTxs e separar do resto
   for (const tx of finalPendingTxs) {
     if (tx.type === "credit_card_expense") {
@@ -297,22 +297,22 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
       processedTxs.push(tx);
     }
   }
-  
+
   const includeCreditCards = !accountId || accountId === "all" || isCheckingAccount;
-  
+
   if (includeCreditCards) {
     // Buscar também as transações pendentes reais do banco de dados
     const dbPendingCCTxs = await db.query.transactions.findMany({
       where: and(
         eq(transactions.userId, userId),
         eq(transactions.type, "credit_card_expense"),
-        eq(transactions.status, "pending")
+        eq(transactions.status, "pending"),
       ),
-      with: { 
+      with: {
         category: true,
         account: true,
-        creditCard: true 
-      }
+        creditCard: true,
+      },
     });
 
     // Identificar faturas que já foram pagas no banco de dados para evitar projeções fantasmas
@@ -351,14 +351,14 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
       const groupKey = `${tx.creditCardId}-${invMonth}`;
       realPendingCountByGroup.set(groupKey, (realPendingCountByGroup.get(groupKey) || 0) + 1);
     }
-    
+
     pendingCCTxs.push(...dbPendingCCTxs);
 
-    const ccGroups = new Map<string, typeof processedTxs[0]>();
+    const ccGroups = new Map<string, (typeof processedTxs)[0]>();
 
     for (const tx of pendingCCTxs) {
       if (!tx.creditCardId) continue;
-      
+
       const invMonth = tx.invoiceMonth || tx.competencyMonth || tx.date.substring(0, 7);
       const groupKey = `${tx.creditCardId}-${invMonth}`;
 
@@ -367,7 +367,7 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
       if (paidInvoiceKeys.has(groupKey) && realPendingCount === 0) {
         continue;
       }
-      
+
       if (!ccGroups.has(groupKey)) {
         const card = tx.creditCard || userCards.find((c) => c.id === tx.creditCardId);
         const dueDay = card?.dueDay || 10;
@@ -378,7 +378,7 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
         if (paymentDate < startProjectionDateStr && realPendingCount === 0) {
           continue;
         }
-        
+
         ccGroups.set(groupKey, {
           ...tx,
           id: -(tx.creditCardId + 900000 + Math.floor(Math.random() * 10000)),
@@ -407,7 +407,7 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
           },
         });
       }
-      
+
       const group = ccGroups.get(groupKey);
       if (group) {
         group.amount = String(Number(group.amount) + Number(tx.amount));
@@ -485,7 +485,107 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
     });
   }
 
+  // 5. Generate complete daily chart data (Past + Future)
+  const chartData: {
+    date: string;
+    balancePast: number | null;
+    balanceProjected: number | null;
+  }[] = [];
+
+  const accountIds = allAccounts.map((a) => a.id);
+  const realCurrentBalance = allAccounts.reduce((acc, curr) => acc + Number(curr.currentBalance), 0);
+
+  if (accountIds.length > 0) {
+    const hasPastDays = targetStartDateStr <= todayDate;
+
+    if (hasPastDays) {
+      const lastPastDateStr = targetEndDateStr < todayDate ? targetEndDateStr : todayDate;
+      const lastPastDateParsed = parseISO(lastPastDateStr);
+
+      let balanceAtEnd = realCurrentBalance;
+      if (targetEndDateStr < todayDate) {
+        const postCompPaidTxs = await db.query.transactions.findMany({
+          where: and(
+            eq(transactions.userId, userId),
+            eq(transactions.status, "paid"),
+            gt(transactions.date, targetEndDateStr),
+            lte(transactions.date, todayDate),
+            inArray(transactions.accountId, accountIds),
+            ne(transactions.type, "credit_card_expense"),
+          ),
+        });
+        for (const tx of postCompPaidTxs) {
+          const amt = Number(tx.amount);
+          if (tx.type === "income" || (tx.type === "transfer" && tx.parentTransactionId)) {
+            balanceAtEnd -= amt;
+          } else if (tx.type === "expense" || (tx.type === "transfer" && !tx.parentTransactionId)) {
+            balanceAtEnd += amt;
+          }
+        }
+      }
+
+      const pastPaidTxs = await db.query.transactions.findMany({
+        where: and(
+          eq(transactions.userId, userId),
+          eq(transactions.status, "paid"),
+          gte(transactions.date, targetStartDateStr),
+          lte(transactions.date, lastPastDateStr),
+          inArray(transactions.accountId, accountIds),
+          ne(transactions.type, "credit_card_expense"),
+        ),
+        orderBy: [asc(transactions.date)],
+      });
+
+      const dailyPaidDelta = new Map<string, number>();
+      for (const tx of pastPaidTxs) {
+        const amt = Number(tx.amount);
+        let delta = 0;
+        if (tx.type === "income" || (tx.type === "transfer" && tx.parentTransactionId)) {
+          delta = amt;
+        } else if (tx.type === "expense" || (tx.type === "transfer" && !tx.parentTransactionId)) {
+          delta = -amt;
+        }
+        dailyPaidDelta.set(tx.date, (dailyPaidDelta.get(tx.date) || 0) + delta);
+      }
+
+      let totalWindowDelta = 0;
+      for (const delta of dailyPaidDelta.values()) {
+        totalWindowDelta += delta;
+      }
+
+      const startingPastBalance = balanceAtEnd - totalWindowDelta;
+      let runningPastBalance = startingPastBalance;
+
+      const pastDaysCount = differenceInDays(lastPastDateParsed, targetStartDate);
+
+      for (let i = 0; i <= pastDaysCount; i++) {
+        const dateStr = format(addDays(targetStartDate, i), "yyyy-MM-dd");
+        runningPastBalance += dailyPaidDelta.get(dateStr) || 0;
+
+        const isToday = dateStr === todayDate;
+        const isJunction = isToday && dateStr <= targetEndDateStr;
+
+        chartData.push({
+          date: dateStr,
+          balancePast: Math.round(runningPastBalance * 100) / 100,
+          balanceProjected: isJunction ? Math.round(runningPastBalance * 100) / 100 : null,
+        });
+      }
+    }
+
+    for (const p of projection) {
+      if (p.date > todayDate || (isFutureCompetency && p.date >= targetStartDateStr)) {
+        chartData.push({
+          date: p.date,
+          balancePast: null,
+          balanceProjected: Math.round(p.projected_balance * 100) / 100,
+        });
+      }
+    }
+  }
+
   return {
+    chartData,
     projection,
     overdueTransactions,
   };

@@ -1,27 +1,31 @@
-'use client';
+"use client";
+"use client";
 
-import { ClientDataLoader } from '@/components/client-data-loader';
-import { getDashboardFullData } from '@/app/actions/dashboard-full';
-import { AccountBalancesSummary } from '@/components/account-balances-summary';
-import { BalanceEvolutionChart, COLOR_PAST, COLOR_FUTURE } from '@/components/balance-evolution-chart';
-import { InstallmentsStackedChart } from '@/components/installments-stacked-chart';
-import { ExpensesForecastChart } from '@/components/expenses-forecast-chart';
-import { CategoryForecastChart } from '@/components/category-forecast-chart';
-import { GlobalIncomeExpenseChart } from '@/components/global-income-expense-chart';
-import { AccountIncomeExpenseChart } from '@/components/account-income-expense-chart';
-import { AccountVsGlobalExpenseChart } from '@/components/account-vs-global-expense-chart';
-import { PurchasingPowerChart } from '@/components/purchasing-power-chart';
-import { ExpenseTreemap } from '@/components/charts/ExpenseTreemap';
-import { ArrowUpCircle, ArrowDownCircle, CreditCard as CreditCardIcon, TrendingUp, Grid3X3, Layers } from 'lucide-react';
+import { getDashboardFullData } from "@/app/actions/dashboard-full";
+import { AccountBalancesSummary } from "@/components/account-balances-summary";
+import { AccountIncomeExpenseChart } from "@/components/account-income-expense-chart";
+import { AccountVsGlobalExpenseChart } from "@/components/account-vs-global-expense-chart";
+import { BalanceEvolutionChart, COLOR_FUTURE, COLOR_PAST } from "@/components/balance-evolution-chart";
+import { CategoryForecastChart } from "@/components/category-forecast-chart";
+import { ClientDataLoader } from "@/components/client-data-loader";
+import { CreditCardInvoicesList, type Invoice } from "@/components/credit-card-invoices-list";
+import { ExpensesBentoGrid } from "@/components/expenses-bento-grid";
+import { ExpensesForecastChart } from "@/components/expenses-forecast-chart";
+import { GlobalIncomeExpenseChart } from "@/components/global-income-expense-chart";
+import { InstallmentsStackedChart } from "@/components/installments-stacked-chart";
+import { MonthlyBalanceGrid } from "@/components/monthly-balance-grid";
+import { PurchasingPowerChart } from "@/components/purchasing-power-chart";
+import { CreditCard as CreditCardIcon, Grid3X3, Layers, TrendingUp } from "lucide-react";
 
 type DashboardFullData = Awaited<ReturnType<typeof getDashboardFullData>>;
 
-export function DashboardClientPage({ closingDay, initialData }: { closingDay: number; initialData: DashboardFullData }) {
-  
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-  };
-
+export function DashboardClientPage({
+  closingDay,
+  initialData,
+}: {
+  closingDay: number;
+  initialData: DashboardFullData;
+}) {
   return (
     <ClientDataLoader
       closingDay={closingDay}
@@ -31,17 +35,17 @@ export function DashboardClientPage({ closingDay, initialData }: { closingDay: n
     >
       {(dashboard, selectedMonth) => (
         <div className="space-y-6 mt-6">
-          <AccountBalancesSummary balances={dashboard.balancesData.balancesByType} totalBalance={dashboard.balancesData.totalBalance} />
+          <AccountBalancesSummary totalBalance={dashboard.balancesData.totalBalance} />
+
+          <MonthlyBalanceGrid totalIncome={dashboard.data.totalIncome} totalExpense={dashboard.data.totalExpense} />
 
           {/* Gráfico de Evolução de Saldo */}
-          <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
+          <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
             <div className="flex flex-row items-center gap-2 mb-4">
               <TrendingUp className="h-5 w-5 text-primary" />
               <div>
                 <h2 className="text-xl font-bold">Evolução de Saldo</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Últimos 6 meses e projeção para os próximos 6
-                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">Últimos 6 meses e projeção para os próximos 6</p>
               </div>
             </div>
             <div>
@@ -62,14 +66,12 @@ export function DashboardClientPage({ closingDay, initialData }: { closingDay: n
           </div>
 
           {/* Gráfico de Parcelas */}
-          <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
+          <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
             <div className="flex flex-row items-center gap-2 mb-4">
               <Layers className="h-5 w-5 text-primary" />
               <div>
                 <h2 className="text-xl font-bold">Projeção de Parcelamentos</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Acúmulo de faturas com compras parceladas
-                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">Acúmulo de faturas com compras parceladas</p>
               </div>
             </div>
             <div>
@@ -78,7 +80,7 @@ export function DashboardClientPage({ closingDay, initialData }: { closingDay: n
           </div>
 
           {/* Previsão de Gastos */}
-          <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
+          <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
             <div className="flex flex-row items-center gap-2 mb-4">
               <TrendingUp className="h-5 w-5 text-primary" />
               <div>
@@ -94,7 +96,7 @@ export function DashboardClientPage({ closingDay, initialData }: { closingDay: n
           </div>
 
           {/* Previsão por Categoria */}
-          <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
+          <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
             <div className="flex flex-row items-center gap-2 mb-4">
               <Grid3X3 className="h-5 w-5 text-primary" />
               <div>
@@ -105,99 +107,61 @@ export function DashboardClientPage({ closingDay, initialData }: { closingDay: n
               </div>
             </div>
             <div>
-              <CategoryForecastChart data={dashboard.categoryForecastData.data} keys={dashboard.categoryForecastData.keys} />
-            </div>
-          </div>
-
-          {/* Resumo do Mês */}
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm flex flex-col space-y-4">
-              <div className="flex items-center gap-2">
-                <ArrowUpCircle className="h-5 w-5 text-green-500" />
-                <span className="text-sm font-medium text-muted-foreground">Receitas do Mês</span>
-              </div>
-              <div className="text-4xl font-bold text-foreground">
-                <span className="text-muted-foreground text-sm mr-1">R$</span>
-                {new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(dashboard.data.totalIncome)}
-              </div>
-            </div>
-
-            <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm flex flex-col space-y-4">
-              <div className="flex items-center gap-2">
-                <ArrowDownCircle className="h-5 w-5 text-red-500" />
-                <span className="text-sm font-medium text-muted-foreground">Despesas do Mês</span>
-              </div>
-              <div className="text-4xl font-bold text-foreground">
-                <span className="text-muted-foreground text-sm mr-1">R$</span>
-                {new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(dashboard.data.totalExpense)}
-              </div>
+              <CategoryForecastChart
+                data={dashboard.categoryForecastData.data}
+                keys={dashboard.categoryForecastData.keys}
+              />
             </div>
           </div>
 
           {/* Gráficos Comparativos */}
           <div className="grid gap-6 lg:grid-cols-2">
-            <GlobalIncomeExpenseChart initialData={dashboard.incomeVsExpenseData.global} competencyMonth={selectedMonth} />
-            <AccountIncomeExpenseChart initialData={dashboard.incomeVsExpenseData.byAccount} competencyMonth={selectedMonth} />
+            <GlobalIncomeExpenseChart
+              initialData={dashboard.incomeVsExpenseData.global}
+              competencyMonth={selectedMonth}
+            />
+            <AccountIncomeExpenseChart
+              initialData={dashboard.incomeVsExpenseData.byAccount}
+              competencyMonth={selectedMonth}
+            />
           </div>
 
           {/* Gráficos Analíticos */}
           <div className="grid gap-6 lg:grid-cols-2">
-            <PurchasingPowerChart initialData={dashboard.incomeVsExpenseData.byAccount} competencyMonth={selectedMonth} />
-            <AccountVsGlobalExpenseChart initialData={dashboard.incomeVsExpenseData.accountVsGlobal} competencyMonth={selectedMonth} />
+            <PurchasingPowerChart
+              initialData={dashboard.incomeVsExpenseData.byAccount}
+              competencyMonth={selectedMonth}
+            />
+            <AccountVsGlobalExpenseChart
+              initialData={dashboard.incomeVsExpenseData.accountVsGlobal}
+              competencyMonth={selectedMonth}
+            />
           </div>
 
-          {/* Mapa de Despesas */}
-          <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
-            <div className="flex flex-row items-center gap-2 mb-4">
+          {/* Mapa de Despesas Bento */}
+          <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
+            <div className="flex flex-row items-center gap-2 mb-6">
               <Grid3X3 className="h-5 w-5 text-primary" />
               <div>
                 <h2 className="text-xl font-bold">Mapeamento de Despesas</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Categorias que mais consumiram seu orçamento</p>
+              </div>
+            </div>
+            <ExpensesBentoGrid data={dashboard.treemapData.all} />
+          </div>
+
+          {/* Faturas Abertas */}
+          <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
+            <div className="flex flex-row items-center gap-2 mb-6">
+              <CreditCardIcon className="h-5 w-5 text-primary" />
+              <div>
+                <h2 className="text-xl font-bold">Faturas Abertas</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Visualize onde o seu dinheiro está sendo gasto neste mês
+                  Acompanhe os gastos dos seus cartões de crédito neste mês
                 </p>
               </div>
             </div>
-            <ExpenseTreemap data={dashboard.treemapData} />
-          </div>
-
-          {/* Contas e Faturas */}
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
-              <h2 className="text-xl font-bold mb-4">Saldos por Conta</h2>
-              <div className="space-y-4">
-                {dashboard.data.accounts.map(acc => (
-                  <div key={acc.id} className="flex justify-between items-center border-b border-muted/50 pb-3 last:border-0 last:pb-0">
-                    <span className="font-medium">{acc.name}</span>
-                    <span className={`font-bold ${Number(acc.currentBalance) < 0 ? "text-red-500" : ""}`}>
-                      {formatCurrency(Number(acc.currentBalance))}
-                    </span>
-                  </div>
-                ))}
-                {dashboard.data.accounts.length === 0 && (
-                  <p className="text-sm text-muted-foreground py-4">Nenhuma conta cadastrada.</p>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-card rounded-none sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
-              <h2 className="text-xl font-bold mb-4">Faturas Abertas</h2>
-              <div className="space-y-4">
-                {dashboard.data.cardInvoices.map(invoice => (
-                  <div key={invoice.card.id} className="flex justify-between items-center border-b border-muted/50 pb-3 last:border-0 last:pb-0">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-orange-500/10 p-2 rounded-full">
-                        <CreditCardIcon className="h-5 w-5 text-orange-500" />
-                      </div>
-                      <span className="font-medium">{invoice.card.name}</span>
-                    </div>
-                    <span className="text-red-500 font-bold">{formatCurrency(invoice.invoiceTotal)}</span>
-                  </div>
-                ))}
-                {dashboard.data.cardInvoices.length === 0 && (
-                  <p className="text-sm text-muted-foreground py-4">Nenhuma fatura com gastos neste mês.</p>
-                )}
-              </div>
-            </div>
+            <CreditCardInvoicesList invoices={dashboard.data.cardInvoices as unknown as Invoice[]} />
           </div>
         </div>
       )}

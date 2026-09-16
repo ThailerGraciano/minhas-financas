@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useEffect, ReactNode } from 'react';
-import { CompetencyFilter } from '@/components/competency-filter';
-import { getDefaultCompetencyMonth } from '@/lib/date-utils';
-import { Loader2 } from 'lucide-react';
+import { CompetencyFilter } from "@/components/competency-filter";
+import { getDefaultCompetencyMonth } from "@/lib/date-utils";
+import { Loader2 } from "lucide-react";
+import { ReactNode, useEffect, useState } from "react";
 
 interface ClientDataLoaderProps<T> {
   closingDay: number;
@@ -20,7 +20,7 @@ export function ClientDataLoader<T>({
   fetchAction,
   children,
   headerContent,
-  initialMonth
+  initialMonth,
 }: ClientDataLoaderProps<T>) {
   const currentMonth = initialMonth || getDefaultCompetencyMonth(closingDay);
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
@@ -70,23 +70,27 @@ export function ClientDataLoader<T>({
     <>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         {typeof headerContent === "function" ? (
-          <div className="flex-1 w-full">{headerContent(data, selectedMonth, isLoading)}</div>
+          <div className="flex-1 w-full md:w-auto">{headerContent(data, selectedMonth, isLoading)}</div>
         ) : headerContent ? (
-          <div className="flex-1 w-full">{headerContent}</div>
+          <div className="flex-1 w-full md:w-auto hidden md:block">{headerContent}</div>
         ) : (
-          <div />
+          <div className="hidden md:block" />
         )}
-        <div className="flex items-center gap-4 shrink-0">
-          <CompetencyFilter 
-            closingDay={closingDay} 
-            value={selectedMonth} 
-            onChange={handleMonthChange} 
-          />
-          {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
+        <div className="flex items-center justify-center w-full md:w-auto shrink-0">
+          <div className="bg-white/5 border border-white/10 rounded-full px-4 py-2 flex items-center gap-4 shadow-sm backdrop-blur-md w-full md:w-auto justify-center">
+            <CompetencyFilter closingDay={closingDay} value={selectedMonth} onChange={handleMonthChange} />
+            {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
+          </div>
         </div>
       </div>
 
-      <div className={isLoading ? "opacity-50 pointer-events-none transition-opacity duration-200" : "transition-opacity duration-200"}>
+      <div
+        className={
+          isLoading
+            ? "opacity-50 pointer-events-none transition-opacity duration-200"
+            : "transition-opacity duration-200"
+        }
+      >
         {children(data, selectedMonth, isLoading)}
       </div>
     </>

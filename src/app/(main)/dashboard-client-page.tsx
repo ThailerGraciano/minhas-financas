@@ -1,14 +1,14 @@
 "use client";
-"use client";
 
 import { getDashboardFullData } from "@/app/actions/dashboard-full";
 import { AccountBalancesSummary } from "@/components/account-balances-summary";
 import { AccountIncomeExpenseChart } from "@/components/account-income-expense-chart";
 import { AccountVsGlobalExpenseChart } from "@/components/account-vs-global-expense-chart";
+import { AccountsCarousel } from "@/components/accounts-carousel";
 import { BalanceEvolutionChart, COLOR_FUTURE, COLOR_PAST } from "@/components/balance-evolution-chart";
 import { CategoryForecastChart } from "@/components/category-forecast-chart";
 import { ClientDataLoader } from "@/components/client-data-loader";
-import { CreditCardInvoicesList, type Invoice } from "@/components/credit-card-invoices-list";
+import { CreditCardInvoicesList } from "@/components/credit-card-invoices-list";
 import { ExpensesBentoGrid } from "@/components/expenses-bento-grid";
 import { ExpensesForecastChart } from "@/components/expenses-forecast-chart";
 import { GlobalIncomeExpenseChart } from "@/components/global-income-expense-chart";
@@ -16,6 +16,7 @@ import { InstallmentsStackedChart } from "@/components/installments-stacked-char
 import { MonthlyBalanceGrid } from "@/components/monthly-balance-grid";
 import { PurchasingPowerChart } from "@/components/purchasing-power-chart";
 import { CreditCard as CreditCardIcon, Grid3X3, Layers, TrendingUp } from "lucide-react";
+import Link from "next/link";
 
 type DashboardFullData = Awaited<ReturnType<typeof getDashboardFullData>>;
 
@@ -38,6 +39,19 @@ export function DashboardClientPage({
           <AccountBalancesSummary totalBalance={dashboard.balancesData.totalBalance} />
 
           <MonthlyBalanceGrid totalIncome={dashboard.data.totalIncome} totalExpense={dashboard.data.totalExpense} />
+
+          {/* Minhas Contas & Caixas */}
+          {dashboard.data.accounts && dashboard.data.accounts.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between px-1">
+                <h2 className="text-xl font-bold text-foreground">Minhas Contas & Caixas</h2>
+                <Link href="/accounts" className="text-xs text-primary font-medium hover:underline">
+                  Ver todas
+                </Link>
+              </div>
+              <AccountsCarousel accounts={dashboard.data.accounts} />
+            </div>
+          )}
 
           {/* Gráfico de Evolução de Saldo */}
           <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
@@ -65,6 +79,50 @@ export function DashboardClientPage({
             </div>
           </div>
 
+          {/* Previsão de Gastos */}
+          <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
+            <div className="flex flex-row items-center gap-2 mb-4">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              <div>
+                <h2 className="text-xl font-bold">Previsão de Gastos</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Projeção de despesas variáveis, fixas e parceladas para os próximos 6 meses
+                </p>
+              </div>
+            </div>
+            <div>
+              <ExpensesForecastChart data={dashboard.forecastData} />
+            </div>
+          </div>
+
+          {/* Mapeamento de Despesas (Bento Grid) */}
+          <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
+            <div className="flex flex-row items-center gap-2 mb-4">
+              <Grid3X3 className="h-5 w-5 text-primary" />
+              <div>
+                <h2 className="text-xl font-bold">Mapeamento de Despesas</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Visualize onde o seu dinheiro está sendo gasto neste mês
+                </p>
+              </div>
+            </div>
+            <ExpensesBentoGrid data={dashboard.treemapData} />
+          </div>
+
+          {/* Faturas Abertas */}
+          <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
+            <div className="flex flex-row items-center gap-2 mb-6">
+              <CreditCardIcon className="h-5 w-5 text-primary" />
+              <div>
+                <h2 className="text-xl font-bold">Faturas Abertas</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Acompanhe os gastos dos seus cartões de crédito neste mês
+                </p>
+              </div>
+            </div>
+            <CreditCardInvoicesList invoices={dashboard.data.cardInvoices} />
+          </div>
+
           {/* Gráfico de Parcelas */}
           <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
             <div className="flex flex-row items-center gap-2 mb-4">
@@ -76,22 +134,6 @@ export function DashboardClientPage({
             </div>
             <div>
               <InstallmentsStackedChart data={dashboard.installmentsData.data} keys={dashboard.installmentsData.keys} />
-            </div>
-          </div>
-
-          {/* Previsão de Gastos */}
-          <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
-            <div className="flex flex-row items-center gap-2 mb-4">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              <div>
-                <h2 className="text-xl font-bold">Previsão de Gastos</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Projeção de despesas variávies, fixas e parceladas para os próximos 6 meses
-                </p>
-              </div>
-            </div>
-            <div>
-              <ExpensesForecastChart data={dashboard.forecastData} />
             </div>
           </div>
 
@@ -136,32 +178,6 @@ export function DashboardClientPage({
               initialData={dashboard.incomeVsExpenseData.accountVsGlobal}
               competencyMonth={selectedMonth}
             />
-          </div>
-
-          {/* Mapa de Despesas Bento */}
-          <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
-            <div className="flex flex-row items-center gap-2 mb-6">
-              <Grid3X3 className="h-5 w-5 text-primary" />
-              <div>
-                <h2 className="text-xl font-bold">Mapeamento de Despesas</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Categorias que mais consumiram seu orçamento</p>
-              </div>
-            </div>
-            <ExpensesBentoGrid data={dashboard.treemapData.all} />
-          </div>
-
-          {/* Faturas Abertas */}
-          <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
-            <div className="flex flex-row items-center gap-2 mb-6">
-              <CreditCardIcon className="h-5 w-5 text-primary" />
-              <div>
-                <h2 className="text-xl font-bold">Faturas Abertas</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Acompanhe os gastos dos seus cartões de crédito neste mês
-                </p>
-              </div>
-            </div>
-            <CreditCardInvoicesList invoices={dashboard.data.cardInvoices as unknown as Invoice[]} />
           </div>
         </div>
       )}

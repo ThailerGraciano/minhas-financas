@@ -2,28 +2,28 @@
 
 import { Archive, Landmark, PiggyBank, Wallet } from "lucide-react";
 
-type Account = {
-  id: string;
+export type AccountCarouselItem = {
+  id: string | number;
   name: string;
   currentBalance: string | number;
-  type?: string;
+  type?: string | null;
 };
 
-export function AccountsCarousel({ accounts }: { accounts: Account[] }) {
+export function AccountsCarousel({ accounts }: { accounts: AccountCarouselItem[] }) {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
   };
 
-  const getIcon = (type?: string) => {
+  const getIcon = (type?: string | null) => {
     switch (type) {
       case "savings":
         return <PiggyBank className="w-5 h-5 text-blue-500" />;
       case "wallet":
-        return <Wallet className="w-5 h-5 text-green-500" />;
+        return <Wallet className="w-5 h-5 text-emerald-500" />;
       case "stash":
         return <Archive className="w-5 h-5 text-amber-500" />;
       default:
-        return <Landmark className="w-5 h-5 text-purple-500" />;
+        return <Landmark className="w-5 h-5 text-primary" />;
     }
   };
 
@@ -33,25 +33,25 @@ export function AccountsCarousel({ accounts }: { accounts: Account[] }) {
 
   return (
     <div className="w-full relative">
-      <div className="flex overflow-x-auto flex-nowrap gap-4 pb-4 -mx-2 px-2 sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+      <div className="flex overflow-x-auto gap-3 pb-2 scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {accounts.map((acc) => (
           <div
             key={acc.id}
-            className="flex-shrink-0 w-[200px] bg-card rounded-[1.5rem] p-4 flex flex-col space-y-3 shadow-sm border border-white/5"
+            className="flex-shrink-0 w-[200px] bg-card rounded-2xl sm:rounded-[1.5rem] p-4 flex flex-col space-y-3 shadow-sm border border-white/5 hover:border-white/10 transition-all"
           >
             <div className="flex items-center justify-between">
-              <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-background/80 flex items-center justify-center border border-white/5">
                 {getIcon(acc.type)}
               </div>
-              <div className="text-[10px] font-bold text-muted-foreground bg-white/5 px-2 py-0.5 rounded-full uppercase tracking-wider">
+              <div className="text-[10px] font-bold text-muted-foreground bg-white/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-white/5">
                 100% CDI
               </div>
             </div>
 
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-muted-foreground truncate">{acc.name}</span>
-              <span className="text-lg font-bold text-foreground">
-                <span className="text-xs text-muted-foreground mr-1">R$</span>
+            <div className="flex flex-col pt-1">
+              <span className="text-xs font-medium text-muted-foreground truncate">{acc.name}</span>
+              <span className="text-lg font-bold text-foreground tracking-tight">
+                <span className="text-primary text-xs mr-1 font-semibold">R$</span>
                 {formatCurrency(Number(acc.currentBalance))}
               </span>
             </div>

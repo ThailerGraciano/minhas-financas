@@ -18,10 +18,10 @@ export function MonthlyBalanceGrid({ totalIncome, totalExpense }: MonthlyBalance
   const expensePercent = (totalExpense / totalMoved) * 100;
 
   return (
-    <div className="grid gap-4 grid-cols-2">
+    <div className="grid grid-cols-2 gap-3">
       {/* Card Receitas */}
-      <div className="bg-card rounded-[2rem] border-transparent shadow-sm flex flex-col pt-6 pb-0 overflow-hidden relative">
-        <div className="px-4 sm:px-6 mb-4 flex flex-col space-y-2">
+      <div className="bg-card rounded-2xl sm:rounded-[2rem] border-transparent shadow-sm flex flex-col pt-5 pb-0 overflow-hidden relative">
+        <div className="px-4 sm:px-6 mb-3 sm:mb-4 flex flex-col space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ArrowUpCircle className="h-5 w-5 text-emerald-500" />
@@ -43,8 +43,8 @@ export function MonthlyBalanceGrid({ totalIncome, totalExpense }: MonthlyBalance
       </div>
 
       {/* Card Despesas */}
-      <div className="bg-card rounded-[2rem] border-transparent shadow-sm flex flex-col pt-6 pb-0 overflow-hidden relative">
-        <div className="px-4 sm:px-6 mb-4 flex flex-col space-y-2">
+      <div className="bg-card rounded-2xl sm:rounded-[2rem] border-transparent shadow-sm flex flex-col pt-5 pb-0 overflow-hidden relative">
+        <div className="px-4 sm:px-6 mb-3 sm:mb-4 flex flex-col space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ArrowDownCircle className="h-5 w-5 text-rose-500" />

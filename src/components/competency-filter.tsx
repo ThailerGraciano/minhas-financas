@@ -1,12 +1,12 @@
 "use client";
 
-import { addMonths, format, subMonths } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Calendar, Clock } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { addMonths, format, subMonths } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 interface CompetencyFilterProps {
   /** Dia de fechamento do ciclo financeiro (ex: 25) */
@@ -32,7 +32,7 @@ export function CompetencyFilter({ closingDay, value, defaultMonth, onChange }: 
   const fallbackMonth = defaultMonth || format(new Date(), "yyyy-MM");
 
   // Se 'value' foi fornecido, usamos ele (controlled mode), senão usamos a URL
-  const currentMonth = value !== undefined ? value : (searchParams.get("month") || fallbackMonth);
+  const currentMonth = value !== undefined ? value : searchParams.get("month") || fallbackMonth;
   const currentDate = new Date(`${currentMonth}-01T00:00:00`);
 
   // Gera opções: 12 meses passados + mês atual + 12 meses futuros
@@ -42,28 +42,30 @@ export function CompetencyFilter({ closingDay, value, defaultMonth, onChange }: 
     setIsMounted(true);
   }, []);
 
-  const monthOptions = isMounted ? (() => {
-    const options: { value: string; label: string }[] = [];
-    const now = new Date();
+  const monthOptions = isMounted
+    ? (() => {
+        const options: { value: string; label: string }[] = [];
+        const now = new Date();
 
-    for (let i = -12; i <= 12; i++) {
-      const d = addMonths(now, i);
-      const value = format(d, "yyyy-MM");
-      const label = format(d, "MMMM yyyy", { locale: ptBR });
-      options.push({
-        value,
-        label: label.charAt(0).toUpperCase() + label.slice(1),
-      });
-    }
-    return options;
-  })() : [];
+        for (let i = -12; i <= 12; i++) {
+          const d = addMonths(now, i);
+          const value = format(d, "yyyy-MM");
+          const label = format(d, "MMMM yyyy", { locale: ptBR });
+          options.push({
+            value,
+            label: label.charAt(0).toUpperCase() + label.slice(1),
+          });
+        }
+        return options;
+      })()
+    : [];
 
   const navigateToMonth = (monthStr: string) => {
     if (onChange) {
       onChange(monthStr);
       return;
     }
-    
+
     const params = new URLSearchParams(searchParams.toString());
     // Se for o mês padrão configurado, remove o param para URL limpa
     if (monthStr === fallbackMonth) {
@@ -85,56 +87,40 @@ export function CompetencyFilter({ closingDay, value, defaultMonth, onChange }: 
     navigateToMonth(format(next, "yyyy-MM"));
   };
 
-  const displayLabel = format(currentDate, "MMMM yyyy", { locale: ptBR });
-  const capitalizedLabel = displayLabel.charAt(0).toUpperCase() + displayLabel.slice(1);
-
-  // Calcula o intervalo do ciclo para exibição
-  const cycleStart = closingDay + 1;
-  const cycleEnd = closingDay;
-
   return (
-    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-      <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 rounded-md"
-          onClick={goToPrevMonth}
-          aria-label="Mês anterior"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
+    <div className="flex items-center gap-1">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 rounded-full hover:bg-background/50"
+        onClick={goToPrevMonth}
+        aria-label="Mês anterior"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
 
-        <Select value={currentMonth} onValueChange={navigateToMonth}>
-          <SelectTrigger className="h-8 border-0 bg-transparent shadow-none font-semibold focus:ring-0 focus:ring-offset-0 capitalize min-w-[150px] data-[state=open]:bg-muted/50">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {monthOptions.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value} className="capitalize">
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <Select value={currentMonth} onValueChange={navigateToMonth}>
+        <SelectTrigger className="h-7 border-0 bg-transparent shadow-none font-semibold focus:ring-0 focus:ring-offset-0 capitalize text-sm min-w-[130px] p-0 text-center justify-center">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {monthOptions.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value} className="capitalize">
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 rounded-md"
-          onClick={goToNextMonth}
-          aria-label="Próximo mês"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
-
-      <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/50 bg-muted/40 text-xs text-muted-foreground whitespace-nowrap">
-        <Clock className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-        <span>
-          Ciclo: <strong className="font-semibold text-foreground/90">dia {cycleStart} ao dia {cycleEnd}</strong>
-        </span>
-      </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 rounded-full hover:bg-background/50"
+        onClick={goToNextMonth}
+        aria-label="Próximo mês"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
     </div>
   );
 }

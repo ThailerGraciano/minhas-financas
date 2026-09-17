@@ -49,13 +49,18 @@ type NewTransaction = typeof transactions.$inferInsert;
 export function TransactionFormDialog({
   trigger,
   onSuccess,
-}: { trigger?: React.ReactNode; onSuccess?: () => void } = {}) {
+  initialTab = "expense",
+}: {
+  trigger?: React.ReactNode;
+  onSuccess?: () => void;
+  initialTab?: "expense" | "income" | "transfer";
+} = {}) {
   const [open, setOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [formData, setFormData] = useState<FormData | null>(null);
   const [formError, setFormError] = useState("");
 
-  const [tab, setTab] = useState("expense");
+  const [tab, setTab] = useState<"expense" | "income" | "transfer">(initialTab);
   const [step, setStep] = useState(1);
 
   const [amount, setAmount] = useState<number | undefined>(undefined);
@@ -95,6 +100,7 @@ export function TransactionFormDialog({
 
   const resetState = () => {
     setStep(1);
+    setTab(initialTab);
     setAmount(undefined);
     setTransactionDate(format(new Date(), "yyyy-MM-dd"));
     setDescription("");
@@ -473,7 +479,7 @@ export function TransactionFormDialog({
         {trigger ? (
           trigger
         ) : (
-          <Button className="cursor-pointer fixed bottom-20 md:bottom-8 right-4 md:right-8 rounded-full h-14 w-14 shadow-2xl p-0 bg-primary text-primary-foreground hover:brightness-110 transition-all hover:scale-110 active:scale-95 z-[100] border-none flex items-center justify-center">
+          <Button className="cursor-pointer fixed bottom-20 right-4 z-50 md:hidden rounded-full h-14 w-14 shadow-2xl p-0 bg-primary text-white hover:brightness-110 transition-all hover:scale-110 active:scale-95 border-none flex items-center justify-center">
             <Plus className="h-7 w-7 pointer-events-none" />
           </Button>
         )}

@@ -21,6 +21,7 @@ import {
   Landmark,
   LogOut,
   PieChart,
+  Plus,
   Receipt,
   Settings,
   ShoppingCart,
@@ -32,6 +33,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "./sidebar-provider";
+import { TransactionFormDialog } from "./transaction-form-dialog";
 
 export interface HeaderUserData {
   id?: string;
@@ -135,7 +137,27 @@ export function Navigation({ user }: { user?: HeaderUserData }) {
             </div>
           )}
         </div>
-        <div className="flex-1 overflow-y-auto py-4 flex flex-col gap-1 px-3">
+
+        {/* Nova Transação Desktop Button */}
+        <div className="px-3 pb-2 pt-1">
+          <TransactionFormDialog
+            trigger={
+              <button
+                type="button"
+                className={cn(
+                  "w-full bg-primary hover:bg-primary/90 text-white rounded-xl py-2.5 font-semibold flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all hover:brightness-110 active:scale-95",
+                  isCollapsed ? "px-0" : "px-4",
+                )}
+                title={isCollapsed ? "Nova Transação" : undefined}
+              >
+                <Plus className="w-5 h-5 shrink-0" />
+                {!isCollapsed && <span className="text-sm font-medium whitespace-nowrap">Nova Transação</span>}
+              </button>
+            }
+          />
+        </div>
+
+        <div className="flex-1 overflow-y-auto py-2 flex flex-col gap-1 px-3">
           {navItems.map((item) => {
             const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
             return (

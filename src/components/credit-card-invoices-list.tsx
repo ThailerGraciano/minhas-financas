@@ -3,14 +3,17 @@
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
+export type InvoiceCard = {
+  id: number;
+  name: string;
+  creditLimit: string | number;
+  dueDay: number;
+  closingDay: number;
+  [key: string]: unknown;
+};
+
 export type Invoice = {
-  card: {
-    id: number;
-    name: string;
-    creditLimit: string | number;
-    dueDay: number;
-    closingDay: number;
-  };
+  card: InvoiceCard;
   invoiceTotal: number;
 };
 
@@ -24,7 +27,7 @@ export function CreditCardInvoicesList({ invoices }: CreditCardInvoicesListProps
 
   if (invoices.length === 0) {
     return (
-      <div className="flex h-[150px] items-center justify-center text-sm text-muted-foreground border border-dashed rounded-[2rem]">
+      <div className="flex h-[150px] items-center justify-center text-sm text-muted-foreground border border-dashed rounded-2xl">
         Nenhuma fatura com gastos neste mês.
       </div>
     );
@@ -44,8 +47,33 @@ export function CreditCardInvoicesList({ invoices }: CreditCardInvoicesListProps
     return "bg-primary text-primary-foreground";
   };
 
+  const getRemainingDaysText = (closingDay: number, dueDay: number) => {
+    const today = new Date();
+    const currentDay = today.getDate();
+
+    let daysUntilClosing = closingDay - currentDay;
+    if (daysUntilClosing < 0) {
+      const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+      daysUntilClosing = daysInMonth - currentDay + closingDay;
+    }
+
+    let daysUntilDue = dueDay - currentDay;
+    if (daysUntilDue < 0) {
+      const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+      daysUntilDue = daysInMonth - currentDay + dueDay;
+    }
+
+    if (daysUntilClosing === 0) {
+      return `Fecha hoje • Vence em ${daysUntilDue} dias`;
+    }
+    if (daysUntilClosing === 1) {
+      return `Fecha amanhã • Vence em ${daysUntilDue} dias`;
+    }
+    return `Fecha em ${daysUntilClosing} dias • Vence em ${daysUntilDue} dias`;
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {invoices.map(({ card, invoiceTotal }) => {
         const limit = Number(card.creditLimit);
         const percentUsed = limit > 0 ? (invoiceTotal / limit) * 100 : 0;
@@ -62,29 +90,30 @@ export function CreditCardInvoicesList({ invoices }: CreditCardInvoicesListProps
         }
 
         const logoColor = getInstitutionLogo(card.name);
+        const daysText = getRemainingDaysText(card.closingDay, card.dueDay);
 
         return (
           <div
             key={card.id}
-            className="bg-card rounded-[2rem] p-5 shadow-sm border border-white/5 flex flex-col gap-4 relative overflow-hidden"
+            className="bg-card rounded-2xl sm:rounded-[1.5rem] p-4 sm:p-5 shadow-sm border border-white/5 flex flex-col gap-3 relative overflow-hidden hover:border-white/10 transition-all"
           >
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-3">
                 <div
                   className={cn(
-                    "w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shadow-inner",
+                    "w-10 h-10 rounded-xl flex items-center justify-center font-bold text-base shadow-sm shrink-0",
                     logoColor,
                   )}
                 >
                   {card.name.charAt(0).toUpperCase()}
                 </div>
-                <div className="flex flex-col">
-                  <span className="font-semibold">{card.name}</span>
-                  <span className="text-xs text-muted-foreground">Vence dia {card.dueDay}</span>
+                <div className="flex flex-col min-w-0">
+                  <span className="font-semibold text-foreground truncate">{card.name}</span>
+                  <span className="text-xs text-muted-foreground">{daysText}</span>
                 </div>
               </div>
-              <div className="flex flex-col items-end">
-                <span className="font-black text-lg">{formatCurrency(invoiceTotal)}</span>
+              <div className="flex flex-col items-end shrink-0">
+                <span className="font-black text-base sm:text-lg text-foreground">{formatCurrency(invoiceTotal)}</span>
                 <span className={cn("text-xs font-semibold", alertText || "text-muted-foreground")}>
                   {percentUsed.toFixed(1)}% utilizado
                 </span>

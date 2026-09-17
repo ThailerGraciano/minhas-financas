@@ -1,18 +1,21 @@
 "use client";
 
-import type { TreemapNode } from "@/app/actions/dashboard";
+import type { TreemapDataSets, TreemapNode } from "@/app/actions/dashboard";
+import { CategoryIcon } from "@/components/category-icon";
 import { cn } from "@/lib/utils";
 
 interface ExpensesBentoGridProps {
-  data: TreemapNode;
+  data: TreemapDataSets | TreemapNode;
 }
 
 export function ExpensesBentoGrid({ data }: ExpensesBentoGridProps) {
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
+  const rootNode: TreemapNode = "all" in data ? data.all : data;
+
   // Calcula os valores agregados de cada categoria
-  const categories = (data.children || [])
+  const categories = (rootNode.children || [])
     .map((cat) => {
       let total = 0;
       const countValue = (node: TreemapNode) => {
@@ -29,45 +32,106 @@ export function ExpensesBentoGrid({ data }: ExpensesBentoGridProps) {
 
   if (categories.length === 0) {
     return (
-      <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground border border-dashed rounded-lg">
-        Nenhuma despesa para exibir.
+      <div className="flex h-[180px] items-center justify-center text-sm text-muted-foreground border border-dashed rounded-2xl">
+        Nenhuma despesa para exibir neste período.
       </div>
     );
   }
 
-  // Define as paletas de cores para os blocos
-  const colors = [
-    "bg-blue-500/10 text-blue-500 border-blue-500/20",
-    "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-    "bg-amber-500/10 text-amber-500 border-amber-500/20",
-    "bg-purple-500/10 text-purple-500 border-purple-500/20",
-    "bg-rose-500/10 text-rose-500 border-rose-500/20",
-    "bg-cyan-500/10 text-cyan-500 border-cyan-500/20",
+  // Paletas de cores para os blocos da grade Bento
+  const blockStyles = [
+    {
+      bg: "bg-gradient-to-br from-blue-500/15 via-blue-500/5 to-transparent",
+      border: "border-blue-500/20 hover:border-blue-500/40",
+      iconBg: "bg-blue-500/20 text-blue-400",
+      badge: "text-blue-400 bg-blue-500/10",
+    },
+    {
+      bg: "bg-gradient-to-br from-orange-500/15 via-orange-500/5 to-transparent",
+      border: "border-orange-500/20 hover:border-orange-500/40",
+      iconBg: "bg-orange-500/20 text-orange-400",
+      badge: "text-orange-400 bg-orange-500/10",
+    },
+    {
+      bg: "bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-transparent",
+      border: "border-emerald-500/20 hover:border-emerald-500/40",
+      iconBg: "bg-emerald-500/20 text-emerald-400",
+      badge: "text-emerald-400 bg-emerald-500/10",
+    },
+    {
+      bg: "bg-gradient-to-br from-purple-500/15 via-purple-500/5 to-transparent",
+      border: "border-purple-500/20 hover:border-purple-500/40",
+      iconBg: "bg-purple-500/20 text-purple-400",
+      badge: "text-purple-400 bg-purple-500/10",
+    },
+    {
+      bg: "bg-gradient-to-br from-amber-500/15 via-amber-500/5 to-transparent",
+      border: "border-amber-500/20 hover:border-amber-500/40",
+      iconBg: "bg-amber-500/20 text-amber-400",
+      badge: "text-amber-400 bg-amber-500/10",
+    },
+    {
+      bg: "bg-gradient-to-br from-rose-500/15 via-rose-500/5 to-transparent",
+      border: "border-rose-500/20 hover:border-rose-500/40",
+      iconBg: "bg-rose-500/20 text-rose-400",
+      badge: "text-rose-400 bg-rose-500/10",
+    },
   ];
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       {categories.map((cat, idx) => {
         const percent = grandTotal > 0 ? (cat.total / grandTotal) * 100 : 0;
-        const isDominant = idx === 0 || (idx === 1 && percent > 20); // maiores categorias ocupam 2 colunas
-        const colorClass = colors[idx % colors.length];
+        // As 2 maiores categorias ocupam 2 colunas no grid Bento assimétrico
+        const isDominant = idx === 0 || idx === 1;
+        const style = blockStyles[idx % blockStyles.length];
 
         return (
           <div
             key={cat.name}
             className={cn(
-              "rounded-3xl p-5 flex flex-col justify-between border shadow-sm transition-transform hover:scale-[1.02]",
-              isDominant ? "col-span-2 row-span-2 aspect-auto min-h-[140px]" : "col-span-1 aspect-square",
-              colorClass,
+              "rounded-2xl sm:rounded-3xl p-4 sm:p-5 flex flex-col justify-between border shadow-sm transition-all duration-200 hover:scale-[1.01]",
+              isDominant ? "col-span-2 min-h-[140px]" : "col-span-1 min-h-[120px]",
+              style.bg,
+              style.border,
             )}
           >
-            <div className="flex justify-between items-start gap-2">
-              <span className={cn("font-medium leading-tight", isDominant ? "text-lg" : "text-sm truncate")}>
+            {/* Top row: Icon on left, Percentage right-aligned on right */}
+            <div className="flex items-center justify-between gap-2">
+              <div
+                className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm", style.iconBg)}
+              >
+                <CategoryIcon name={cat.name} className="w-4 h-4" />
+              </div>
+              <span
+                className={cn(
+                  "font-bold text-xs sm:text-sm px-2 py-0.5 rounded-full border border-white/5",
+                  style.badge,
+                )}
+              >
+                {percent.toFixed(0)}%
+              </span>
+            </div>
+
+            {/* Middle: Category name */}
+            <div className="mt-3">
+              <span
+                className={cn(
+                  "font-semibold text-foreground/90 block truncate",
+                  isDominant ? "text-base sm:text-lg" : "text-xs sm:text-sm",
+                )}
+              >
                 {cat.name}
               </span>
-              <span className={cn("font-bold", isDominant ? "text-xl" : "text-sm")}>{percent.toFixed(0)}%</span>
             </div>
-            <div className={cn("font-black tracking-tight mt-4", isDominant ? "text-3xl" : "text-lg")}>
+
+            {/* Base: Total value */}
+            <div
+              className={cn(
+                "font-black tracking-tight text-foreground mt-1",
+                isDominant ? "text-xl sm:text-2xl" : "text-base sm:text-lg",
+              )}
+            >
               {formatCurrency(cat.total)}
             </div>
           </div>

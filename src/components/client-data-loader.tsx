@@ -77,9 +77,9 @@ export function ClientDataLoader<T>({
           <div className="hidden md:block" />
         )}
         <div className="flex items-center justify-center w-full md:w-auto shrink-0">
-          <div className="bg-white/5 border border-white/10 rounded-full px-4 py-2 flex items-center gap-4 shadow-sm backdrop-blur-md w-full md:w-auto justify-center">
+          <div className="rounded-full bg-secondary px-4 py-1.5 flex items-center gap-2 shadow-sm border border-white/5 justify-center">
             <CompetencyFilter closingDay={closingDay} value={selectedMonth} onChange={handleMonthChange} />
-            {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
+            {isLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
           </div>
         </div>
       </div>

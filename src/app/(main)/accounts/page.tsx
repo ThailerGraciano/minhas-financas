@@ -13,6 +13,7 @@ export default async function AccountsPage() {
     name: acc.name,
     type: acc.type,
     currentBalance: acc.currentBalance,
+    targetAmount: acc.targetAmount,
   }));
 
   return (

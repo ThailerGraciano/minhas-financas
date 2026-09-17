@@ -1,79 +1,105 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { createAccount, updateAccount } from '@/app/actions/accounts';
-import { Button } from '@/components/ui/button';
-import { CurrencyInput } from '@/components/ui/currency-input';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Loader2 } from 'lucide-react';
+import { createAccount, updateAccount } from "@/app/actions/accounts";
+import { Button } from "@/components/ui/button";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus } from "lucide-react";
+import { useState } from "react";
 
 type Account = {
   id: number;
   name: string;
   type: string;
   currentBalance: string;
+  targetAmount?: string | null;
 };
 
-export function AccountFormDialog({ 
-  accountToEdit, 
+export function AccountFormDialog({
+  accountToEdit,
   trigger,
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
-  hideTrigger
-}: { 
-  accountToEdit?: Account, 
-  trigger?: React.ReactNode,
-  open?: boolean,
-  onOpenChange?: (open: boolean) => void,
-  hideTrigger?: boolean
+  hideTrigger,
+}: {
+  accountToEdit?: Account;
+  trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const isControlled = controlledOpen !== undefined;
   const open = isControlled ? controlledOpen : uncontrolledOpen;
-  
+
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState("");
+  const [balance, setBalance] = useState<number>(accountToEdit ? Number(accountToEdit.currentBalance) : 0);
+  const [targetAmount, setTargetAmount] = useState<number>(
+    accountToEdit?.targetAmount ? Number(accountToEdit.targetAmount) : 0,
+  );
+
   const handleOpenChange = (value: boolean) => {
     if (isControlled && controlledOnOpenChange) {
       controlledOnOpenChange(value);
     } else {
       setUncontrolledOpen(value);
     }
-  };
 
-  const [isPending, setIsPending] = useState(false);
-  const [error, setError] = useState('');
-  const [balance, setBalance] = useState<number>(accountToEdit ? Number(accountToEdit.currentBalance) : 0);
+    if (value) {
+      if (accountToEdit) {
+        setBalance(Number(accountToEdit.currentBalance || 0));
+        setTargetAmount(accountToEdit.targetAmount ? Number(accountToEdit.targetAmount) : 0);
+      } else {
+        setBalance(0);
+        setTargetAmount(0);
+      }
+      setError("");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsPending(true);
-    setError('');
+    setError("");
 
     const formData = new FormData(e.currentTarget);
-    const name = formData.get('name') as string;
-    const type = formData.get('type') as string;
-    const currentBalance = formData.get('currentBalance') as string;
+    const name = formData.get("name") as string;
+    const type = formData.get("type") as string;
+    const currentBalance = formData.get("currentBalance") as string;
+    const targetAmountValue = targetAmount > 0 ? targetAmount.toString() : null;
 
-    const result = accountToEdit 
+    const result = accountToEdit
       ? await updateAccount(accountToEdit.id, {
           name,
           type,
           currentBalance,
+          targetAmount: targetAmountValue,
         })
       : await createAccount({
           name,
           type,
           currentBalance,
+          targetAmount: targetAmountValue,
         });
-    
+
     setIsPending(false);
 
     if (result.success) {
       handleOpenChange(false);
     } else {
-      setError(result.error || `Erro ao ${accountToEdit ? 'atualizar' : 'criar'} conta`);
+      setError(result.error || `Erro ao ${accountToEdit ? "atualizar" : "criar"} conta`);
     }
   };
 
@@ -81,25 +107,39 @@ export function AccountFormDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       {!hideTrigger && (
         <DialogTrigger asChild>
-          {trigger || <Button className="cursor-pointer"><Plus className="w-4 h-4 mr-2 md:mr-2 pointer-events-none" /><span className="hidden md:inline pointer-events-none">Nova Conta</span><span className="md:hidden pointer-events-none">Conta</span></Button>}
+          {trigger || (
+            <Button className="cursor-pointer">
+              <Plus className="w-4 h-4 mr-2 md:mr-2 pointer-events-none" />
+              <span className="hidden md:inline pointer-events-none">Nova Conta</span>
+              <span className="md:hidden pointer-events-none">Conta</span>
+            </Button>
+          )}
         </DialogTrigger>
       )}
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>{accountToEdit ? 'Editar Conta' : 'Nova Conta'}</DialogTitle>
+            <DialogTitle>{accountToEdit ? "Editar Conta" : "Nova Conta"}</DialogTitle>
             <DialogDescription>
-              {accountToEdit ? 'Altere as informações da sua conta bancária.' : 'Adicione uma nova conta bancária ou carteira.'}
+              {accountToEdit
+                ? "Altere as informações da sua conta bancária."
+                : "Adicione uma nova conta bancária ou carteira."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="name">Nome da Conta</Label>
-              <Input id="name" name="name" required placeholder="Ex: Nubank, Itaú..." defaultValue={accountToEdit?.name} />
+              <Input
+                id="name"
+                name="name"
+                required
+                placeholder="Ex: Nubank, Itaú..."
+                defaultValue={accountToEdit?.name}
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="type">Tipo</Label>
-              <Select name="type" defaultValue={accountToEdit?.type || 'checking'} required>
+              <Select name="type" defaultValue={accountToEdit?.type || "checking"} required>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecione o tipo..." />
                 </SelectTrigger>
@@ -114,15 +154,35 @@ export function AccountFormDialog({
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="currentBalance">{accountToEdit ? 'Saldo Atual' : 'Saldo Atual Inicial'}</Label>
-              <CurrencyInput id="currentBalance" name="currentBalance" required value={balance} onValueChange={setBalance} />
+              <Label htmlFor="currentBalance">{accountToEdit ? "Saldo Atual" : "Saldo Atual Inicial"}</Label>
+              <CurrencyInput
+                id="currentBalance"
+                name="currentBalance"
+                required
+                value={balance}
+                onValueChange={setBalance}
+              />
+            </div>
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="targetAmount">Objetivo da Conta (opcional)</Label>
+                <span className="text-xs text-muted-foreground">Opcional</span>
+              </div>
+              <CurrencyInput
+                id="targetAmount"
+                name="targetAmount"
+                value={targetAmount}
+                onValueChange={setTargetAmount}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Defina um valor alvo para acompanhar o progresso na lista de contas.
+              </p>
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
           <DialogFooter>
             <Button type="submit" isLoading={isPending} disabled={isPending}>
-              
-              {isPending ? 'Salvando...' : 'Salvar Conta'}
+              {isPending ? "Salvando..." : "Salvar Conta"}
             </Button>
           </DialogFooter>
         </form>

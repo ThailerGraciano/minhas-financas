@@ -26,6 +26,7 @@ import {
   Settings,
   ShoppingCart,
   TableProperties,
+  Target,
   TrendingUp,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
@@ -47,6 +48,7 @@ const navItems = [
   { name: "Transações", href: "/transactions", icon: Receipt },
   { name: "Contas", href: "/accounts", icon: Landmark },
   { name: "Cartões", href: "/credit-cards", icon: CreditCard },
+  { name: "Orçamentos", href: "/budgets", icon: Target },
   { name: "Power Grid", href: "/power-grid", icon: TableProperties },
   { name: "Planejamento", href: "/planning", icon: TrendingUp },
   { name: "Empréstimos", href: "/loans", icon: HandCoins },
@@ -84,6 +86,9 @@ function getPageInfo(pathname: string): { title: string; subtitle: string } {
   }
   if (pathname.startsWith("/credit-cards")) {
     return { title: "Cartões", subtitle: "Faturas e Limites" };
+  }
+  if (pathname.startsWith("/budgets")) {
+    return { title: "Orçamentos", subtitle: "Orçamento Base Zero" };
   }
   if (pathname.startsWith("/power-grid")) {
     return { title: "Power Grid", subtitle: "Matriz Financeira" };

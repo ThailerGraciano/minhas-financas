@@ -380,3 +380,34 @@ export const marketReceiptTransactionsRelations = relations(marketReceiptTransac
     references: [transactions.id],
   }),
 }));
+
+export const budgets = pgTable("budgets", {
+  id: serial("id").primaryKey(),
+  userId: uuid("user_id")
+    .references(() => users.id)
+    .notNull(),
+  categoryId: integer("category_id")
+    .references(() => categories.id)
+    .notNull(),
+  subcategoryId: integer("subcategory_id").references(() => subcategories.id),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  pillar: varchar("pillar", { length: 50 }).notNull(), // needs, lifestyle, goals
+  month: varchar("month", { length: 7 }).notNull(), // YYYY-MM
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const budgetsRelations = relations(budgets, ({ one }) => ({
+  user: one(users, {
+    fields: [budgets.userId],
+    references: [users.id],
+  }),
+  category: one(categories, {
+    fields: [budgets.categoryId],
+    references: [categories.id],
+  }),
+  subcategory: one(subcategories, {
+    fields: [budgets.subcategoryId],
+    references: [subcategories.id],
+  }),
+}));

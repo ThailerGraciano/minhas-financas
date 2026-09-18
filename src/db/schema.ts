@@ -109,7 +109,8 @@ export const transactions = pgTable("transactions", {
   subcategoryId: integer("subcategory_id").references(() => subcategories.id),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   description: varchar("description", { length: 255 }).notNull(),
-  date: date("date").notNull(),
+  dueDate: date("due_date").notNull(),
+  launchDate: date("launch_date").notNull(),
   competencyMonth: varchar("competency_month", { length: 7 }).notNull(), // YYYY-MM
   status: varchar("status", { length: 50 }).notNull(), // pending, paid, ignored
   isFixed: boolean("is_fixed").default(false).notNull(), // deprecated

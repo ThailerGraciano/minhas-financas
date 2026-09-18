@@ -138,7 +138,8 @@ export async function createLoan(input: CreateLoanInput) {
             status: "paid",
             amount: principal.toString(),
             description: `Empréstimo: ${input.name}`,
-            date: input.date,
+            dueDate: input.date,
+            launchDate: input.date,
             competencyMonth,
             accountId: input.bankIncomeAccountId,
             categoryId: input.categoryId,
@@ -176,7 +177,8 @@ export async function createLoan(input: CreateLoanInput) {
             status: "pending",
             amount: installmentValue.toString(),
             description: `Parcela ${i}/${input.installments} - ${input.name}`,
-            date: dateStr,
+            dueDate: dateStr,
+            launchDate: dateStr,
             competencyMonth: isCreditCard && invoiceMonth ? invoiceMonth : currentCompetency,
             accountId: isCreditCard ? null : input.bankExpenseAccountId,
             creditCardId: isCreditCard ? input.bankCreditCardId : null,
@@ -214,7 +216,8 @@ export async function createLoan(input: CreateLoanInput) {
             status: "paid",
             amount: principal.toString(),
             description: `Empréstimo concedido: ${input.name} (Saída)`,
-            date: input.date,
+            dueDate: input.date,
+            launchDate: input.date,
             competencyMonth,
             accountId: input.reserveAccountId,
             categoryId: transferCategoryId,
@@ -234,7 +237,8 @@ export async function createLoan(input: CreateLoanInput) {
             status: "paid",
             amount: principal.toString(),
             description: `Empréstimo concedido: ${input.name} (Entrada)`,
-            date: input.date,
+            dueDate: input.date,
+            launchDate: input.date,
             competencyMonth,
             accountId: input.checkingAccountId,
             categoryId: transferCategoryId,
@@ -267,7 +271,8 @@ export async function createLoan(input: CreateLoanInput) {
             status: "pending",
             amount: installmentValue.toString(),
             description: `Devolução ${i}/${input.installments} - ${input.name} (Saída)`,
-            date: dateStr,
+            dueDate: dateStr,
+            launchDate: dateStr,
             competencyMonth: currentCompetency,
             accountId: input.checkingAccountId,
             categoryId: transferCategoryId,
@@ -286,7 +291,8 @@ export async function createLoan(input: CreateLoanInput) {
             status: "pending",
             amount: installmentValue.toString(),
             description: `Devolução ${i}/${input.installments} - ${input.name} (Entrada)`,
-            date: dateStr,
+            dueDate: dateStr,
+            launchDate: dateStr,
             competencyMonth: currentCompetency,
             accountId: input.reserveAccountId,
             categoryId: transferCategoryId,
@@ -389,7 +395,7 @@ export async function getLoansPageData() {
     data.installments.push({
       id: tx.id,
       amount,
-      date: tx.date,
+      date: tx.dueDate,
       competencyMonth: tx.competencyMonth,
       status: tx.status,
       installmentCurrent: tx.installmentCurrent,
@@ -506,7 +512,7 @@ export async function updateInstallmentDate(transactionId: number, date: string,
   // Atualizar a própria transação
   await db
     .update(transactions)
-    .set({ date, competencyMonth })
+    .set({ dueDate: date, launchDate: date, competencyMonth })
     .where(and(eq(transactions.id, transactionId), eq(transactions.userId, userId)));
 
   // Se a transação for a perna "out" de um personal loan, precisamos atualizar a perna "in"
@@ -516,7 +522,7 @@ export async function updateInstallmentDate(transactionId: number, date: string,
   // Buscar se tem filhas
   await db
     .update(transactions)
-    .set({ date, competencyMonth })
+    .set({ dueDate: date, launchDate: date, competencyMonth })
     .where(and(eq(transactions.parentTransactionId, transactionId), eq(transactions.userId, userId)));
 
   // Buscar se é filha (para atualizar a mãe também, mantendo a consistência do dia)
@@ -524,7 +530,7 @@ export async function updateInstallmentDate(transactionId: number, date: string,
   if (tx?.parentTransactionId) {
     await db
       .update(transactions)
-      .set({ date, competencyMonth })
+      .set({ dueDate: date, launchDate: date, competencyMonth })
       .where(and(eq(transactions.id, tx.parentTransactionId), eq(transactions.userId, userId)));
   }
 

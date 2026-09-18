@@ -4,13 +4,17 @@ import { auth } from "@/auth";
 import { db } from "@/db";
 import { accounts, creditCards, fixedTransactions, settings, transactions } from "@/db/schema";
 import { buildGlobalCompetencyCondition, getTargetInvoiceMonth } from "@/lib/competency-utils";
+import { calculateCreditCardDueDate } from "@/lib/utils/competency";
 import { addMonths, endOfMonth, format, getDate, parseISO, subMonths } from "date-fns";
 import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 type NewTransaction = typeof transactions.$inferInsert;
-type CreateTransactionInput = Omit<NewTransaction, "userId"> & {
+type CreateTransactionInput = Omit<NewTransaction, "userId" | "dueDate" | "launchDate"> & {
+  dueDate?: string;
+  launchDate?: string;
+  date?: string;
   destinationAccountId?: number;
   isFixed?: boolean;
   isTotalAmount?: boolean;
@@ -66,8 +70,10 @@ const transactionSchema = z
   .object({
     description: z.string().min(1, "Descrição é obrigatória"),
     amount: z.string().refine((val) => Number(val) > 0, "Valor deve ser maior que zero"),
-    date: z.string().min(1, "Data é obrigatória"),
-    competencyMonth: z.string().min(1),
+    dueDate: z.string().optional(),
+    launchDate: z.string().optional(),
+    date: z.string().optional(),
+    competencyMonth: z.string().optional(),
     categoryId: z.number().int().positive("Categoria é obrigatória").optional(),
     type: z.string().min(1),
     status: z.string().min(1),
@@ -78,6 +84,13 @@ const transactionSchema = z
   })
   .passthrough()
   .superRefine((data, ctx) => {
+    if (!data.dueDate && !data.date) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Data é obrigatória",
+        path: ["dueDate"],
+      });
+    }
     if (data.type === "credit_card_expense") {
       if (!data.invoiceMonth || !/^\d{4}-\d{2}$/.test(data.invoiceMonth)) {
         ctx.addIssue({
@@ -108,7 +121,11 @@ const transactionSchema = z
 
 const subcategoryRequiredTypes = ["income", "expense", "credit_card_expense"];
 
-export async function getTransactions(month?: string, accountId?: number) {
+export async function getTransactions(
+  month?: string,
+  accountId?: number,
+  dateMode: "due_date" | "launch_date" = "due_date",
+) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
@@ -120,11 +137,11 @@ export async function getTransactions(month?: string, accountId?: number) {
 
   const userCards = await db.query.creditCards.findMany({
     where: eq(creditCards.userId, userId),
-    
+
     columns: { id: true, dueDay: true, closingDay: true },
   });
 
-  const condition = buildGlobalCompetencyCondition(currentMonth, closingDay, userId, userCards);
+  const condition = buildGlobalCompetencyCondition(currentMonth, closingDay, userId, userCards, dateMode);
   let finalCondition = condition;
   if (accountId) {
     finalCondition = and(condition, eq(transactions.accountId, accountId)) as typeof condition;
@@ -138,7 +155,7 @@ export async function getTransactions(month?: string, accountId?: number) {
       creditCard: true,
     },
     // Forced recompile to clear Next.js cache
-    orderBy: (t, { desc }) => [desc(t.date)],
+    orderBy: (t, { desc }) => [dateMode === "launch_date" ? desc(t.launchDate) : desc(t.dueDate)],
   });
 
   const monthDate = parseISO(`${currentMonth}-01`);
@@ -205,7 +222,8 @@ export async function getTransactions(month?: string, accountId?: number) {
         subcategoryId: ft.subcategoryId,
         amount: ft.amount,
         description: ft.type === "transfer" ? `${ft.description} (Saída)` : ft.description,
-        date: dateStr,
+        dueDate: dateStr,
+        launchDate: dateStr,
         competencyMonth: currentMonth,
         invoiceMonth: targetInvoiceMonth,
         status: "pending",
@@ -241,7 +259,11 @@ export async function getTransactions(month?: string, accountId?: number) {
 
   const allTransactions = [...realTransactions, ...virtualTransactions].filter((t) => t.status !== "ignored");
 
-  allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  allTransactions.sort((a, b) => {
+    const dateA = dateMode === "launch_date" ? a.launchDate : a.dueDate;
+    const dateB = dateMode === "launch_date" ? b.launchDate : b.dueDate;
+    return new Date(dateB).getTime() - new Date(dateA).getTime();
+  });
 
   return allTransactions;
 }
@@ -261,17 +283,37 @@ export async function createTransaction(
 
   const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
   const closingDay = appSettings?.closingDay || 25;
-  const parsedDate = parseISO(data.date);
+
+  const rawDueDate = data.dueDate || data.date || format(new Date(), "yyyy-MM-dd");
+  const rawLaunchDate = data.launchDate || rawDueDate;
+
+  let finalDueDate = rawDueDate;
+  const finalLaunchDate = rawLaunchDate;
+
+  if (data.type === "credit_card_expense" && data.creditCardId) {
+    const card = await db.query.creditCards.findFirst({
+      where: eq(creditCards.id, data.creditCardId),
+    });
+    if (card) {
+      const calculatedDueDate = calculateCreditCardDueDate(parseISO(finalLaunchDate), card.closingDay, card.dueDay);
+      finalDueDate = format(calculatedDueDate, "yyyy-MM-dd");
+      if (!data.invoiceMonth) {
+        data.invoiceMonth = format(calculatedDueDate, "yyyy-MM");
+      }
+    }
+  }
+
+  const parsedDueDate = parseISO(finalDueDate);
 
   if (data.type === "credit_card_expense") {
     if (data.invoiceMonth) {
       data.competencyMonth = data.invoiceMonth;
     } else if (!data.competencyMonth) {
-      data.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
+      data.competencyMonth = getCompetencyMonth(parsedDueDate, closingDay);
     }
   } else {
     data.invoiceMonth = null;
-    data.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
+    data.competencyMonth = getCompetencyMonth(parsedDueDate, closingDay);
   }
 
   if (subcategoryRequiredTypes.includes(data.type) && (!data.subcategoryId || data.subcategoryId <= 0)) {
@@ -279,7 +321,12 @@ export async function createTransaction(
   }
 
   try {
-    const { isFixed, destinationAccountId, isTotalAmount, current_installment, ...txData } = data;
+    const { isFixed, destinationAccountId, isTotalAmount, current_installment, date: _date, ...restTxData } = data;
+    const txData = {
+      ...restTxData,
+      dueDate: finalDueDate,
+      launchDate: finalLaunchDate,
+    };
     const isTransfer = txData.type === "transfer" && destinationAccountId;
 
     if (isTransfer && !txData.categoryId) {
@@ -313,17 +360,19 @@ export async function createTransaction(
             subcategoryId: txData.subcategoryId || null,
             amount: txData.amount,
             description: txData.description,
-            startDate: txData.date,
+            startDate: txData.dueDate,
             active: true,
             destinationAccountId: destinationAccountId || null,
           })
           .returning();
 
-        const baseDate = parseISO(txData.date);
+        const baseDueDate = parseISO(txData.dueDate);
+        const baseLaunchDate = parseISO(txData.launchDate);
         const baseCompetency = parseISO(`${txData.competencyMonth}-01`);
 
         for (let i = 0; i < 12; i++) {
-          const nextDate = addMonths(baseDate, i);
+          const nextDueDate = addMonths(baseDueDate, i);
+          const nextLaunchDate = addMonths(baseLaunchDate, i);
           const nextCompetency = addMonths(baseCompetency, i);
           const nextCompetencyStr = format(nextCompetency, "yyyy-MM");
           const invoiceMonthStr = txData.type === "credit_card_expense" ? nextCompetencyStr : null;
@@ -336,7 +385,8 @@ export async function createTransaction(
                 ...txData,
                 userId,
                 description: `${txData.description} (Saída)`,
-                date: format(nextDate, "yyyy-MM-dd"),
+                dueDate: format(nextDueDate, "yyyy-MM-dd"),
+                launchDate: format(nextLaunchDate, "yyyy-MM-dd"),
                 competencyMonth: nextCompetencyStr,
                 invoiceMonth: invoiceMonthStr,
                 status,
@@ -350,7 +400,8 @@ export async function createTransaction(
               userId,
               accountId: destinationAccountId,
               description: `${txData.description} (Entrada)`,
-              date: format(nextDate, "yyyy-MM-dd"),
+              dueDate: format(nextDueDate, "yyyy-MM-dd"),
+              launchDate: format(nextLaunchDate, "yyyy-MM-dd"),
               competencyMonth: nextCompetencyStr,
               invoiceMonth: invoiceMonthStr,
               status,
@@ -363,7 +414,8 @@ export async function createTransaction(
             await tx.insert(transactions).values({
               ...txData,
               userId,
-              date: format(nextDate, "yyyy-MM-dd"),
+              dueDate: format(nextDueDate, "yyyy-MM-dd"),
+              launchDate: format(nextLaunchDate, "yyyy-MM-dd"),
               competencyMonth: nextCompetencyStr,
               invoiceMonth: invoiceMonthStr,
               status,
@@ -469,11 +521,13 @@ export async function createTransaction(
           );
         }
 
-        const baseDate = parseISO(data.date);
-        const baseCompetency = txData.competencyMonth ? parseISO(`${txData.competencyMonth}-01`) : baseDate;
+        const baseDueDate = parseISO(txData.dueDate);
+        const baseLaunchDate = parseISO(txData.launchDate);
+        const baseCompetency = txData.competencyMonth ? parseISO(`${txData.competencyMonth}-01`) : baseDueDate;
 
         for (let i = currentInstallment + 1; i <= totalInstallments; i++) {
-          const nextDate = addMonths(baseDate, i - currentInstallment);
+          const nextDueDate = addMonths(baseDueDate, i - currentInstallment);
+          const nextLaunchDate = addMonths(baseLaunchDate, i - currentInstallment);
           const nextCompetency = addMonths(baseCompetency, i - currentInstallment);
           const nextCompetencyStr = format(nextCompetency, "yyyy-MM");
           const invoiceMonthStr = txData.type === "credit_card_expense" ? nextCompetencyStr : null;
@@ -487,7 +541,8 @@ export async function createTransaction(
                 description: `${txData.description} (${i}/${totalInstallments}) (Saída)`,
                 userId,
                 amount: isLast ? lastParcelAmount : baseParcelAmount,
-                date: format(nextDate, "yyyy-MM-dd"),
+                dueDate: format(nextDueDate, "yyyy-MM-dd"),
+                launchDate: format(nextLaunchDate, "yyyy-MM-dd"),
                 competencyMonth: nextCompetencyStr,
                 invoiceMonth: invoiceMonthStr,
                 status: "pending",
@@ -502,7 +557,8 @@ export async function createTransaction(
               description: `${txData.description} (${i}/${totalInstallments}) (Entrada)`,
               userId,
               amount: isLast ? lastParcelAmount : baseParcelAmount,
-              date: format(nextDate, "yyyy-MM-dd"),
+              dueDate: format(nextDueDate, "yyyy-MM-dd"),
+              launchDate: format(nextLaunchDate, "yyyy-MM-dd"),
               competencyMonth: nextCompetencyStr,
               invoiceMonth: invoiceMonthStr,
               status: "pending",
@@ -516,7 +572,8 @@ export async function createTransaction(
               description: `${txData.description} (${i}/${totalInstallments})`,
               userId,
               amount: isLast ? lastParcelAmount : baseParcelAmount,
-              date: format(nextDate, "yyyy-MM-dd"),
+              dueDate: format(nextDueDate, "yyyy-MM-dd"),
+              launchDate: format(nextLaunchDate, "yyyy-MM-dd"),
               competencyMonth: nextCompetencyStr,
               invoiceMonth: invoiceMonthStr,
               status: "pending",
@@ -730,7 +787,9 @@ export async function payVirtualTransaction(txData: {
   subcategoryId: number | null;
   amount: string;
   description: string;
-  date: string;
+  dueDate?: string;
+  launchDate?: string;
+  date?: string;
   competencyMonth: string;
   fixedTransactionId: string | null;
 }) {
@@ -738,6 +797,9 @@ export async function payVirtualTransaction(txData: {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
     const userId = session.user.id;
+
+    const dueDate = txData.dueDate || txData.date || format(new Date(), "yyyy-MM-dd");
+    const launchDate = txData.launchDate || dueDate;
 
     if (txData.type === "transfer" && txData.fixedTransactionId) {
       const ft = await db.query.fixedTransactions.findFirst({
@@ -755,7 +817,8 @@ export async function payVirtualTransaction(txData: {
               subcategoryId: ft.subcategoryId,
               amount: ft.amount,
               description: `${ft.description} (Saída)`,
-              date: txData.date,
+              dueDate,
+              launchDate,
               competencyMonth: txData.competencyMonth,
               status: "paid",
               paidAt: new Date(),
@@ -775,7 +838,8 @@ export async function payVirtualTransaction(txData: {
               subcategoryId: ft.subcategoryId,
               amount: ft.amount,
               description: `${ft.description} (Entrada)`,
-              date: txData.date,
+              dueDate,
+              launchDate,
               competencyMonth: txData.competencyMonth,
               status: "paid",
               paidAt: new Date(),
@@ -823,7 +887,7 @@ export async function getCreditCardInvoices(creditCardId: number, month?: string
       category: true,
       subcategory: true,
     },
-    orderBy: (t, { desc }) => [desc(t.date)],
+    orderBy: (t, { desc }) => [desc(t.dueDate)],
   });
 }
 
@@ -891,7 +955,8 @@ export async function deleteTransaction(
                     subcategoryId: ft.subcategoryId,
                     amount: ft.amount,
                     description: `${ft.description} (Saída)`,
-                    date: virtualDate,
+                    dueDate: virtualDate,
+                    launchDate: virtualDate,
                     competencyMonth: virtualCompetencyMonth,
                     status: "ignored",
                     fixedTransactionId: ft.id,
@@ -908,7 +973,8 @@ export async function deleteTransaction(
                   subcategoryId: ft.subcategoryId,
                   amount: ft.amount,
                   description: `${ft.description} (Entrada)`,
-                  date: virtualDate,
+                  dueDate: virtualDate,
+                  launchDate: virtualDate,
                   competencyMonth: virtualCompetencyMonth,
                   status: "ignored",
                   fixedTransactionId: ft.id,
@@ -924,7 +990,8 @@ export async function deleteTransaction(
                   subcategoryId: ft.subcategoryId,
                   amount: ft.amount,
                   description: ft.description,
-                  date: virtualDate,
+                  dueDate: virtualDate,
+                  launchDate: virtualDate,
                   competencyMonth: virtualCompetencyMonth,
                   status: "ignored",
                   fixedTransactionId: ft.id,
@@ -954,7 +1021,7 @@ export async function deleteTransaction(
       if (mode === "future") {
         const parentId =
           transactionItem.installmentParentId || transactionItem.parentTransactionId || transactionItem.id;
-        const targetDate = transactionItem.date;
+        const targetDate = transactionItem.dueDate;
 
         const conditions = [
           eq(transactions.installmentParentId, parentId),
@@ -965,7 +1032,7 @@ export async function deleteTransaction(
         const txsToDelete = await tx
           .select()
           .from(transactions)
-          .where(and(or(...conditions), gte(transactions.date, targetDate), eq(transactions.userId, userId)));
+          .where(and(or(...conditions), gte(transactions.dueDate, targetDate), eq(transactions.userId, userId)));
 
         // Sort descending by ID to avoid foreign key constraints (children deleted before parents)
         txsToDelete.sort((a, b) => b.id - a.id);
@@ -1131,13 +1198,20 @@ export async function updateTransaction(
         }
       } else {
         inputData.invoiceMonth = null;
-        if (inputData.date) {
-          const parsedDate = parseISO(inputData.date);
+        const candidateDueDate = inputData.dueDate || inputData.date;
+        if (candidateDueDate) {
+          const parsedDate = parseISO(candidateDueDate);
           inputData.competencyMonth = getCompetencyMonth(parsedDate, closingDay);
         }
       }
 
-      const { destinationAccountId, updateFuture, ...data } = inputData;
+      const { destinationAccountId, updateFuture, date: legacyDate, ...data } = inputData;
+      if (inputData.dueDate || legacyDate) {
+        data.dueDate = inputData.dueDate || legacyDate;
+      }
+      if (inputData.launchDate) {
+        data.launchDate = inputData.launchDate;
+      }
 
       if (oldTx.type === "transfer") {
         const isDestinationTx = !!oldTx.parentTransactionId;
@@ -1246,7 +1320,7 @@ export async function updateTransaction(
 
       if (updateFuture && (oldTx.fixedTransactionId || oldTx.installmentTotal)) {
         const parentId = oldTx.installmentParentId || oldTx.parentTransactionId || oldTx.id;
-        const targetDate = oldTx.date;
+        const targetDate = oldTx.dueDate;
 
         const conditions = [
           eq(transactions.installmentParentId, parentId),
@@ -1261,7 +1335,7 @@ export async function updateTransaction(
         const allRelated = await tx
           .select()
           .from(transactions)
-          .where(and(or(...conditions), gte(transactions.date, targetDate), eq(transactions.userId, userId)));
+          .where(and(or(...conditions), gte(transactions.dueDate, targetDate), eq(transactions.userId, userId)));
 
         const updatedIds = [oldTx.id];
         if (oldTx.type === "transfer" && oldTx.parentTransactionId) {
@@ -1288,45 +1362,45 @@ export async function updateTransaction(
           );
 
           const isDestination = targetTx.type === "transfer" && targetTx.parentTransactionId !== null;
-          
+
           let newAccountId = targetTx.accountId;
           let newCreditCardId = targetTx.creditCardId;
           let newType = targetTx.type;
 
           if (data.type !== undefined && targetTx.type !== "transfer") {
-             newType = data.type;
-             newAccountId = data.accountId !== undefined ? data.accountId : null;
-             newCreditCardId = data.creditCardId !== undefined ? data.creditCardId : null;
+            newType = data.type;
+            newAccountId = data.accountId !== undefined ? data.accountId : null;
+            newCreditCardId = data.creditCardId !== undefined ? data.creditCardId : null;
           } else if (targetTx.type === "transfer") {
-             if (isDestination && destinationAccountId !== undefined) {
-               newAccountId = destinationAccountId;
-             } else if (!isDestination && data.accountId !== undefined) {
-               newAccountId = data.accountId;
-             }
+            if (isDestination && destinationAccountId !== undefined) {
+              newAccountId = destinationAccountId;
+            } else if (!isDestination && data.accountId !== undefined) {
+              newAccountId = data.accountId;
+            }
           }
 
           let newInvoiceMonth = targetTx.invoiceMonth;
           let newCompetencyMonth = targetTx.competencyMonth;
-          
+
           if (newType === "credit_card_expense" && newCreditCardId) {
-             const card = cardMap.get(newCreditCardId);
-             if (card) {
-                newCompetencyMonth = getCompetencyMonth(parseISO(targetTx.date), card.closingDay);
-                newInvoiceMonth = newCompetencyMonth;
-             }
+            const card = cardMap.get(newCreditCardId);
+            if (card) {
+              newCompetencyMonth = getCompetencyMonth(parseISO(targetTx.dueDate), card.closingDay);
+              newInvoiceMonth = newCompetencyMonth;
+            }
           } else if (newType === "expense" || newType === "income" || newType === "transfer") {
-             newInvoiceMonth = null;
-             newCompetencyMonth = getCompetencyMonth(parseISO(targetTx.date), closingDay);
+            newInvoiceMonth = null;
+            newCompetencyMonth = getCompetencyMonth(parseISO(targetTx.dueDate), closingDay);
           }
 
           let newDescription = targetTx.description;
           if (data.description !== undefined) {
-             const baseDesc = data.description.replace(/\s*\(Saída\)|\s*\(Entrada\)/g, "");
-             if (targetTx.type === "transfer") {
-                newDescription = isDestination ? `${baseDesc} (Entrada)` : `${baseDesc} (Saída)`;
-             } else {
-                newDescription = baseDesc;
-             }
+            const baseDesc = data.description.replace(/\s*\(Saída\)|\s*\(Entrada\)/g, "");
+            if (targetTx.type === "transfer") {
+              newDescription = isDestination ? `${baseDesc} (Entrada)` : `${baseDesc} (Saída)`;
+            } else {
+              newDescription = baseDesc;
+            }
           }
 
           const [updatedTx] = await tx
@@ -1359,14 +1433,15 @@ export async function updateTransaction(
         if (oldTx.fixedTransactionId) {
           const updateFixed: Record<string, unknown> = {};
           if (data.amount !== undefined) updateFixed.amount = data.amount;
-          if (data.description !== undefined) updateFixed.description = data.description.replace(/\s*\(Saída\)|\s*\(Entrada\)/g, "");
+          if (data.description !== undefined)
+            updateFixed.description = data.description.replace(/\s*\(Saída\)|\s*\(Entrada\)/g, "");
           if (data.categoryId !== undefined) updateFixed.categoryId = data.categoryId;
           if (data.subcategoryId !== undefined) updateFixed.subcategoryId = data.subcategoryId;
           if (data.accountId !== undefined) updateFixed.accountId = data.accountId;
           if (data.creditCardId !== undefined) updateFixed.creditCardId = data.creditCardId;
           if (data.type !== undefined && data.type !== "transfer") updateFixed.type = data.type;
           if (destinationAccountId !== undefined) updateFixed.destinationAccountId = destinationAccountId;
-          
+
           if (Object.keys(updateFixed).length > 0) {
             await tx
               .update(fixedTransactions)
@@ -1441,16 +1516,17 @@ export async function fixAllCompetencies() {
   let updatedCount = 0;
 
   for (const tx of allTxs) {
-    const parsedDate = parseISO(tx.date);
+    const purchaseDate = parseISO(tx.launchDate || tx.dueDate);
+    const dueDateParsed = parseISO(tx.dueDate);
     let correctCompetency: string;
 
     if (tx.type === "credit_card_expense" && tx.creditCardId) {
       const card = cardMap.get(tx.creditCardId);
       if (!card) continue;
-      const dueDate = calculateCreditCardDueDate(parsedDate, card.closingDay, card.dueDay);
+      const dueDate = calculateCreditCardDueDate(purchaseDate, card.closingDay, card.dueDay);
       correctCompetency = format(dueDate, "yyyy-MM");
     } else {
-      correctCompetency = getCompetencyMonth(parsedDate, closingDay);
+      correctCompetency = getCompetencyMonth(dueDateParsed, closingDay);
     }
 
     if (tx.competencyMonth !== correctCompetency) {
@@ -1491,7 +1567,7 @@ export async function backfillInvoiceMonths() {
     if (!newInvoiceMonth && tx.creditCardId) {
       const card = cardMap.get(tx.creditCardId);
       if (card) {
-        const dueDate = calculateCreditCardDueDate(parseISO(tx.date), card.closingDay, card.dueDay);
+        const dueDate = calculateCreditCardDueDate(parseISO(tx.launchDate || tx.dueDate), card.closingDay, card.dueDay);
         newInvoiceMonth = format(dueDate, "yyyy-MM");
       }
     }

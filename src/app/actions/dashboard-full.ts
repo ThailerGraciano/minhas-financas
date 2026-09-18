@@ -11,13 +11,13 @@ import {
   getInstallmentsChartData,
 } from "./dashboard";
 
-export async function getDashboardFullData(month: string) {
+export async function getDashboardFullData(month: string, dateMode: "due_date" | "launch_date" = "due_date") {
   // Executando em lotes (batches) para melhorar a performance em relação à execução 100% sequencial,
   // mas sem sobrecarregar o pool de conexões (Supabase/Postgres) como um Promise.all único faria.
 
   // Lote 1: Dados críticos / visão geral
   const [data, balancesData, evolutionData] = await Promise.all([
-    getDashboardData(month),
+    getDashboardData(month, dateMode),
     getBalancesByType(),
     getBalanceEvolutionData(),
   ]);
@@ -25,8 +25,8 @@ export async function getDashboardFullData(month: string) {
   // Lote 2: Gráficos e agrupamentos
   const [installmentsData, incomeVsExpenseData, treemapData] = await Promise.all([
     getInstallmentsChartData(),
-    getIncomeVsExpenseData(month),
-    getExpenseTreemapData(month),
+    getIncomeVsExpenseData(month, false, dateMode),
+    getExpenseTreemapData(month, dateMode),
   ]);
 
   // Lote 3: Previsões e estimativas

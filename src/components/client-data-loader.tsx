@@ -2,8 +2,9 @@
 
 import { CompetencyFilter } from "@/components/competency-filter";
 import { getDefaultCompetencyMonth } from "@/lib/date-utils";
+import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 
 interface ClientDataLoaderProps<T> {
   closingDay: number;
@@ -11,6 +12,7 @@ interface ClientDataLoaderProps<T> {
   fetchAction: (month: string) => Promise<T>;
   children: (data: T, selectedMonth: string, isLoading: boolean) => ReactNode;
   headerContent?: ReactNode | ((data: T, selectedMonth: string, isLoading: boolean) => ReactNode);
+  headerActions?: ReactNode | ((data: T, selectedMonth: string, isLoading: boolean) => ReactNode);
   initialMonth?: string;
 }
 
@@ -20,6 +22,7 @@ export function ClientDataLoader<T>({
   fetchAction,
   children,
   headerContent,
+  headerActions,
   initialMonth,
 }: ClientDataLoaderProps<T>) {
   const currentMonth = initialMonth || getDefaultCompetencyMonth(closingDay);
@@ -27,6 +30,7 @@ export function ClientDataLoader<T>({
   const [data, setData] = useState<T>(initialData);
   const [isLoading, setIsLoading] = useState(false);
   const [prevInitialData, setPrevInitialData] = useState(initialData);
+  const isFirstRender = useRef(true);
 
   // Sync state when server props change (e.g. after a Server Action)
   if (initialData !== prevInitialData) {
@@ -37,33 +41,30 @@ export function ClientDataLoader<T>({
   }
 
   useEffect(() => {
-    if (selectedMonth !== currentMonth) {
-      let active = true;
-      fetchAction(selectedMonth)
-        .then((newData) => {
-          if (active) {
-            setData(newData);
-            setIsLoading(false);
-          }
-        })
-        .catch((error) => {
-          console.error("Failed to load data:", error);
-          if (active) setIsLoading(false);
-        });
-      return () => {
-        active = false;
-      };
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
     }
-  }, [selectedMonth, currentMonth, fetchAction]);
+    let active = true;
+    setIsLoading(true);
+    fetchAction(selectedMonth)
+      .then((newData) => {
+        if (active) {
+          setData(newData);
+          setIsLoading(false);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load data:", error);
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedMonth, fetchAction]);
 
   const handleMonthChange = (month: string) => {
     setSelectedMonth(month);
-    if (month !== currentMonth) {
-      setIsLoading(true);
-    } else {
-      setData(initialData);
-      setIsLoading(false);
-    }
   };
 
   return (
@@ -76,11 +77,17 @@ export function ClientDataLoader<T>({
         ) : (
           <div className="hidden md:block" />
         )}
-        <div className="flex items-center justify-center w-full md:w-auto shrink-0">
-          <div className="rounded-full bg-secondary px-4 py-1.5 flex items-center gap-2 shadow-sm border border-white/5 justify-center">
+        <div
+          className={cn(
+            "flex items-center gap-2.5 w-full md:w-auto shrink-0 flex-wrap sm:flex-nowrap",
+            headerActions ? "justify-between md:justify-end" : "justify-center md:justify-end",
+          )}
+        >
+          <div className="rounded-full bg-secondary px-3 py-1 sm:py-1.5 flex items-center gap-1.5 shadow-sm border border-white/5 justify-center shrink-0">
             <CompetencyFilter closingDay={closingDay} value={selectedMonth} onChange={handleMonthChange} />
-            {isLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+            {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground shrink-0" />}
           </div>
+          {typeof headerActions === "function" ? headerActions(data, selectedMonth, isLoading) : headerActions}
         </div>
       </div>
 

@@ -1,55 +1,38 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { processBatchUpdates } from "@/app/actions/batch";
 import {
-  getTransactionsForGrid,
   getGridFilterOptions,
+  getTransactionsForGrid,
   type GridFilters,
   type GridTransaction,
 } from "@/app/actions/power-grid";
-import { processBatchUpdates } from "@/app/actions/batch";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { parseISO, addMonths, format } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { addMonths, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Card } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  TableProperties,
-  Search,
-  Loader2,
-  Filter,
-  X,
-  Database,
-  ArrowUpCircle,
   ArrowDownCircle,
   ArrowRightLeft,
+  ArrowUpCircle,
+  CheckCircle2,
   CreditCard,
+  Database,
+  Filter,
+  Loader2,
+  Save,
+  Search,
+  TableProperties,
   Trash2,
   Undo2,
-  Save,
-  CheckCircle2,
+  X,
 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 type FilterOptions = Awaited<ReturnType<typeof getGridFilterOptions>>;
 
@@ -87,7 +70,7 @@ type PendingChange = {
 
 function generateInvoiceOptions(baseDateStr?: string): { value: string; label: string }[] {
   const baseDate = baseDateStr ? parseISO(baseDateStr) : new Date();
-  
+
   const options = [];
   for (let i = -6; i <= 12; i++) {
     const d = addMonths(baseDate, i);
@@ -225,20 +208,22 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
         } else if (pending.type === "edit" && pending.changes) {
           // Prepare changes for the database schema (e.g. amount string, numbers, dates)
           const formattedChanges: Record<string, string | number | null | undefined> = {};
-          
-          if (pending.changes.date) formattedChanges.date = pending.changes.date;
+
+          if (pending.changes.dueDate) formattedChanges.dueDate = pending.changes.dueDate;
+          if (pending.changes.launchDate) formattedChanges.launchDate = pending.changes.launchDate;
           if (pending.changes.description) formattedChanges.description = pending.changes.description;
           if (pending.changes.amount !== undefined) {
-             formattedChanges.amount = String(pending.changes.amount);
+            formattedChanges.amount = String(pending.changes.amount);
           }
           if (pending.changes.categoryId) formattedChanges.categoryId = pending.changes.categoryId;
-          if (pending.changes.subcategoryId !== undefined) formattedChanges.subcategoryId = pending.changes.subcategoryId;
+          if (pending.changes.subcategoryId !== undefined)
+            formattedChanges.subcategoryId = pending.changes.subcategoryId;
           if (pending.changes.invoiceMonth !== undefined) formattedChanges.invoiceMonth = pending.changes.invoiceMonth;
           if (pending.changes.status) formattedChanges.status = pending.changes.status;
 
           // Only add if there's actually a change to send
           if (Object.keys(formattedChanges).length > 0) {
-             updates.push({ id, changes: formattedChanges, original: original as NonNullable<GridTransaction> });
+            updates.push({ id, changes: formattedChanges, original: original as NonNullable<GridTransaction> });
           }
         }
       }
@@ -273,12 +258,8 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
             <TableProperties className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-              Power Grid
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Edição em lote de transações
-            </p>
+            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Power Grid</h1>
+            <p className="text-sm text-muted-foreground">Edição em lote de transações</p>
           </div>
         </div>
 
@@ -295,10 +276,7 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
 
       {/* ─── Filters Panel ──────────────────────────────── */}
       <Accordion type="single" collapsible defaultValue="filters">
-        <AccordionItem
-          value="filters"
-          className="rounded-xl border border-border bg-card/50 backdrop-blur-sm"
-        >
+        <AccordionItem value="filters" className="rounded-xl border border-border bg-card/50 backdrop-blur-sm">
           <AccordionTrigger className="px-4 py-3 hover:no-underline">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-primary" />
@@ -445,7 +423,12 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
             {/* ── Actions ──────────────────────────────── */}
             <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               {activeFilterCount > 0 && (
-                <Button variant="ghost" size="sm" onClick={handleClearFilters} className="gap-1.5 text-muted-foreground">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClearFilters}
+                  className="gap-1.5 text-muted-foreground"
+                >
                   <X className="h-3.5 w-3.5" /> Limpar filtros
                 </Button>
               )}
@@ -473,7 +456,9 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
             <div className="space-y-1.5">
               <p className="text-lg font-medium text-muted-foreground">Nenhum dado carregado</p>
               <p className="max-w-sm text-sm text-muted-foreground/70">
-                Selecione os filtros desejados e clique em <span className="font-medium text-foreground">&quot;Carregar Dados&quot;</span> para exibir as transações na grade.
+                Selecione os filtros desejados e clique em{" "}
+                <span className="font-medium text-foreground">&quot;Carregar Dados&quot;</span> para exibir as
+                transações na grade.
               </p>
             </div>
           </div>
@@ -494,34 +479,51 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
               const pending = pendingChanges[tx.id];
               const isDeleted = pending?.type === "delete";
               const isEdited = pending?.type === "edit";
-              
+
               // Use pending changes if available, otherwise original data
-              const currentDate = pending?.changes?.date ?? tx.date;
+              const currentDueDate = pending?.changes?.dueDate ?? tx.dueDate;
               const currentDesc = pending?.changes?.description ?? tx.description;
-              const currentCategory = pending?.changes?.categoryId ? String(pending.changes.categoryId) : String(tx.categoryId);
-              const currentSubcategory = pending?.changes?.subcategoryId !== undefined 
-                ? (pending.changes.subcategoryId === null ? "none" : String(pending.changes.subcategoryId)) 
-                : (tx.subcategoryId ? String(tx.subcategoryId) : "none");
-              const currentInvoiceMonth = pending?.changes?.invoiceMonth !== undefined 
-                ? (pending.changes.invoiceMonth === null ? "none" : pending.changes.invoiceMonth)
-                : (tx.invoiceMonth ? tx.invoiceMonth : "none");
+              const currentCategory = pending?.changes?.categoryId
+                ? String(pending.changes.categoryId)
+                : String(tx.categoryId);
+              const currentSubcategory =
+                pending?.changes?.subcategoryId !== undefined
+                  ? pending.changes.subcategoryId === null
+                    ? "none"
+                    : String(pending.changes.subcategoryId)
+                  : tx.subcategoryId
+                    ? String(tx.subcategoryId)
+                    : "none";
+              const currentInvoiceMonth =
+                pending?.changes?.invoiceMonth !== undefined
+                  ? pending.changes.invoiceMonth === null
+                    ? "none"
+                    : pending.changes.invoiceMonth
+                  : tx.invoiceMonth
+                    ? tx.invoiceMonth
+                    : "none";
               const currentAmount = pending?.changes?.amount ?? tx.amount;
 
               // CSS classes to highlight changed cells
               const getCellClass = (field: keyof GridTransaction) => {
-                const isChanged = pending?.type === "edit" && pending.changes?.[field] !== undefined && pending.changes[field] !== tx[field];
-                return isChanged ? "!bg-green-500/20 !border-green-500/50 text-green-700 dark:text-green-400 font-medium" : "";
+                const isChanged =
+                  pending?.type === "edit" &&
+                  pending.changes?.[field] !== undefined &&
+                  pending.changes[field] !== tx[field];
+                return isChanged
+                  ? "!bg-green-500/20 !border-green-500/50 text-green-700 dark:text-green-400 font-medium"
+                  : "";
               };
 
-              const selectedCategoryObj = filterOptions.categories.find(c => String(c.id) === currentCategory);
+              const selectedCategoryObj = filterOptions.categories.find((c) => String(c.id) === currentCategory);
               const subcategories = selectedCategoryObj?.subcategories || [];
 
               return (
-                <Card 
+                <Card
                   key={tx.id}
                   className={`p-4 transition-colors ${
-                    isDeleted 
-                      ? "bg-destructive/5 border-destructive/50 opacity-60" 
+                    isDeleted
+                      ? "bg-destructive/5 border-destructive/50 opacity-60"
                       : isEdited
                         ? "bg-success/5 border-success/50"
                         : "hover:bg-white/5 border-b border-white/5 shadow-none rounded-xl"
@@ -529,14 +531,17 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
                 >
                   {/* Top Row */}
                   <div className="flex items-center gap-4">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/50" title={type.label}>
+                    <div
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/50"
+                      title={type.label}
+                    >
                       {type.icon}
                     </div>
                     <Input
                       type="text"
                       value={currentDesc}
                       onChange={(e) => handleFieldChange(tx.id, "description", e.target.value)}
-                      className={`flex-1 border border-input bg-background shadow-sm hover:border-ring/50 transition-colors px-3 text-base font-medium ${getCellClass('description')} ${isDeleted ? "pointer-events-none" : ""}`}
+                      className={`flex-1 border border-input bg-background shadow-sm hover:border-ring/50 transition-colors px-3 text-base font-medium ${getCellClass("description")} ${isDeleted ? "pointer-events-none" : ""}`}
                       disabled={isDeleted}
                     />
                     <Input
@@ -544,51 +549,41 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
                       step="0.01"
                       value={currentAmount}
                       onChange={(e) => handleFieldChange(tx.id, "amount", e.target.value)}
-                      className={`w-32 shrink-0 text-right text-lg font-bold border border-input bg-background shadow-sm hover:border-ring/50 transition-colors px-3 ${getCellClass('amount')} ${isDeleted ? "pointer-events-none" : ""} ${tx.type === "income" ? "text-emerald-500" : "text-red-500"}`}
+                      className={`w-32 shrink-0 text-right text-lg font-bold border border-input bg-background shadow-sm hover:border-ring/50 transition-colors px-3 ${getCellClass("amount")} ${isDeleted ? "pointer-events-none" : ""} ${tx.type === "income" ? "text-emerald-500" : "text-red-500"}`}
                       disabled={isDeleted}
                     />
-                    {isDeleted ? (
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => handleToggleDelete(tx.id)}
-                        className="text-muted-foreground hover:text-foreground shrink-0"
-                        title="Desfazer exclusão"
-                      >
-                        <Undo2 className="h-5 w-5" />
-                      </Button>
-                    ) : (
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => handleToggleDelete(tx.id)}
-                        className="text-muted-foreground hover:bg-red-500/10 hover:text-red-500 shrink-0"
-                        title="Excluir"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </Button>
-                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleToggleDelete(tx.id)}
+                      className="text-muted-foreground hover:bg-red-500/10 hover:text-red-500 shrink-0"
+                      title={isDeleted ? "Desfazer exclusão" : "Excluir"}
+                    >
+                      {isDeleted ? <Undo2 className="h-5 w-5" /> : <Trash2 className="h-5 w-5" />}
+                    </Button>
                   </div>
-                  
+
                   {/* Bottom Row */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-center mt-4">
                     <Input
                       type="date"
-                      value={currentDate}
-                      onChange={(e) => handleFieldChange(tx.id, "date", e.target.value)}
-                      className={`h-9 w-full border border-input bg-background shadow-sm hover:border-ring/50 transition-colors ${getCellClass('date')} ${isDeleted ? "pointer-events-none" : ""}`}
+                      value={currentDueDate}
+                      onChange={(e) => handleFieldChange(tx.id, "dueDate", e.target.value)}
+                      className={`h-9 w-full border border-input bg-background shadow-sm hover:border-ring/50 transition-colors ${getCellClass("dueDate")} ${isDeleted ? "pointer-events-none" : ""}`}
                       disabled={isDeleted}
                     />
-                    
-                    <Select 
-                      value={currentCategory} 
+
+                    <Select
+                      value={currentCategory}
                       onValueChange={(val) => {
                         handleFieldChange(tx.id, "categoryId", Number(val));
                         handleFieldChange(tx.id, "subcategoryId", null); // reset subcat on cat change
                       }}
                       disabled={isDeleted}
                     >
-                      <SelectTrigger className={`h-9 w-full border border-input bg-background shadow-sm hover:border-ring/50 transition-colors ${getCellClass('categoryId')} ${isDeleted ? "pointer-events-none opacity-100" : ""}`}>
+                      <SelectTrigger
+                        className={`h-9 w-full border border-input bg-background shadow-sm hover:border-ring/50 transition-colors ${getCellClass("categoryId")} ${isDeleted ? "pointer-events-none opacity-100" : ""}`}
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -600,12 +595,16 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
                       </SelectContent>
                     </Select>
 
-                    <Select 
-                      value={currentSubcategory} 
-                      onValueChange={(val) => handleFieldChange(tx.id, "subcategoryId", val === "none" ? null : Number(val))}
+                    <Select
+                      value={currentSubcategory}
+                      onValueChange={(val) =>
+                        handleFieldChange(tx.id, "subcategoryId", val === "none" ? null : Number(val))
+                      }
                       disabled={isDeleted || subcategories.length === 0}
                     >
-                      <SelectTrigger className={`h-9 w-full border border-input bg-background shadow-sm hover:border-ring/50 transition-colors ${getCellClass('subcategoryId')} ${isDeleted ? "pointer-events-none opacity-100" : ""}`}>
+                      <SelectTrigger
+                        className={`h-9 w-full border border-input bg-background shadow-sm hover:border-ring/50 transition-colors ${getCellClass("subcategoryId")} ${isDeleted ? "pointer-events-none opacity-100" : ""}`}
+                      >
                         <SelectValue placeholder="Subcategoria..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -618,13 +617,15 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
                       </SelectContent>
                     </Select>
 
-                    {tx.type === 'credit_card_expense' ? (
-                      <Select 
-                        value={currentInvoiceMonth} 
+                    {tx.type === "credit_card_expense" ? (
+                      <Select
+                        value={currentInvoiceMonth}
                         onValueChange={(val) => handleFieldChange(tx.id, "invoiceMonth", val === "none" ? null : val)}
                         disabled={isDeleted}
                       >
-                        <SelectTrigger className={`h-9 w-full border border-input bg-background shadow-sm hover:border-ring/50 transition-colors ${getCellClass('invoiceMonth')} ${isDeleted ? "pointer-events-none opacity-100" : ""}`}>
+                        <SelectTrigger
+                          className={`h-9 w-full border border-input bg-background shadow-sm hover:border-ring/50 transition-colors ${getCellClass("invoiceMonth")} ${isDeleted ? "pointer-events-none opacity-100" : ""}`}
+                        >
                           <SelectValue placeholder="Mês da Fatura" />
                         </SelectTrigger>
                         <SelectContent>
@@ -661,9 +662,7 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
                 <p className="font-semibold">
                   {pendingCount} {pendingCount === 1 ? "alteração pendente" : "alterações pendentes"}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  As modificações só serão aplicadas ao salvar.
-                </p>
+                <p className="text-xs text-muted-foreground">As modificações só serão aplicadas ao salvar.</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -699,18 +698,17 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
                 <span className="text-xs text-muted-foreground">Excluídas</span>
               </div>
             </div>
-            
+
             {batchResult?.balanceAdjustments && batchResult.balanceAdjustments.length > 0 && (
               <div className="space-y-2 rounded-lg border border-border bg-card p-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Ajustes de Saldo
-                </p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ajustes de Saldo</p>
                 <div className="space-y-1">
                   {batchResult.balanceAdjustments.map((adj: { accountId: number; delta: number }) => (
                     <div key={adj.accountId} className="flex justify-between text-sm">
                       <span>Conta ID: {adj.accountId}</span>
                       <span className={adj.delta >= 0 ? "text-emerald-500" : "text-red-500"}>
-                        {adj.delta >= 0 ? "+" : ""}{adj.delta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        {adj.delta >= 0 ? "+" : ""}
+                        {adj.delta.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                       </span>
                     </div>
                   ))}

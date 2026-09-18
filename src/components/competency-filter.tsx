@@ -100,10 +100,10 @@ export function CompetencyFilter({ closingDay, value, defaultMonth, onChange }: 
       </Button>
 
       <Select value={currentMonth} onValueChange={navigateToMonth}>
-        <SelectTrigger className="h-7 border-0 bg-transparent shadow-none font-semibold focus:ring-0 focus:ring-offset-0 capitalize text-sm min-w-[130px] p-0 text-center justify-center">
+        <SelectTrigger className="h-7 border-0 bg-transparent shadow-none font-semibold focus:ring-0 focus:ring-offset-0 capitalize text-xs sm:text-sm min-w-[130px] sm:min-w-[155px] px-1 text-center justify-center gap-1.5 whitespace-nowrap shrink-0">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="min-w-[180px]">
           {monthOptions.map((opt) => (
             <SelectItem key={opt.value} value={opt.value} className="capitalize">
               {opt.label}

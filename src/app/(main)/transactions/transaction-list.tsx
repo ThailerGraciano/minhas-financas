@@ -17,8 +17,8 @@ import {
 } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
@@ -34,13 +34,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash, Filter } from "lucide-react";
+import { Filter, Pencil, Trash } from "lucide-react";
 
 export type TransactionWithRelations = {
   id: number;
   description: string;
   amount: string | number;
-  date: string;
+  dueDate: string;
+  launchDate: string;
+  date?: string;
   type: string;
   status: string;
   isFixed: boolean | null;
@@ -98,7 +100,9 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
             subcategoryId: tx.subcategoryId ?? null,
             amount: String(tx.amount),
             description: tx.description,
-            date: tx.date,
+            dueDate: tx.dueDate || tx.date || "",
+            launchDate: tx.launchDate || tx.dueDate || tx.date || "",
+            date: tx.dueDate || tx.date || "",
             competencyMonth: tx.competencyMonth ?? "",
             fixedTransactionId: tx.fixedTransactionId ?? null,
           }
@@ -121,7 +125,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
       mode,
       isVirtual,
       fixedId,
-      isVirtual ? transactionToDelete.date : undefined,
+      isVirtual ? transactionToDelete.dueDate || transactionToDelete.date : undefined,
       isVirtual ? transactionToDelete.competencyMonth : undefined,
     );
 
@@ -164,7 +168,9 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
         subcategoryId: tx.subcategoryId ?? null,
         amount: String(tx.amount),
         description: tx.description,
-        date: tx.date,
+        dueDate: tx.dueDate || tx.date || "",
+        launchDate: tx.launchDate || tx.dueDate || tx.date || "",
+        date: tx.dueDate || tx.date || "",
         competencyMonth: tx.competencyMonth ?? "",
         fixedTransactionId: tx.fixedTransactionId ?? null,
       });
@@ -235,11 +241,11 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
 
   const displayedTransactions = useMemo(() => {
     let filteredTxs = transactions;
-    
+
     if (selectedCategory !== "Todas") {
       filteredTxs = filteredTxs.filter((tx) => (tx.category?.name || "Sem Categoria") === selectedCategory);
     }
-    
+
     if (showOnlyPending) {
       filteredTxs = filteredTxs.filter((tx) => tx.status === "pending");
     }
@@ -250,11 +256,11 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
       const grouped = new Map<string, TransactionWithRelations & { _pendingCount: number; _paidCount: number }>();
       const otherTxs: TransactionWithRelations[] = [];
 
-            filteredTxs.forEach((tx) => {
+      filteredTxs.forEach((tx) => {
         if (tx.type === "credit_card_expense" && tx.creditCardId) {
           const groupKey = `${tx.creditCardId}`;
           if (!grouped.has(groupKey)) {
-            let groupDate = tx.date;
+            let groupDate = tx.dueDate || tx.date || "";
 
             const cardDueDay = tx.creditCard?.dueDay;
             if (cardDueDay) {
@@ -263,11 +269,16 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
             }
 
             grouped.set(groupKey, {
-              id: -(tx.creditCardId * 10000 + parseInt((tx.invoiceMonth || tx.competencyMonth || "0").replace("-", ""))), // id virtual determinístico
+              id: -(
+                tx.creditCardId * 10000 +
+                parseInt((tx.invoiceMonth || tx.competencyMonth || "0").replace("-", ""))
+              ), // id virtual determinístico
               isGroup: true,
               type: "expense",
               description: `Fatura: ${tx.creditCard?.name || "Cartão"}`,
               amount: 0,
+              dueDate: groupDate,
+              launchDate: groupDate,
               date: groupDate,
               status: tx.status,
               isFixed: null,
@@ -308,10 +319,10 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
 
     return [...processedTxs].sort((a, b) => {
       if (sortBy === "date_desc") {
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
+        return new Date(b.dueDate || b.date || 0).getTime() - new Date(a.dueDate || a.date || 0).getTime();
       }
       if (sortBy === "date_asc") {
-        return new Date(a.date).getTime() - new Date(b.date).getTime();
+        return new Date(a.dueDate || a.date || 0).getTime() - new Date(b.dueDate || b.date || 0).getTime();
       }
       if (sortBy === "amount_desc") {
         return Number(b.amount) - Number(a.amount);
@@ -326,9 +337,9 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
   const groupedTransactions = useMemo(() => {
     const groups: Record<string, TransactionWithRelations[]> = {};
     const order: string[] = [];
-    
+
     displayedTransactions.forEach((tx) => {
-      const dateKey = tx.date.split("T")[0];
+      const dateKey = (tx.dueDate || tx.date || "").split("T")[0];
       if (!groups[dateKey]) {
         groups[dateKey] = [];
         order.push(dateKey);
@@ -402,7 +413,10 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
               Ordenar por:
             </Label>
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger id="sort-by" className="w-[140px] sm:w-[180px] h-9 bg-background rounded-full border-transparent">
+              <SelectTrigger
+                id="sort-by"
+                className="w-[140px] sm:w-[180px] h-9 bg-background rounded-full border-transparent"
+              >
                 <SelectValue placeholder="Ordenar por" />
               </SelectTrigger>
               <SelectContent>
@@ -413,7 +427,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
               </SelectContent>
             </Select>
           </div>
-          
+
           <Button variant="outline" size="sm" className="gap-2 rounded-full whitespace-nowrap">
             <Filter className="w-4 h-4" />
             Filtros
@@ -426,7 +440,6 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
           Nenhuma transação encontrada para este período.
         </div>
       ) : (
-
         <div className="flex flex-col gap-6">
           {groupedTransactions.map((group) => (
             <div key={group.date} className="flex flex-col gap-2">
@@ -460,10 +473,20 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                       </button>
                       {getIcon(tx.type)}
                       <div className="flex flex-col min-w-0">
-                        <span className="font-medium text-sm sm:text-base truncate leading-tight">{tx.description}</span>
-                        <span className="text-xs text-muted-foreground truncate mt-0.5">
-                          {getSource(tx)} • {tx.category?.name || "Geral"}
+                        <span className="font-medium text-sm sm:text-base truncate leading-tight">
+                          {tx.description}
                         </span>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground truncate mt-0.5">
+                          <span>
+                            {getSource(tx)} • {tx.category?.name || "Geral"}
+                          </span>
+                          {tx.launchDate && !tx.isGroup && (
+                            <>
+                              <span>•</span>
+                              <span>Lançado em {format(parseISO(tx.launchDate.split("T")[0]), "dd/MM/yyyy")}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -483,21 +506,29 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                           {formatCurrency(tx.amount)}
                         </span>
 
-                        <button 
+                        <button
                           onClick={() => handleMarkAsPaid(tx)}
                           disabled={loadingId === tx.id}
                           className="transition-opacity hover:opacity-80"
                         >
                           {tx.status === "paid" ? (
                             <Badge className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 uppercase font-bold text-[10px] border-0 h-5 px-1.5 cursor-pointer">
-                              {tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)")) ? "Recebido" : "Pago"}
+                              {tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)"))
+                                ? "Recebido"
+                                : "Pago"}
                             </Badge>
                           ) : tx.status === "partial" ? (
-                            <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/30 uppercase font-bold px-1.5 h-5 bg-transparent cursor-pointer">
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] text-amber-500 border-amber-500/30 uppercase font-bold px-1.5 h-5 bg-transparent cursor-pointer"
+                            >
                               Parcial
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/30 uppercase font-bold px-1.5 h-5 bg-transparent cursor-pointer">
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] text-amber-500 border-amber-500/30 uppercase font-bold px-1.5 h-5 bg-transparent cursor-pointer"
+                            >
                               Pendente
                             </Badge>
                           )}

@@ -1,7 +1,7 @@
-import { SQL, and, eq, ne, or, isNull, gte, lte } from 'drizzle-orm';
-import { transactions } from '@/db/schema';
-import { parseISO, subMonths, format, addMonths, endOfMonth } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { transactions } from "@/db/schema";
+import { addMonths, endOfMonth, format, parseISO, subMonths } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { SQL, and, eq, gte, isNull, lte, ne, or } from "drizzle-orm";
 
 /**
  * Retorna o "Mês de Fatura" alvo dado o "Mês de Competência Global" (e.g. Agosto),
@@ -14,7 +14,7 @@ import { ptBR } from 'date-fns/locale';
 export function getTargetInvoiceMonth(globalMonth: string, globalClosingDay: number, cardDueDay: number): string {
   if (cardDueDay > globalClosingDay) {
     const date = parseISO(`${globalMonth}-01`);
-    return format(subMonths(date, 1), 'yyyy-MM');
+    return format(subMonths(date, 1), "yyyy-MM");
   }
   return globalMonth;
 }
@@ -29,50 +29,48 @@ export function buildGlobalCompetencyCondition(
   currentMonth: string,
   globalClosingDay: number,
   userId: string,
-  userCards: { id: number; dueDay: number; closingDay: number }[]
+  userCards: { id: number; dueDay: number; closingDay: number }[],
+  dateMode: "due_date" | "launch_date" = "due_date",
 ): SQL {
   const currentMonthDate = parseISO(`${currentMonth}-01`);
   const prevMonthDate = subMonths(currentMonthDate, 1);
-  
+
   const cycleEndDay = Math.min(globalClosingDay, endOfMonth(currentMonthDate).getDate());
   const cycleStartDay = Math.min(globalClosingDay + 1, endOfMonth(prevMonthDate).getDate());
 
-  const endDateStr = format(currentMonthDate, `yyyy-MM-${String(cycleEndDay).padStart(2, '0')}`);
-  const startDateStr = format(prevMonthDate, `yyyy-MM-${String(cycleStartDay).padStart(2, '0')}`);
+  const endDateStr = format(currentMonthDate, `yyyy-MM-${String(cycleEndDay).padStart(2, "0")}`);
+  const startDateStr = format(prevMonthDate, `yyyy-MM-${String(cycleStartDay).padStart(2, "0")}`);
+
+  if (dateMode === "launch_date") {
+    return and(
+      eq(transactions.userId, userId),
+      gte(transactions.launchDate, startDateStr),
+      lte(transactions.launchDate, endDateStr),
+    )!;
+  }
 
   const normalTransactionsCondition = and(
-    ne(transactions.type, 'credit_card_expense'),
-    gte(transactions.date, startDateStr),
-    lte(transactions.date, endDateStr)
+    ne(transactions.type, "credit_card_expense"),
+    gte(transactions.dueDate, startDateStr),
+    lte(transactions.dueDate, endDateStr),
   )!;
 
   if (!userCards || userCards.length === 0) {
-    return and(
-      eq(transactions.userId, userId),
-      normalTransactionsCondition
-    )!;
+    return and(eq(transactions.userId, userId), normalTransactionsCondition)!;
   }
 
   const ccConditions: SQL[] = [];
   for (const card of userCards) {
     const targetInvoiceMonth = getTargetInvoiceMonth(currentMonth, globalClosingDay, card.dueDay);
-    
+
     ccConditions.push(
-      and(
-        eq(transactions.creditCardId, card.id), getInvoiceCondition(targetInvoiceMonth, card.closingDay)
-      )!
+      and(eq(transactions.creditCardId, card.id), getInvoiceCondition(targetInvoiceMonth, card.closingDay))!,
     );
   }
 
   return and(
     eq(transactions.userId, userId),
-    or(
-      normalTransactionsCondition,
-      and(
-        eq(transactions.type, 'credit_card_expense'),
-        or(...ccConditions)
-      )
-    )
+    or(normalTransactionsCondition, and(eq(transactions.type, "credit_card_expense"), or(...ccConditions))),
   )!;
 }
 
@@ -84,7 +82,7 @@ export function buildCreditCardCompetencyCondition(
   currentMonth: string,
   globalClosingDay: number,
   userId: string,
-  userCards: { id: number; dueDay: number; closingDay: number }[]
+  userCards: { id: number; dueDay: number; closingDay: number }[],
 ): SQL {
   if (!userCards || userCards.length === 0) {
     return eq(transactions.id, -1);
@@ -93,19 +91,10 @@ export function buildCreditCardCompetencyCondition(
   const ccConditions: SQL[] = [];
 
   for (const card of userCards) {
-    ccConditions.push(
-      and(
-        eq(transactions.creditCardId, card.id),
-        getInvoiceCondition(currentMonth, card.closingDay)
-      )!
-    );
+    ccConditions.push(and(eq(transactions.creditCardId, card.id), getInvoiceCondition(currentMonth, card.closingDay))!);
   }
 
-  return and(
-    eq(transactions.userId, userId),
-    eq(transactions.type, 'credit_card_expense'),
-    or(...ccConditions)
-  )!;
+  return and(eq(transactions.userId, userId), eq(transactions.type, "credit_card_expense"), or(...ccConditions))!;
 }
 
 /**
@@ -117,17 +106,17 @@ export function getInvoiceCondition(targetInvoiceMonth: string, cardClosingDay: 
   const targetPrevMonthDate = subMonths(targetMonthDate, 1);
   const cardCycleEndDay = Math.min(cardClosingDay, endOfMonth(targetMonthDate).getDate());
   const cardCycleStartDay = Math.min(cardClosingDay + 1, endOfMonth(targetPrevMonthDate).getDate());
-  
-  const cardEndDateStr = format(targetMonthDate, `yyyy-MM-${String(cardCycleEndDay).padStart(2, '0')}`);
-  const cardStartDateStr = format(targetPrevMonthDate, `yyyy-MM-${String(cardCycleStartDay).padStart(2, '0')}`);
+
+  const cardEndDateStr = format(targetMonthDate, `yyyy-MM-${String(cardCycleEndDay).padStart(2, "0")}`);
+  const cardStartDateStr = format(targetPrevMonthDate, `yyyy-MM-${String(cardCycleStartDay).padStart(2, "0")}`);
 
   return or(
     eq(transactions.invoiceMonth, targetInvoiceMonth),
     and(
       isNull(transactions.invoiceMonth),
-      gte(transactions.date, cardStartDateStr),
-      lte(transactions.date, cardEndDateStr)
-    )
+      gte(transactions.dueDate, cardStartDateStr),
+      lte(transactions.dueDate, cardEndDateStr),
+    ),
   )!;
 }
 
@@ -136,7 +125,7 @@ export function getInvoiceCondition(targetInvoiceMonth: string, cardClosingDay: 
  */
 export function generateInvoiceOptions(baseDateStr?: string): { value: string; label: string }[] {
   const baseDate = baseDateStr ? parseISO(baseDateStr) : new Date();
-  
+
   const options = [];
   for (let i = -6; i <= 12; i++) {
     const d = addMonths(baseDate, i);

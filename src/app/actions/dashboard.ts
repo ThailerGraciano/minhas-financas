@@ -10,7 +10,7 @@ import { and, eq, gt, gte, inArray, isNotNull, lte, ne } from "drizzle-orm";
 
 import { getTransactions } from "./transactions";
 
-export async function getDashboardData(month?: string) {
+export async function getDashboardData(month?: string, dateMode: "due_date" | "launch_date" = "due_date") {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
@@ -24,7 +24,7 @@ export async function getDashboardData(month?: string) {
   const totalBalance = allAccounts.reduce((acc, curr) => acc + Number(curr.currentBalance), 0);
 
   const allCards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
-  const condition = buildGlobalCompetencyCondition(currentMonth, closingDay, userId, allCards);
+  const condition = buildGlobalCompetencyCondition(currentMonth, closingDay, userId, allCards, dateMode);
 
   const monthTransactions = await db
     .select()
@@ -143,7 +143,7 @@ export async function getBalanceEvolutionData(): Promise<BalanceEvolutionPoint[]
   const lastFutureDateStr = format(endOfMonth(months[months.length - 1]), "yyyy-MM-dd");
 
   const paidTxs = await db
-    .select({ type: transactions.type, amount: transactions.amount, date: transactions.date })
+    .select({ type: transactions.type, amount: transactions.amount, dueDate: transactions.dueDate })
     .from(transactions)
     .where(
       and(
@@ -154,14 +154,14 @@ export async function getBalanceEvolutionData(): Promise<BalanceEvolutionPoint[]
     );
 
   const pendingTxs = await db
-    .select({ type: transactions.type, amount: transactions.amount, date: transactions.date })
+    .select({ type: transactions.type, amount: transactions.amount, dueDate: transactions.dueDate })
     .from(transactions)
     .where(
       and(
         inArray(transactions.accountId, accountIds),
         eq(transactions.status, "pending"),
-        gte(transactions.date, tomorrowStr),
-        lte(transactions.date, lastFutureDateStr),
+        gte(transactions.dueDate, tomorrowStr),
+        lte(transactions.dueDate, lastFutureDateStr),
         eq(transactions.userId, userId),
       ),
     );
@@ -190,8 +190,8 @@ export async function getBalanceEvolutionData(): Promise<BalanceEvolutionPoint[]
       .where(
         and(
           inArray(transactions.accountId, accountIds),
-          gte(transactions.date, tomorrowStr),
-          lte(transactions.date, lastFutureDateStr),
+          gte(transactions.dueDate, tomorrowStr),
+          lte(transactions.dueDate, lastFutureDateStr),
           isNotNull(transactions.fixedTransactionId),
           eq(transactions.userId, userId),
         ),
@@ -210,11 +210,11 @@ export async function getBalanceEvolutionData(): Promise<BalanceEvolutionPoint[]
     const monthLabel = format(monthStart, "MMM", { locale: ptBR });
     const label = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1);
 
-    const balancePast = !isFuture ? calcDelta(paidTxs.filter((t) => t.date <= lastDayStr)) : null;
+    const balancePast = !isFuture ? calcDelta(paidTxs.filter((t) => t.dueDate <= lastDayStr)) : null;
 
     let balanceFuture: number | null = null;
     if (isFuture || isCurrentMonth) {
-      const futurePending = pendingTxs.filter((t) => t.date <= lastDayStr);
+      const futurePending = pendingTxs.filter((t) => t.dueDate <= lastDayStr);
 
       const virtualRows: { type: string; amount: string }[] = [];
       for (const ft of activeFixed) {
@@ -324,13 +324,17 @@ export async function getInstallmentsChartData() {
   };
 }
 
-export async function getIncomeVsExpenseData(competencyMonth: string, showOnlyPaid: boolean = false) {
+export async function getIncomeVsExpenseData(
+  competencyMonth: string,
+  showOnlyPaid: boolean = false,
+  dateMode: "due_date" | "launch_date" = "due_date",
+) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
 
   const [allTransactions, allAccounts] = await Promise.all([
-    getTransactions(competencyMonth),
+    getTransactions(competencyMonth, undefined, dateMode),
     db.select().from(accounts).where(eq(accounts.userId, userId)),
   ]);
 
@@ -444,7 +448,10 @@ export type TreemapDataSets = {
   fixed: TreemapNode;
 };
 
-export async function getExpenseTreemapData(competencyMonth: string): Promise<TreemapDataSets> {
+export async function getExpenseTreemapData(
+  competencyMonth: string,
+  dateMode: "due_date" | "launch_date" = "due_date",
+): Promise<TreemapDataSets> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
@@ -452,11 +459,11 @@ export async function getExpenseTreemapData(competencyMonth: string): Promise<Tr
   const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
   const closingDay = appSettings?.closingDay || 25;
   const userCards = await db
-    
+
     .select({ id: creditCards.id, dueDay: creditCards.dueDay, closingDay: creditCards.closingDay })
     .from(creditCards)
     .where(eq(creditCards.userId, userId));
-  const condition = buildGlobalCompetencyCondition(competencyMonth, closingDay, userId, userCards);
+  const condition = buildGlobalCompetencyCondition(competencyMonth, closingDay, userId, userCards, dateMode);
 
   const rawTransactions = await db.query.transactions.findMany({
     where: and(

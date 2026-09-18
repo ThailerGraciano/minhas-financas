@@ -15,7 +15,9 @@ export interface Transaction {
   type: string;
   amount: string | number;
   description: string;
-  date: string;
+  dueDate?: string;
+  launchDate?: string;
+  date?: string;
   account?: { id?: number; name: string } | null;
   creditCard?: { id?: number; name: string } | null;
   category?: { id?: number; name: string } | null;
@@ -193,7 +195,7 @@ export function UpcomingTransactionsManager({
                     {/* Esquerda: Data na lateral */}
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="shrink-0 w-18 sm:w-20 text-xs font-semibold text-muted-foreground text-left whitespace-nowrap">
-                        {formatLeftDate(tx.date)}
+                        {formatLeftDate(tx.dueDate || tx.date || "")}
                       </div>
 
                       {/* Ícone Temático Arredondado com fundo suave */}
@@ -280,7 +282,7 @@ export function UpcomingTransactionsManager({
                   return (
                     <TableRow key={tx.id} className="hover:bg-muted/40">
                       <TableCell className="font-medium whitespace-nowrap text-xs text-rose-500 tabular-nums">
-                        {formatFullDate(tx.date)}
+                        {formatFullDate(tx.dueDate || tx.date || "")}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col">

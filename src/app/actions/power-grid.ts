@@ -2,7 +2,7 @@
 
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { transactions, categories, creditCards } from "@/db/schema";
+import { categories, creditCards, transactions } from "@/db/schema";
 import { and, eq, gte, lte, ne, SQL } from "drizzle-orm";
 
 export interface GridFilters {
@@ -21,16 +21,13 @@ export async function getTransactionsForGrid(filters: GridFilters) {
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
 
-  const conditions: SQL[] = [
-    eq(transactions.userId, userId),
-    ne(transactions.status, "ignored"),
-  ];
+  const conditions: SQL[] = [eq(transactions.userId, userId), ne(transactions.status, "ignored")];
 
   if (filters.dateStart) {
-    conditions.push(gte(transactions.date, filters.dateStart));
+    conditions.push(gte(transactions.dueDate, filters.dateStart));
   }
   if (filters.dateEnd) {
-    conditions.push(lte(transactions.date, filters.dateEnd));
+    conditions.push(lte(transactions.dueDate, filters.dateEnd));
   }
   if (filters.amountMin !== undefined) {
     conditions.push(gte(transactions.amount, filters.amountMin.toFixed(2)));
@@ -59,7 +56,7 @@ export async function getTransactionsForGrid(filters: GridFilters) {
       subcategory: { columns: { id: true, name: true } },
       creditCard: { columns: { id: true, name: true } },
     },
-    orderBy: (t, { desc }) => [desc(t.date), desc(t.id)],
+    orderBy: (t, { desc }) => [desc(t.dueDate), desc(t.id)],
   });
 
   return rows;
@@ -84,9 +81,7 @@ export async function getGridFilterOptions() {
       },
       orderBy: (c, { asc }) => [asc(c.name)],
     }),
-    db.select({ id: creditCards.id, name: creditCards.name })
-      .from(creditCards)
-      .where(eq(creditCards.userId, userId)),
+    db.select({ id: creditCards.id, name: creditCards.name }).from(creditCards).where(eq(creditCards.userId, userId)),
   ]);
 
   return { categories: cats, creditCards: cards };

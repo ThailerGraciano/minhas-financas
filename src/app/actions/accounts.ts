@@ -101,7 +101,8 @@ export async function adjustAccountBalance(
         categoryId: adjustCategory.id,
         amount: Math.abs(diff).toFixed(2),
         description: "Ajuste de saldo",
-        date: today,
+        dueDate: today,
+        launchDate: today,
         competencyMonth,
         status: "paid",
       });
@@ -173,7 +174,7 @@ export async function getHistoricalBalance(accountId: number, targetDate: Date):
         and(
           eq(transactions.accountId, accountId),
           eq(transactions.status, "paid"),
-          lte(transactions.date, targetStr),
+          lte(transactions.dueDate, targetStr),
           eq(transactions.userId, userId),
         ),
       );
@@ -194,8 +195,8 @@ export async function getHistoricalBalance(accountId: number, targetDate: Date):
       and(
         eq(transactions.accountId, accountId),
         eq(transactions.status, "pending"),
-        gte(transactions.date, tomorrowStr),
-        lte(transactions.date, targetStr),
+        gte(transactions.dueDate, tomorrowStr),
+        lte(transactions.dueDate, targetStr),
         eq(transactions.userId, userId),
       ),
     );
@@ -226,8 +227,8 @@ export async function getHistoricalBalance(accountId: number, targetDate: Date):
       .where(
         and(
           eq(transactions.accountId, accountId),
-          gte(transactions.date, tomorrowStr),
-          lte(transactions.date, targetStr),
+          gte(transactions.dueDate, tomorrowStr),
+          lte(transactions.dueDate, targetStr),
           eq(transactions.userId, userId),
         ),
       );

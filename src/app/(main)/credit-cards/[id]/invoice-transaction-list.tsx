@@ -20,7 +20,9 @@ import { TransactionStatusToggle } from "./transaction-status-toggle";
 
 interface Transaction {
   id: number;
-  date: string;
+  date?: string;
+  dueDate?: string;
+  launchDate?: string;
   description: string;
   amount: string | number;
   status: string;
@@ -63,7 +65,9 @@ export function InvoiceTransactionList({ transactions }: { transactions: Transac
     return [...transactions].sort((a, b) => {
       let comparison = 0;
       if (sortField === "date") {
-        comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
+        const dateA = new Date(a.launchDate || a.dueDate || a.date || 0).getTime();
+        const dateB = new Date(b.launchDate || b.dueDate || b.date || 0).getTime();
+        comparison = dateA - dateB;
       } else if (sortField === "description") {
         comparison = a.description.localeCompare(b.description);
       } else if (sortField === "amount") {
@@ -92,8 +96,12 @@ export function InvoiceTransactionList({ transactions }: { transactions: Transac
   };
 
   const formatDate = (dateStr: string) => {
-    const [, month, day] = dateStr.split("-");
-    return `${day}/${month}`;
+    if (!dateStr) return "-";
+    const parts = dateStr.split("T")[0].split("-");
+    if (parts.length >= 3) {
+      return `${parts[2]}/${parts[1]}`;
+    }
+    return dateStr;
   };
 
   return (
@@ -118,7 +126,7 @@ export function InvoiceTransactionList({ transactions }: { transactions: Transac
             {sortedTransactions.map((tx) => (
               <TableRow key={tx.id}>
                 <TableCell className="font-medium whitespace-nowrap px-1 sm:px-4 py-2 sm:py-4">
-                  {formatDate(tx.date)}
+                  {formatDate(tx.launchDate || tx.dueDate || tx.date || "")}
                 </TableCell>
                 <TableCell className="max-w-[90px] sm:max-w-[250px] px-1 sm:px-4 py-2 sm:py-4">
                   <div className="flex flex-col overflow-hidden">

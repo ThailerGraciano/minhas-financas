@@ -1,21 +1,20 @@
-'use client';
+"use client";
 
 import { getTransactionFormData } from "@/app/actions/form-data";
-import { updateTransaction, getTransactionDetailsForEdit } from "@/app/actions/transactions";
+import { getTransactionDetailsForEdit, updateTransaction } from "@/app/actions/transactions";
 import { CategoryIcon } from "@/components/category-icon";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
 import { addMonths, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
 type FormData = NonNullable<Awaited<ReturnType<typeof getTransactionFormData>>>;
 type Category = FormData["categories"][0];
@@ -27,7 +26,9 @@ interface TransactionProp {
   type: string;
   description: string;
   amount: number | string;
-  date: string;
+  date?: string;
+  dueDate?: string;
+  launchDate?: string;
   categoryId?: number | string | null;
   subcategoryId?: number | string | null;
   accountId?: number | string | null;
@@ -54,7 +55,8 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
   const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("");
   const [amount, setAmount] = useState<number>(0);
   const [description, setDescription] = useState("");
-  const [date, setDate] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [launchDate, setLaunchDate] = useState("");
   const [originalAmount, setOriginalAmount] = useState<number>(0);
   const [updateFuture, setUpdateFuture] = useState(false);
 
@@ -77,24 +79,32 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
       setSelectedCategoryId(transaction.categoryId ? String(transaction.categoryId) : "");
       setSelectedSubcategoryId(transaction.subcategoryId ? String(transaction.subcategoryId) : "");
       setDescription(transaction.description);
-      setDate(transaction.date.substring(0, 10));
+      const rawDueDate = transaction.dueDate || transaction.date || "";
+      const rawLaunchDate = transaction.launchDate || transaction.dueDate || transaction.date || "";
+      setDueDate(rawDueDate ? rawDueDate.substring(0, 10) : "");
+      setLaunchDate(rawLaunchDate ? rawLaunchDate.substring(0, 10) : "");
       setAmount(Number(transaction.amount));
       setOriginalAmount(Number(transaction.amount));
       setUpdateFuture(false);
       setSelectedAccountId("");
       setSelectedDestinationAccountId("");
 
-      getTransactionDetailsForEdit(Number(transaction.id)).then((details: TransactionProp | null) => {
+      getTransactionDetailsForEdit(Number(transaction.id)).then((details) => {
         const dataToUse = details || transaction;
         setFullTransaction(dataToUse as TransactionProp);
+        if (dataToUse.dueDate) setDueDate(dataToUse.dueDate.substring(0, 10));
+        if (dataToUse.launchDate) setLaunchDate(dataToUse.launchDate.substring(0, 10));
         setSelectedAccountId(
-          dataToUse.accountId ? String(dataToUse.accountId) :
-            dataToUse.creditCardId ? `cc-${dataToUse.creditCardId}` : ""
+          dataToUse.accountId
+            ? String(dataToUse.accountId)
+            : dataToUse.creditCardId
+              ? `cc-${dataToUse.creditCardId}`
+              : "",
         );
-        if (dataToUse.type === 'transfer' && dataToUse.destinationAccountId) {
+        if (dataToUse.type === "transfer" && "destinationAccountId" in dataToUse && dataToUse.destinationAccountId) {
           setSelectedDestinationAccountId(String(dataToUse.destinationAccountId));
         }
-        if (dataToUse.type === 'credit_card_expense' && dataToUse.competencyMonth) {
+        if (dataToUse.type === "credit_card_expense" && dataToUse.competencyMonth) {
           setSelectedInvoiceMonth(dataToUse.competencyMonth);
         }
       });
@@ -104,7 +114,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
   const filteredCategories = useMemo(() => {
     if (!formData?.categories || !transaction) return [];
     const targetType = transaction.type === "income" ? "income" : "expense";
-    return formData.categories.filter((c: Category) => c.type === targetType || c.type === 'expense'); // transfer/credit_card_expense use expense categories
+    return formData.categories.filter((c: Category) => c.type === targetType || c.type === "expense"); // transfer/credit_card_expense use expense categories
   }, [formData, transaction]);
 
   const activeSubcategories = useMemo(() => {
@@ -123,17 +133,18 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
   };
 
   const invoiceOptions = useMemo(() => {
-    if (!selectedAccountId || !selectedAccountId.startsWith('cc-') || !formData?.creditCards) return [];
-    const cardId = Number(selectedAccountId.replace('cc-', ''));
+    if (!selectedAccountId || !selectedAccountId.startsWith("cc-") || !formData?.creditCards) return [];
+    const cardId = Number(selectedAccountId.replace("cc-", ""));
     const card = formData.creditCards.find((c: CreditCard) => c.id === cardId);
     if (!card) return [];
 
     let baseDate: Date;
-    if (transaction?.type === 'credit_card_expense' && transaction.competencyMonth) {
+    if (transaction?.type === "credit_card_expense" && transaction.competencyMonth) {
       const [year, month] = transaction.competencyMonth.split("-").map(Number);
       baseDate = new Date(year, month - 1, 1);
     } else {
-      const defaultMonth = getDefaultInvoiceMonth(card.closingDay, transaction?.date ? transaction.date.substring(0, 10) : new Date().toISOString());
+      const refDate = launchDate || dueDate || transaction?.dueDate || transaction?.date || new Date().toISOString();
+      const defaultMonth = getDefaultInvoiceMonth(card.closingDay, refDate.substring(0, 10));
       const [year, month] = defaultMonth.split("-").map(Number);
       baseDate = new Date(year, month - 1, 1);
     }
@@ -147,30 +158,54 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
       options.push({ value, label: capitalizedLabel });
     }
     return options;
-  }, [selectedAccountId, formData?.creditCards, transaction?.type, transaction?.competencyMonth, transaction?.date]);
+  }, [
+    selectedAccountId,
+    formData?.creditCards,
+    transaction?.type,
+    transaction?.competencyMonth,
+    transaction?.dueDate,
+    transaction?.date,
+    launchDate,
+    dueDate,
+  ]);
 
-  
   const hasChanges = useMemo(() => {
     if (!transaction || !fullTransaction) return false;
     const origDesc = transaction.description;
-    const origDate = transaction.date.substring(0, 10);
+    const origDueDate = (transaction.dueDate || transaction.date || "").substring(0, 10);
+    const origLaunchDate = (transaction.launchDate || transaction.dueDate || transaction.date || "").substring(0, 10);
     const origAmount = Number(transaction.amount);
     const origCat = transaction.categoryId ? String(transaction.categoryId) : "";
     const origSubCat = transaction.subcategoryId ? String(transaction.subcategoryId) : "";
-    const origAcc = fullTransaction.accountId ? String(fullTransaction.accountId) :
-             fullTransaction.creditCardId ? `cc-${fullTransaction.creditCardId}` : "";
+    const origAcc = fullTransaction.accountId
+      ? String(fullTransaction.accountId)
+      : fullTransaction.creditCardId
+        ? `cc-${fullTransaction.creditCardId}`
+        : "";
     const origDestAcc = fullTransaction.destinationAccountId ? String(fullTransaction.destinationAccountId) : "";
 
     return (
       description !== origDesc ||
-      date !== origDate ||
+      dueDate !== origDueDate ||
+      launchDate !== origLaunchDate ||
       amount !== origAmount ||
       selectedCategoryId !== origCat ||
       selectedSubcategoryId !== origSubCat ||
       selectedAccountId !== origAcc ||
       selectedDestinationAccountId !== origDestAcc
     );
-  }, [description, date, amount, selectedCategoryId, selectedSubcategoryId, selectedAccountId, selectedDestinationAccountId, transaction, fullTransaction]);
+  }, [
+    description,
+    dueDate,
+    launchDate,
+    amount,
+    selectedCategoryId,
+    selectedSubcategoryId,
+    selectedAccountId,
+    selectedDestinationAccountId,
+    transaction,
+    fullTransaction,
+  ]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -181,39 +216,46 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
     const form = new FormData(e.currentTarget);
     const description = form.get("description") as string;
     const amount = form.get("amount") as string;
-    const date = form.get("date") as string;
+    const launchDateVal = (form.get("launchDate") as string) || launchDate;
+    const dueDateVal = (form.get("dueDate") as string) || dueDate;
 
-    let competencyMonth = date.substring(0, 7);
-    const isCreditCard = selectedAccountId && selectedAccountId.startsWith('cc-');
+    let competencyMonth = dueDateVal.substring(0, 7);
+    const isCreditCard = selectedAccountId && selectedAccountId.startsWith("cc-");
     if (isCreditCard && selectedInvoiceMonth) {
       competencyMonth = selectedInvoiceMonth;
     }
 
-    const accountId = selectedAccountId && !selectedAccountId.startsWith('cc-') ? Number(selectedAccountId) : null;
-    const creditCardId = selectedAccountId && selectedAccountId.startsWith('cc-') ? Number(selectedAccountId.replace('cc-', '')) : null;
+    const accountId = selectedAccountId && !selectedAccountId.startsWith("cc-") ? Number(selectedAccountId) : null;
+    const creditCardId =
+      selectedAccountId && selectedAccountId.startsWith("cc-") ? Number(selectedAccountId.replace("cc-", "")) : null;
 
     let type = transaction.type;
-    if (transaction.type === 'expense' && isCreditCard) {
-      type = 'credit_card_expense';
-    } else if (transaction.type === 'credit_card_expense' && !isCreditCard) {
-      type = 'expense';
+    if (transaction.type === "expense" && isCreditCard) {
+      type = "credit_card_expense";
+    } else if (transaction.type === "credit_card_expense" && !isCreditCard) {
+      type = "expense";
     }
 
     const updateData = {
       description,
       amount,
-      date,
+      dueDate: dueDateVal,
+      launchDate: launchDateVal,
+      date: dueDateVal,
       competencyMonth,
       categoryId: Number(selectedCategoryId),
       subcategoryId: selectedSubcategoryId ? Number(selectedSubcategoryId) : null,
       accountId,
       creditCardId,
       type,
-      destinationAccountId: selectedDestinationAccountId && transaction.type === 'transfer' ? Number(selectedDestinationAccountId) : undefined,
+      destinationAccountId:
+        selectedDestinationAccountId && transaction.type === "transfer"
+          ? Number(selectedDestinationAccountId)
+          : undefined,
       updateFuture,
     };
 
-    console.log("updateData => ", updateData, transaction.id)
+    console.log("updateData => ", updateData, transaction.id);
 
     const res = await updateTransaction(Number(transaction.id), updateData);
 
@@ -233,19 +275,23 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Editar Transação</DialogTitle>
-          <DialogDescription className="sr-only">
-            Modifique os dados da transação selecionada.
-          </DialogDescription>
+          <DialogDescription className="sr-only">Modifique os dados da transação selecionada.</DialogDescription>
         </DialogHeader>
 
         {open && formData ? (
           <form onSubmit={handleSubmit} className="mt-4 space-y-4">
             <div className="grid gap-2">
               <Label htmlFor="description">Descrição</Label>
-              <Input id="description" name="description" value={description} onChange={e => setDescription(e.target.value)} required />
+              <Input
+                id="description"
+                name="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                required
+              />
             </div>
 
-            {transaction.type === 'transfer' ? (
+            {transaction.type === "transfer" ? (
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="accountId">Conta Origem</Label>
@@ -255,7 +301,9 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
                     </SelectTrigger>
                     <SelectContent>
                       {formData.accounts.map((a: { id: string | number; name: string }) => (
-                        <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                        <SelectItem key={a.id} value={String(a.id)}>
+                          {a.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -268,7 +316,9 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
                     </SelectTrigger>
                     <SelectContent>
                       {formData.accounts.map((a: { id: string | number; name: string }) => (
-                        <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                        <SelectItem key={a.id} value={String(a.id)}>
+                          {a.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -283,17 +333,22 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
                   </SelectTrigger>
                   <SelectContent>
                     {formData.accounts.map((a: { id: string | number; name: string }) => (
-                      <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                      <SelectItem key={a.id} value={String(a.id)}>
+                        {a.name}
+                      </SelectItem>
                     ))}
-                    {(transaction.type === 'credit_card_expense' || transaction.type === 'expense') && formData.creditCards.map((c: { id: string | number; name: string }) => (
-                      <SelectItem key={`cc-${c.id}`} value={`cc-${c.id}`}>{c.name} (Cartão)</SelectItem>
-                    ))}
+                    {(transaction.type === "credit_card_expense" || transaction.type === "expense") &&
+                      formData.creditCards.map((c: { id: string | number; name: string }) => (
+                        <SelectItem key={`cc-${c.id}`} value={`cc-${c.id}`}>
+                          {c.name} (Cartão)
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
             )}
 
-            {selectedAccountId && selectedAccountId.startsWith('cc-') && invoiceOptions.length > 0 && (
+            {selectedAccountId && selectedAccountId.startsWith("cc-") && invoiceOptions.length > 0 && (
               <div className="grid gap-2">
                 <Label htmlFor="invoiceMonth">Fatura</Label>
                 <div className="flex flex-wrap gap-4 p-4 rounded-xl bg-muted/20 border border-border/50 max-h-48 overflow-y-auto">
@@ -315,14 +370,25 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
               </div>
             )}
 
+            <div className="grid gap-2">
+              <Label htmlFor="amount">Valor</Label>
+              <CurrencyInput id="amount" name="amount" value={amount} onValueChange={setAmount} required />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="amount">Valor</Label>
-                <CurrencyInput id="amount" name="amount" value={amount} onValueChange={setAmount} required />
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="launchDate">Lançamento</Label>
+                  <span className="text-[11px] text-muted-foreground">Quando ocorreu</span>
+                </div>
+                <DatePicker id="launchDate" name="launchDate" value={launchDate} onChange={setLaunchDate} required />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="date">Data</Label>
-                <DatePicker id="date" name="date" value={date} onChange={setDate} required />
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="dueDate">Vencimento</Label>
+                  <span className="text-[11px] text-muted-foreground">Pagamento</span>
+                </div>
+                <DatePicker id="dueDate" name="dueDate" value={dueDate} onChange={setDueDate} required />
               </div>
             </div>
 
@@ -345,10 +411,13 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="categoryId">Categoria</Label>
-                <Select value={selectedCategoryId} onValueChange={(val) => {
-                  setSelectedCategoryId(val);
-                  setSelectedSubcategoryId("");
-                }}>
+                <Select
+                  value={selectedCategoryId}
+                  onValueChange={(val) => {
+                    setSelectedCategoryId(val);
+                    setSelectedSubcategoryId("");
+                  }}
+                >
                   <SelectTrigger className="w-full h-10 bg-background text-sm flex items-center justify-between">
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
@@ -373,7 +442,9 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
                   required={transaction.type !== "transfer"}
                 >
                   <SelectTrigger className="w-full h-10 bg-background text-sm flex items-center justify-between">
-                    <SelectValue placeholder={activeSubcategories.length === 0 ? "Selecione a categoria" : "Selecione..."} />
+                    <SelectValue
+                      placeholder={activeSubcategories.length === 0 ? "Selecione a categoria" : "Selecione..."}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {activeSubcategories.map((sc: Subcategory) => (
@@ -386,16 +457,13 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
               </div>
             </div>
 
-            {formError && (
-              <p className="text-sm text-destructive text-center">{formError}</p>
-            )}
+            {formError && <p className="text-sm text-destructive text-center">{formError}</p>}
 
             <div className="pt-4 flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
               <Button type="submit" isLoading={isPending} disabled={isPending}>
-
                 {isPending ? "Salvando..." : "Salvar Alterações"}
               </Button>
             </div>

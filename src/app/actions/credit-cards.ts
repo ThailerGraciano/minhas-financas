@@ -101,7 +101,7 @@ export async function getInvoiceSummary(creditCardId: string | number, competenc
       category: true,
       subcategory: true,
     },
-    orderBy: (t, { desc }) => [desc(t.date)],
+    orderBy: (t, { desc }) => [desc(t.launchDate), desc(t.dueDate)],
   });
 
   let total_amount = 0;
@@ -233,7 +233,8 @@ export async function payFullInvoice(
         subcategoryId: subcategoryId,
         amount: pendingAmount.toString(),
         description: `Pagamento de Fatura - ${competencyMonth}`,
-        date: format(new Date(), "yyyy-MM-dd"),
+        dueDate: format(new Date(), "yyyy-MM-dd"),
+        launchDate: format(new Date(), "yyyy-MM-dd"),
         competencyMonth: competencyMonth,
         status: "paid",
       });
@@ -360,7 +361,8 @@ export async function prepayInvoice(
         subcategoryId: subcategoryId,
         amount: amount.toString(),
         description: `Adiantamento de Fatura - ${competencyMonth}`,
-        date: date,
+        dueDate: date,
+        launchDate: date,
         competencyMonth: competencyMonth,
         status: "paid",
       });
@@ -374,7 +376,8 @@ export async function prepayInvoice(
         subcategoryId: subcategoryId,
         amount: (-amount).toString(), // Negative amount
         description: `Adiantamento de Fatura`,
-        date: date,
+        dueDate: date,
+        launchDate: date,
         competencyMonth: competencyMonth,
         invoiceMonth: competencyMonth,
         status: "pending", // Keeps it pending so it reduces the pending sum, and gets marked as paid later
@@ -563,7 +566,8 @@ export async function adjustInvoice(
           subcategoryId: subcategoryId,
           amount: diff.toFixed(2),
           description: `Ajuste de Fatura - ${competencyMonth}`,
-          date: format(new Date(), "yyyy-MM-dd"),
+          dueDate: format(new Date(), "yyyy-MM-dd"),
+          launchDate: format(new Date(), "yyyy-MM-dd"),
           competencyMonth: competencyMonth,
           invoiceMonth: competencyMonth,
           status: "pending",
@@ -615,7 +619,8 @@ export async function adjustInvoice(
           subcategoryId: subcategoryId,
           amount: diff.toFixed(2), // negative value
           description: `Adiantamento de Fatura - ${competencyMonth}`,
-          date: format(new Date(), "yyyy-MM-dd"),
+          dueDate: format(new Date(), "yyyy-MM-dd"),
+          launchDate: format(new Date(), "yyyy-MM-dd"),
           competencyMonth: competencyMonth,
           invoiceMonth: competencyMonth,
           status: "pending",
@@ -646,7 +651,7 @@ export async function getCreditCardsCategorySummary(competencyMonth: string) {
   const closingDay = appSettings?.closingDay || 25;
 
   const userCards = await db
-    
+
     .select({ id: creditCards.id, dueDay: creditCards.dueDay, closingDay: creditCards.closingDay })
     .from(creditCards)
     .where(eq(creditCards.userId, userId));

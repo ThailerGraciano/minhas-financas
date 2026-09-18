@@ -6,7 +6,9 @@ import { Download } from "lucide-react";
 
 interface ExportCSVButtonProps {
   transactions: {
-    date: string;
+    dueDate?: string;
+    launchDate?: string;
+    date?: string;
     description: string | null;
     amount: string | number;
     type: string;

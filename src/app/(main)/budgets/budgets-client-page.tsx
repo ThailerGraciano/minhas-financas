@@ -34,30 +34,27 @@ export function BudgetsClientPage({ initialData, closingDay }: BudgetsClientPage
       initialData={initialData}
       fetchAction={getBudgetData}
       headerContent={() => (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex flex-col space-y-1">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">Orçamento Base Zero</h1>
-              <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
-                Zero-Based Budgeting
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              Distribua e dê um destino para cada centavo das suas receitas antes do mês começar.
-            </p>
+        <div className="flex flex-col space-y-1">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">Orçamento Base Zero</h1>
+            <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
+              Zero-Based Budgeting
+            </span>
           </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              type="button"
-              onClick={handleOpenNew}
-              className="bg-primary hover:bg-primary/90 text-white font-semibold rounded-xl px-4 py-2 flex items-center gap-2 shadow-sm cursor-pointer transition-all hover:brightness-110 active:scale-95"
-            >
-              <Plus className="w-4 h-4" />
-              <span>+ Novo Orçamento</span>
-            </Button>
-          </div>
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Distribua e dê um destino para cada centavo das suas receitas antes do mês começar.
+          </p>
         </div>
+      )}
+      headerActions={() => (
+        <Button
+          type="button"
+          onClick={handleOpenNew}
+          className="bg-primary hover:bg-primary/90 text-white font-semibold rounded-xl px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-sm cursor-pointer transition-all hover:brightness-110 active:scale-95 shrink-0"
+        >
+          <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <span>Novo Orçamento</span>
+        </Button>
       )}
     >
       {(budget, selectedMonth) => (

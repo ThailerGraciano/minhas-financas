@@ -7,16 +7,18 @@ import { AccountVsGlobalExpenseChart } from "@/components/account-vs-global-expe
 import { AccountsCarousel } from "@/components/accounts-carousel";
 import { BalanceEvolutionChart, COLOR_FUTURE, COLOR_PAST } from "@/components/balance-evolution-chart";
 import { CategoryForecastChart } from "@/components/category-forecast-chart";
+import { ExpenseTreemap } from "@/components/charts/ExpenseTreemap";
 import { ClientDataLoader } from "@/components/client-data-loader";
 import { CreditCardInvoicesList } from "@/components/credit-card-invoices-list";
-import { ExpensesBentoGrid } from "@/components/expenses-bento-grid";
 import { ExpensesForecastChart } from "@/components/expenses-forecast-chart";
 import { GlobalIncomeExpenseChart } from "@/components/global-income-expense-chart";
 import { InstallmentsStackedChart } from "@/components/installments-stacked-chart";
 import { MonthlyBalanceGrid } from "@/components/monthly-balance-grid";
 import { PurchasingPowerChart } from "@/components/purchasing-power-chart";
+import { cn } from "@/lib/utils";
 import { CreditCard as CreditCardIcon, Grid3X3, Layers, TrendingUp } from "lucide-react";
 import Link from "next/link";
+import { useCallback, useState } from "react";
 
 type DashboardFullData = Awaited<ReturnType<typeof getDashboardFullData>>;
 
@@ -27,12 +29,44 @@ export function DashboardClientPage({
   closingDay: number;
   initialData: DashboardFullData;
 }) {
+  const [dateMode, setDateMode] = useState<"due_date" | "launch_date">("due_date");
+
+  const fetchAction = useCallback((month: string) => getDashboardFullData(month, dateMode), [dateMode]);
+
   return (
     <ClientDataLoader
       closingDay={closingDay}
       initialData={initialData}
-      fetchAction={getDashboardFullData}
+      fetchAction={fetchAction}
       headerContent={<h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>}
+      headerActions={
+        <div className="flex items-center rounded-full bg-secondary p-1 text-xs border border-white/5">
+          <button
+            type="button"
+            onClick={() => setDateMode("due_date")}
+            className={cn(
+              "px-3 py-1 rounded-full font-medium transition-all text-xs",
+              dateMode === "due_date"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Vencimento (Caixa)
+          </button>
+          <button
+            type="button"
+            onClick={() => setDateMode("launch_date")}
+            className={cn(
+              "px-3 py-1 rounded-full font-medium transition-all text-xs",
+              dateMode === "launch_date"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Lançamento (Consumo)
+          </button>
+        </div>
+      }
     >
       {(dashboard, selectedMonth) => (
         <div className="space-y-6 mt-6">
@@ -95,18 +129,18 @@ export function DashboardClientPage({
             </div>
           </div>
 
-          {/* Mapeamento de Despesas (Bento Grid) */}
+          {/* Mapeamento de Despesas (Treemap Proporcional) */}
           <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
             <div className="flex flex-row items-center gap-2 mb-4">
               <Grid3X3 className="h-5 w-5 text-primary" />
               <div>
                 <h2 className="text-xl font-bold">Mapeamento de Despesas</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Visualize onde o seu dinheiro está sendo gasto neste mês
+                  Distribuição proporcional de gastos por categoria neste mês
                 </p>
               </div>
             </div>
-            <ExpensesBentoGrid data={dashboard.treemapData} />
+            <ExpenseTreemap data={dashboard.treemapData} />
           </div>
 
           {/* Faturas Abertas */}

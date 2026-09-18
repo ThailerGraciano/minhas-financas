@@ -2,29 +2,46 @@ import { format, parseISO } from "date-fns";
 
 export function exportTransactionsToCSV(
   transactions: {
-    date: string;
+    dueDate?: string;
+    launchDate?: string;
+    date?: string;
     description: string | null;
     amount: string | number;
     type: string;
     status: string;
     category?: { name: string } | null;
     subcategory?: { name: string } | null;
-  }[], 
-  invoiceMonth: string, 
-  cardName: string
+  }[],
+  invoiceMonth: string,
+  cardName: string,
 ) {
   // Cabeçalho do CSV
-  const header = ['"Data"', '"Descrição"', '"Categoria"', '"Subcategoria"', '"Valor"', '"Status"'].join(",");
+  const header = [
+    '"Vencimento"',
+    '"Lançamento"',
+    '"Descrição"',
+    '"Categoria"',
+    '"Subcategoria"',
+    '"Valor"',
+    '"Status"',
+  ].join(",");
 
   // Linhas do CSV
   const rows = transactions.map((t) => {
-    // Formatar Data (DD/MM/YYYY)
-    let formattedDate = "";
+    // Formatar Datas (DD/MM/YYYY)
+    const rawDue = (t as { dueDate?: string; date?: string }).dueDate || (t as { date?: string }).date || "";
+    const rawLaunch = (t as { launchDate?: string }).launchDate || rawDue;
+    let formattedDueDate = "";
+    let formattedLaunchDate = "";
     try {
-      formattedDate = format(parseISO(t.date), "dd/MM/yyyy");
-    } catch (_e) {
-      // Fallback em caso de erro no parseISO
-      formattedDate = t.date ? new Date(t.date).toLocaleDateString("pt-BR") : "";
+      formattedDueDate = rawDue ? format(parseISO(rawDue), "dd/MM/yyyy") : "";
+    } catch {
+      formattedDueDate = rawDue;
+    }
+    try {
+      formattedLaunchDate = rawLaunch ? format(parseISO(rawLaunch), "dd/MM/yyyy") : "";
+    } catch {
+      formattedLaunchDate = rawLaunch;
     }
 
     // Escapar aspas na descrição e colocar entre aspas
@@ -38,7 +55,7 @@ export function exportTransactionsToCSV(
     const amount = Number(t.amount || 0);
     const isExpense = t.type === "expense" || t.type === "credit_card_expense";
     const value = isExpense ? -Math.abs(amount) : Math.abs(amount);
-    
+
     // Formato brasileiro: 1.234,56
     const formattedValue = `"${value.toLocaleString("pt-BR", {
       minimumFractionDigits: 2,
@@ -51,7 +68,9 @@ export function exportTransactionsToCSV(
     if (t.status === "pending") statusText = "Pendente";
     const status = `"${statusText}"`;
 
-    return [formattedDate, description, category, subcategory, formattedValue, status].join(",");
+    return [formattedDueDate, formattedLaunchDate, description, category, subcategory, formattedValue, status].join(
+      ",",
+    );
   });
 
   // Unir cabeçalho e linhas
@@ -66,11 +85,11 @@ export function exportTransactionsToCSV(
   // Criar link temporário e disparar download
   const link = document.createElement("a");
   const url = URL.createObjectURL(blob);
-  
+
   link.setAttribute("href", url);
-  link.setAttribute("download", `fatura-${cardName.toLowerCase().replace(/\s+/g, '-')}-${invoiceMonth}.csv`);
+  link.setAttribute("download", `fatura-${cardName.toLowerCase().replace(/\s+/g, "-")}-${invoiceMonth}.csv`);
   link.style.visibility = "hidden";
-  
+
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

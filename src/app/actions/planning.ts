@@ -89,19 +89,19 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
   // 2. Busca Ampla: Buscar TODAS as transações normais na janela da competência (EXCLUINDO CARTÃO)
   const broadConditions: (SQL | undefined)[] = [
     eq(transactions.userId, userId),
-    lte(transactions.date, targetEndDateStr),
+    lte(transactions.dueDate, targetEndDateStr),
     ne(transactions.type, "credit_card_expense"),
   ];
 
   if (isFutureCompetency) {
     broadConditions.push(
-      or(gte(transactions.date, targetStartDateStr), eq(transactions.competencyMonth, competencyMonth)),
+      or(gte(transactions.dueDate, targetStartDateStr), eq(transactions.competencyMonth, competencyMonth)),
     );
   } else {
     // Se for atual, pega a janela inteira E as pendentes atrasadas
     broadConditions.push(
       or(
-        gte(transactions.date, targetStartDateStr),
+        gte(transactions.dueDate, targetStartDateStr),
         eq(transactions.status, "pending"),
         eq(transactions.competencyMonth, competencyMonth),
       ),
@@ -141,14 +141,14 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
       account: true,
       creditCard: true,
     },
-    orderBy: [asc(transactions.date)],
+    orderBy: [asc(transactions.dueDate)],
   });
 
   // 2.1 Deduplicação Correta: Coletar os fixedTransactionIds de TUDO (incluindo 'paid') na competência
   const materializedFixedIds = new Set<string>();
   for (const tx of allTxs) {
     // Consideramos apenas as que estão dentro da janela da competência para deduplicar
-    if (tx.fixedTransactionId && tx.date >= targetStartDateStr && tx.date <= targetEndDateStr) {
+    if (tx.fixedTransactionId && tx.dueDate >= targetStartDateStr && tx.dueDate <= targetEndDateStr) {
       materializedFixedIds.add(tx.fixedTransactionId);
     }
   }
@@ -157,7 +157,7 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
   const ccFixedTxs = await db
     .select({
       fixedTransactionId: transactions.fixedTransactionId,
-      date: transactions.date,
+      dueDate: transactions.dueDate,
       invoiceMonth: transactions.invoiceMonth,
       competencyMonth: transactions.competencyMonth,
       creditCardId: transactions.creditCardId,
@@ -179,7 +179,7 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
   for (const tx of ccFixedTxs) {
     if (tx.fixedTransactionId) {
       if (
-        (tx.date >= targetStartDateStr && tx.date <= targetEndDateStr) ||
+        (tx.dueDate >= targetStartDateStr && tx.dueDate <= targetEndDateStr) ||
         tx.competencyMonth === competencyMonth ||
         (tx.invoiceMonth && targetInvoiceMonths.has(tx.invoiceMonth))
       ) {
@@ -244,7 +244,8 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
         id: -Math.floor(Math.random() * 1000000), // virtual id
         type: ft.type,
         amount: ft.amount,
-        date: virtDateStr,
+        dueDate: virtDateStr,
+        launchDate: virtDateStr,
         description: ft.description + " (Projetada)",
         accountId: ft.accountId,
         creditCardId: ft.creditCardId,
@@ -279,7 +280,7 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
     }
   }
 
-  const mergedTxs = [...allTxs, ...virtualTxs].sort((a, b) => a.date.localeCompare(b.date));
+  const mergedTxs = [...allTxs, ...virtualTxs].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
   // 2.3 Filtro Final em Memória: Manter apenas pending para projeção e atrasadas
   // As 'paid' já cumpriram seu papel na deduplicação
@@ -347,7 +348,7 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
     const realPendingCountByGroup = new Map<string, number>();
     for (const tx of dbPendingCCTxs) {
       if (!tx.creditCardId) continue;
-      const invMonth = tx.invoiceMonth || tx.competencyMonth || tx.date.substring(0, 7);
+      const invMonth = tx.invoiceMonth || tx.competencyMonth || tx.dueDate.substring(0, 7);
       const groupKey = `${tx.creditCardId}-${invMonth}`;
       realPendingCountByGroup.set(groupKey, (realPendingCountByGroup.get(groupKey) || 0) + 1);
     }
@@ -359,7 +360,7 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
     for (const tx of pendingCCTxs) {
       if (!tx.creditCardId) continue;
 
-      const invMonth = tx.invoiceMonth || tx.competencyMonth || tx.date.substring(0, 7);
+      const invMonth = tx.invoiceMonth || tx.competencyMonth || tx.dueDate.substring(0, 7);
       const groupKey = `${tx.creditCardId}-${invMonth}`;
 
       // Se a fatura já foi paga e não há novas transações reais pendentes no banco, ignorar projeção
@@ -384,7 +385,8 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
           id: -(tx.creditCardId + 900000 + Math.floor(Math.random() * 10000)),
           type: "expense", // Invoice will manifest as a checking account expense
           amount: "0",
-          date: paymentDate,
+          dueDate: paymentDate,
+          launchDate: paymentDate,
           description: `Fatura Projetada: ${card?.name || "Cartão"}`,
           invoiceMonth: invMonth,
           isFixed: false,
@@ -416,8 +418,8 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
 
     // Apenas inserir a fatura projetada se sua data de vencimento cair dentro da nossa janela de interesse
     for (const group of ccGroups.values()) {
-      if (group.date <= targetEndDateStr) {
-        if (!isFutureCompetency || group.date >= targetStartDateStr) {
+      if (group.dueDate <= targetEndDateStr) {
+        if (!isFutureCompetency || group.dueDate >= targetStartDateStr) {
           processedTxs.push(group);
         }
       }
@@ -425,8 +427,8 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
   }
 
   // Split into overdue (before start projection date) and projected (start projection date and future)
-  const overdueTransactions = processedTxs.filter((tx) => tx.date < startProjectionDateStr);
-  const futurePendingTxs = processedTxs.filter((tx) => tx.date >= startProjectionDateStr);
+  const overdueTransactions = processedTxs.filter((tx) => tx.dueDate < startProjectionDateStr);
+  const futurePendingTxs = processedTxs.filter((tx) => tx.dueDate >= startProjectionDateStr);
 
   // Apply effect of overdue transactions to initial balance
   for (const tx of overdueTransactions) {
@@ -445,10 +447,10 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
   // 3. Group by date map (only for future/today transactions)
   const grouped = new Map<string, typeof futurePendingTxs>();
   for (const tx of futurePendingTxs) {
-    if (!grouped.has(tx.date)) {
-      grouped.set(tx.date, []);
+    if (!grouped.has(tx.dueDate)) {
+      grouped.set(tx.dueDate, []);
     }
-    grouped.get(tx.date)!.push(tx);
+    grouped.get(tx.dueDate)!.push(tx);
   }
 
   // 4. Generate days up to the end of the competency month
@@ -458,42 +460,53 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
     const targetDate = format(addDays(startProjectionDateParsed, i), "yyyy-MM-dd");
     const dailyTxs = grouped.get(targetDate) || [];
 
-    let total_expenses = 0;
-    let total_incomes = 0;
+    let dailyIncome = 0;
+    let dailyExpense = 0;
 
     for (const tx of dailyTxs) {
       const amount = Number(tx.amount);
       if (tx.type === "income" || (tx.type === "transfer" && tx.parentTransactionId)) {
-        total_incomes += amount;
+        dailyIncome += amount;
       } else if (
         tx.type === "expense" ||
         tx.type === "credit_card_expense" ||
         (tx.type === "transfer" && !tx.parentTransactionId)
       ) {
-        total_expenses += amount;
+        dailyExpense += amount;
       }
     }
 
-    currentBalance = currentBalance + total_incomes - total_expenses;
+    currentBalance += dailyIncome - dailyExpense;
 
     projection.push({
       date: targetDate,
-      total_expenses,
-      total_incomes,
+      income: dailyIncome,
+      expense: dailyExpense,
+      total_incomes: dailyIncome,
+      total_expenses: dailyExpense,
       projected_balance: currentBalance,
+      transactions: dailyTxs,
       transactions_of_the_day: dailyTxs,
     });
   }
 
-  // 5. Generate complete daily chart data (Past + Future)
+  // 5. Chart Data: Historical paid balance + Future projected balance
   const chartData: {
     date: string;
     balancePast: number | null;
     balanceProjected: number | null;
   }[] = [];
 
-  const accountIds = allAccounts.map((a) => a.id);
-  const realCurrentBalance = allAccounts.reduce((acc, curr) => acc + Number(curr.currentBalance), 0);
+  const accountIds =
+    !accountId || accountId === "all"
+      ? allAccounts.map((a) => a.id)
+      : accountId === "checking_accounts"
+        ? allAccounts.filter((a) => a.type === "checking").map((a) => a.id)
+        : [Number(accountId)];
+
+  const realCurrentBalance = allAccounts
+    .filter((a) => accountIds.includes(a.id))
+    .reduce((acc, curr) => acc + Number(curr.currentBalance), 0);
 
   if (accountIds.length > 0) {
     const hasPastDays = targetStartDateStr <= todayDate;
@@ -508,8 +521,8 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
           where: and(
             eq(transactions.userId, userId),
             eq(transactions.status, "paid"),
-            gt(transactions.date, targetEndDateStr),
-            lte(transactions.date, todayDate),
+            gt(transactions.dueDate, targetEndDateStr),
+            lte(transactions.dueDate, todayDate),
             inArray(transactions.accountId, accountIds),
             ne(transactions.type, "credit_card_expense"),
           ),
@@ -528,12 +541,12 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
         where: and(
           eq(transactions.userId, userId),
           eq(transactions.status, "paid"),
-          gte(transactions.date, targetStartDateStr),
-          lte(transactions.date, lastPastDateStr),
+          gte(transactions.dueDate, targetStartDateStr),
+          lte(transactions.dueDate, lastPastDateStr),
           inArray(transactions.accountId, accountIds),
           ne(transactions.type, "credit_card_expense"),
         ),
-        orderBy: [asc(transactions.date)],
+        orderBy: [asc(transactions.dueDate)],
       });
 
       const dailyPaidDelta = new Map<string, number>();
@@ -545,7 +558,7 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
         } else if (tx.type === "expense" || (tx.type === "transfer" && !tx.parentTransactionId)) {
           delta = -amt;
         }
-        dailyPaidDelta.set(tx.date, (dailyPaidDelta.get(tx.date) || 0) + delta);
+        dailyPaidDelta.set(tx.dueDate, (dailyPaidDelta.get(tx.dueDate) || 0) + delta);
       }
 
       let totalWindowDelta = 0;

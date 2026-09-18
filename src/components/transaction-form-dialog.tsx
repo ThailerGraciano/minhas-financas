@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SelectableCard } from "@/components/ui/selectable-card";
 import { Switch } from "@/components/ui/switch";
 import { transactions } from "@/db/schema";
+import { calculateCreditCardDueDate } from "@/lib/utils/competency";
 import { addMonths, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -64,7 +65,9 @@ export function TransactionFormDialog({
   const [step, setStep] = useState(1);
 
   const [amount, setAmount] = useState<number | undefined>(undefined);
-  const [transactionDate, setTransactionDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
+  const [launchDate, setLaunchDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
+  const [dueDate, setDueDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
+  const [isDueDateManuallyEdited, setIsDueDateManuallyEdited] = useState(false);
   const [description, setDescription] = useState("");
 
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
@@ -88,7 +91,6 @@ export function TransactionFormDialog({
   const [isPaid, setIsPaid] = useState(false);
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
-  const isPastOrToday = transactionDate <= todayStr;
 
   const router = useRouter();
 
@@ -102,7 +104,9 @@ export function TransactionFormDialog({
     setStep(1);
     setTab(initialTab);
     setAmount(undefined);
-    setTransactionDate(format(new Date(), "yyyy-MM-dd"));
+    setLaunchDate(format(new Date(), "yyyy-MM-dd"));
+    setDueDate(format(new Date(), "yyyy-MM-dd"));
+    setIsDueDateManuallyEdited(false);
     setDescription("");
     setSelectedCategoryId("");
     setSelectedSubcategoryId("");
@@ -130,12 +134,28 @@ export function TransactionFormDialog({
     return format(baseDate, "yyyy-MM");
   };
 
+  const calculatedCardDueDate = useMemo(() => {
+    if (paymentMethod !== "credit_card" || !selectedCreditCardId || !formData?.creditCards) return null;
+    const card = formData.creditCards.find((c: CreditCard) => c.id === Number(selectedCreditCardId));
+    if (!card) return null;
+    if (selectedInvoiceMonth && /^\d{4}-\d{2}$/.test(selectedInvoiceMonth)) {
+      const [year, month] = selectedInvoiceMonth.split("-").map(Number);
+      const invoiceDate = new Date(year, month - 1, card.dueDay);
+      return format(invoiceDate, "yyyy-MM-dd");
+    }
+    const calculated = calculateCreditCardDueDate(parseISO(launchDate), card.closingDay, card.dueDay);
+    return format(calculated, "yyyy-MM-dd");
+  }, [paymentMethod, selectedCreditCardId, formData, selectedInvoiceMonth, launchDate]);
+
+  const effectiveDueDate = paymentMethod === "credit_card" && calculatedCardDueDate ? calculatedCardDueDate : dueDate;
+  const isPastOrToday = effectiveDueDate <= todayStr;
+
   const invoiceOptions = useMemo(() => {
     if (!selectedCreditCardId || !formData?.creditCards) return [];
     const card = formData.creditCards.find((c: CreditCard) => c.id === Number(selectedCreditCardId));
     if (!card) return [];
 
-    const defaultMonth = getDefaultInvoiceMonth(card.closingDay, transactionDate);
+    const defaultMonth = getDefaultInvoiceMonth(card.closingDay, launchDate);
     const [year, month] = defaultMonth.split("-").map(Number);
     const baseDate = new Date(year, month - 1, 1);
 
@@ -148,7 +168,7 @@ export function TransactionFormDialog({
       options.push({ value, label: capitalizedLabel });
     }
     return options;
-  }, [selectedCreditCardId, formData?.creditCards, transactionDate]);
+  }, [selectedCreditCardId, formData, launchDate]);
 
   const handleCreditCardChange = (value: string) => {
     setSelectedCreditCardId(value);
@@ -159,10 +179,10 @@ export function TransactionFormDialog({
       const card = formData.creditCards.find((c: CreditCard) => c.id === Number(selectedCreditCardId));
       if (card) {
         // eslint-disable-next-line
-        setSelectedInvoiceMonth(getDefaultInvoiceMonth(card.closingDay, transactionDate));
+        setSelectedInvoiceMonth(getDefaultInvoiceMonth(card.closingDay, launchDate));
       }
     }
-  }, [selectedCreditCardId, transactionDate, formData?.creditCards]);
+  }, [selectedCreditCardId, launchDate, formData]);
 
   const filteredCategories = useMemo(() => {
     if (!formData?.categories) return [];
@@ -236,7 +256,8 @@ export function TransactionFormDialog({
   const handleNextStep = () => {
     if (tab === "expense") {
       if (step === 1 && !description.trim()) return toast.error("Preencha a descrição");
-      if (step === 2 && (!amount || !transactionDate)) return toast.error("Preencha o valor e a data");
+      if (step === 2 && (!amount || !launchDate || !effectiveDueDate))
+        return toast.error("Preencha o valor e as datas");
       if (step === 3 && !selectedCategoryId) return toast.error("Selecione uma categoria");
       if (step === 4) {
         if (expenseType === "installment" && (!currentInstallment || !installmentTotal))
@@ -261,7 +282,8 @@ export function TransactionFormDialog({
       }
     } else if (tab === "income") {
       if (step === 1 && !description.trim()) return toast.error("Preencha a descrição");
-      if (step === 2 && (!amount || !transactionDate)) return toast.error("Preencha o valor e a data");
+      if (step === 2 && (!amount || !launchDate || !effectiveDueDate))
+        return toast.error("Preencha o valor e as datas");
       if (step === 3 && !selectedCategoryId) return toast.error("Selecione uma categoria");
       if (step === 4) {
         if (expenseType === "installment" && (!currentInstallment || !installmentTotal))
@@ -270,7 +292,8 @@ export function TransactionFormDialog({
       }
     } else if (tab === "transfer") {
       if (step === 1 && !description.trim()) return toast.error("Preencha a descrição");
-      if (step === 2 && (!amount || !transactionDate)) return toast.error("Preencha o valor e a data");
+      if (step === 2 && (!amount || !launchDate || !effectiveDueDate))
+        return toast.error("Preencha o valor e as datas");
       if (step === 3) {
         if (!accountIdTransferOrigin || !accountIdTransferDest) return toast.error("Selecione as contas");
         if (accountIdTransferOrigin === accountIdTransferDest)
@@ -291,12 +314,13 @@ export function TransactionFormDialog({
     setIsPending(true);
     setFormError("");
 
-    const competencyMonth = transactionDate.substring(0, 7);
+    const competencyMonth = effectiveDueDate.substring(0, 7);
 
     const baseData: Partial<NewTransaction> & Record<string, unknown> = {
       description,
       amount: amount?.toString(),
-      date: transactionDate,
+      dueDate: effectiveDueDate,
+      launchDate: launchDate,
       competencyMonth,
       categoryId: selectedCategoryId ? Number(selectedCategoryId) : undefined,
       subcategoryId: selectedSubcategoryId ? Number(selectedSubcategoryId) : undefined,
@@ -384,8 +408,15 @@ export function TransactionFormDialog({
             </span>
           </div>
           <div className="flex justify-between items-center bg-background p-2 rounded-md">
-            <span className="text-muted-foreground">Data:</span>
-            <span className="font-medium">{format(new Date(transactionDate), "dd/MM/yyyy")}</span>
+            <span className="text-muted-foreground">Lançamento:</span>
+            <span className="font-medium">{launchDate ? format(parseISO(launchDate), "dd/MM/yyyy") : "-"}</span>
+          </div>
+          <div className="flex justify-between items-center bg-background p-2 rounded-md">
+            <span className="text-muted-foreground">Vencimento:</span>
+            <span className="font-medium">
+              {effectiveDueDate ? format(parseISO(effectiveDueDate), "dd/MM/yyyy") : "-"}
+              {paymentMethod === "credit_card" && <span className="text-xs text-muted-foreground ml-1">(Fatura)</span>}
+            </span>
           </div>
           <div className="flex justify-between items-center bg-background p-2 rounded-md">
             <span className="text-muted-foreground">Descrição:</span>
@@ -460,7 +491,7 @@ export function TransactionFormDialog({
 
   const stepNames: Record<number, string> = {
     1: "Identificação",
-    2: "Valor e Data",
+    2: "Valor e Datas",
     3: "Categoria",
     4: "Configuração",
     5: "Situação",
@@ -566,7 +597,7 @@ export function TransactionFormDialog({
 
               {step === 2 && (
                 <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                  <h2 className="text-xl font-medium text-center mb-6">Qual o valor e a data?</h2>
+                  <h2 className="text-xl font-medium text-center mb-6">Qual o valor e as datas?</h2>
                   <div className="grid gap-3">
                     <Label className="text-muted-foreground ml-1">Valor</Label>
                     <CurrencyInput
@@ -580,17 +611,39 @@ export function TransactionFormDialog({
                       autoFocus
                     />
                   </div>
-                  <div className="grid gap-3">
-                    <Label className="text-muted-foreground ml-1">Data</Label>
-                    <DatePicker
-                      id="date"
-                      name="date"
-                      value={transactionDate}
-                      onChange={setTransactionDate}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleNextStep();
-                      }}
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-muted-foreground ml-1">Data de Lançamento</Label>
+                        <span className="text-[11px] text-muted-foreground">Quando ocorreu</span>
+                      </div>
+                      <DatePicker
+                        id="launchDate"
+                        name="launchDate"
+                        value={launchDate}
+                        onChange={(val) => {
+                          setLaunchDate(val);
+                          if (!isDueDateManuallyEdited) {
+                            setDueDate(val);
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-muted-foreground ml-1">Data de Vencimento</Label>
+                        <span className="text-[11px] text-muted-foreground">Pagamento</span>
+                      </div>
+                      <DatePicker
+                        id="dueDate"
+                        name="dueDate"
+                        value={dueDate}
+                        onChange={(val) => {
+                          setDueDate(val);
+                          setIsDueDateManuallyEdited(true);
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
               )}

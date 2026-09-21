@@ -211,9 +211,9 @@ export function ExpenseTreemap({ data }: ExpenseTreemapProps) {
             const percent = totalValue > 0 && node.value ? Math.round((node.value / totalValue) * 100) : 0;
             const percentText = percent > 0 ? `${percent}%` : null;
 
-            const isBig = nodeWidth >= 110 && nodeHeight >= 75;
-            const isMedium = nodeWidth >= 70 && nodeHeight >= 45;
-            const isSmall = nodeWidth >= 40 && nodeHeight >= 28;
+            const isBig = nodeWidth >= 100 && nodeHeight >= 60;
+            const isMedium = nodeWidth >= 60 && nodeHeight >= 36;
+            const isSmall = nodeWidth >= 34 && nodeHeight >= 22;
 
             return (
               <div
@@ -221,7 +221,8 @@ export function ExpenseTreemap({ data }: ExpenseTreemapProps) {
                 onClick={() => handleNodeClick(node)}
                 title={`${node.data.name}: ${formatCurrency(node.value || 0)}${percentText ? ` (${percentText})` : ""}${hasChildren ? " — Clique para detalhar" : ""}`}
                 className={cn(
-                  "absolute rounded-xl p-2 sm:p-2.5 transition-all duration-200 border overflow-hidden flex flex-col justify-between select-none shadow-sm",
+                  "absolute rounded-xl transition-all duration-200 border overflow-hidden flex flex-col justify-between select-none shadow-sm",
+                  isBig ? "p-2 sm:p-2.5" : isMedium ? "p-1.5 sm:p-2" : "p-1",
                   hasChildren ? "cursor-pointer hover:scale-[1.01] hover:z-10 hover:shadow-md" : "cursor-default",
                   style.bg,
                   style.border,
@@ -236,62 +237,109 @@ export function ExpenseTreemap({ data }: ExpenseTreemapProps) {
                 {/* Large tile content */}
                 {isBig ? (
                   <>
-                    <div className="flex items-center justify-between gap-1 w-full">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <CategoryIcon name={node.data.name} className="w-4 h-4 shrink-0 opacity-80" />
-                        <span className={cn("font-bold text-xs sm:text-sm truncate", style.text)}>
-                          {node.data.name}
-                        </span>
-                      </div>
-                      {percentText && (
+                    <div className="flex items-start gap-1.5 w-full min-w-0">
+                      {nodeWidth >= 115 && (
+                        <CategoryIcon name={node.data.name} className="w-4 h-4 shrink-0 mt-0.5 opacity-80" />
+                      )}
+                      <div className="flex flex-col min-w-0 flex-1">
                         <span
                           className={cn(
-                            "font-bold text-[10px] sm:text-xs px-1.5 py-0.5 rounded-md border shrink-0",
-                            style.badge,
+                            "font-bold text-xs sm:text-sm leading-snug break-words",
+                            nodeHeight >= 70 ? "line-clamp-2" : "truncate",
+                            style.text,
                           )}
                         >
-                          {percentText}
+                          {node.data.name}
                         </span>
-                      )}
+                        {nodeHeight >= 110 && hasChildren && node.data.children && node.data.children.length > 0 && (
+                          <span className="text-[10px] text-muted-foreground/70 font-medium mt-0.5 truncate">
+                            {node.data.children.length}{" "}
+                            {node.data.children.length === 1 ? "subcategoria" : "subcategorias"}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="flex items-baseline justify-between gap-1 mt-auto pt-1">
-                      <span className="font-black text-sm sm:text-base tracking-tight text-foreground truncate">
+                    <div className="flex items-end justify-between gap-1.5 mt-auto pt-1 w-full">
+                      <span className="font-black text-xs sm:text-sm md:text-base tracking-tight text-foreground truncate min-w-0">
                         {formatCurrency(node.value || 0)}
                       </span>
-                      {hasChildren && <ZoomIn className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />}
+                      <div className="flex items-center gap-1 shrink-0 ml-auto">
+                        {hasChildren && <ZoomIn className="w-3.5 h-3.5 text-muted-foreground/70 shrink-0" />}
+                        {percentText && (
+                          <span
+                            className={cn(
+                              "font-bold text-[10px] sm:text-xs px-1.5 py-0.5 rounded-md border shrink-0",
+                              style.badge,
+                            )}
+                          >
+                            {percentText}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </>
                 ) : isMedium ? (
                   /* Medium tile content */
                   <div className="flex flex-col justify-between h-full w-full">
-                    <div className="flex items-center justify-between gap-1">
-                      <span className={cn("font-semibold text-xs truncate", style.text)}>{node.data.name}</span>
-                      {percentText && (
-                        <span className={cn("font-bold text-[10px] px-1 rounded shrink-0", style.badge)}>
-                          {percentText}
-                        </span>
-                      )}
+                    <div className="w-full min-w-0">
+                      <span
+                        className={cn(
+                          "font-bold text-[11px] sm:text-xs leading-tight break-words block",
+                          nodeHeight >= 50 ? "line-clamp-2" : "truncate",
+                          style.text,
+                        )}
+                      >
+                        {node.data.name}
+                      </span>
                     </div>
-                    <div className="font-bold text-xs text-foreground truncate mt-auto">
-                      {formatCurrency(node.value || 0)}
+                    <div className="flex items-end justify-between gap-1 mt-auto w-full pt-0.5">
+                      <span className="font-bold text-[10px] sm:text-[11px] text-foreground tracking-tight truncate min-w-0">
+                        {formatCurrency(node.value || 0)}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0 ml-auto">
+                        {hasChildren && <ZoomIn className="w-3 h-3 text-muted-foreground/60 shrink-0" />}
+                        {percentText && (
+                          <span
+                            className={cn(
+                              "font-bold text-[9px] sm:text-[10px] px-1 py-0.5 rounded border shrink-0 leading-none",
+                              style.badge,
+                            )}
+                          >
+                            {percentText}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ) : isSmall ? (
                   /* Small tile content */
-                  <div className="flex flex-col items-center justify-center h-full w-full text-center leading-tight">
-                    <span className={cn("font-medium text-[10px] truncate w-full px-0.5", style.text)}>
+                  <div className="flex flex-col justify-between h-full w-full">
+                    <span
+                      className={cn("font-medium text-[9px] sm:text-[10px] leading-tight truncate w-full", style.text)}
+                    >
                       {node.data.name}
                     </span>
-                    {percentText && (
-                      <span className="text-[9px] font-semibold text-muted-foreground">{percentText}</span>
-                    )}
+                    <div className="flex items-end justify-between gap-0.5 mt-auto w-full">
+                      {nodeWidth >= 55 && nodeHeight >= 36 ? (
+                        <span className="text-[8px] sm:text-[9px] font-bold text-foreground truncate min-w-0">
+                          {formatCurrency(node.value || 0)}
+                        </span>
+                      ) : null}
+                      {percentText && (
+                        <span className="text-[8px] sm:text-[9px] font-bold text-muted-foreground ml-auto shrink-0 leading-none">
+                          {percentText}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   /* Micro tile */
-                  <div className="flex items-center justify-center h-full w-full">
+                  <div className="flex items-end justify-end h-full w-full p-0.5">
                     {percentText && (
-                      <span className="text-[8px] font-bold text-muted-foreground/80">{percentText}</span>
+                      <span className="text-[7px] sm:text-[8px] font-bold text-muted-foreground/80 leading-none">
+                        {percentText}
+                      </span>
                     )}
                   </div>
                 )}

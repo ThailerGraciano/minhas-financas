@@ -11,6 +11,7 @@ import { useMeasure } from "react-use";
 
 interface ExpenseTreemapProps {
   data: TreemapDataSets;
+  showBalance?: boolean;
 }
 
 interface PaletteItem {
@@ -84,7 +85,7 @@ const isTreemapDatasetKey = (key: string): key is keyof TreemapDataSets => {
   return key === "all" || key === "variable" || key === "installment" || key === "fixed";
 };
 
-export function ExpenseTreemap({ data }: ExpenseTreemapProps) {
+export function ExpenseTreemap({ data, showBalance = true }: ExpenseTreemapProps) {
   const [ref, { width, height }] = useMeasure<HTMLDivElement>();
 
   const [filterType, setFilterType] = useState<keyof TreemapDataSets>("all");
@@ -130,8 +131,10 @@ export function ExpenseTreemap({ data }: ExpenseTreemapProps) {
     setCurrentRoot(newPath[index].data);
   };
 
-  const formatCurrency = (val: number) =>
-    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
+  const formatCurrency = (val: number) => {
+    if (!showBalance) return "••••••";
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
+  };
 
   const totalValue = root?.value || 0;
 

@@ -5,15 +5,32 @@ import { ArrowDownLeft, ArrowLeftRight, Barcode, Eye, EyeOff, MoreHorizontal } f
 import Link from "next/link";
 import { useState } from "react";
 
-export function AccountBalancesSummary({ totalBalance }: { totalBalance: number }) {
-  const [showBalance, setShowBalance] = useState(true);
+export function AccountBalancesSummary({
+  totalBalance,
+  showBalance: controlledShowBalance,
+  onToggleShowBalance,
+}: {
+  totalBalance: number;
+  showBalance?: boolean;
+  onToggleShowBalance?: () => void;
+}) {
+  const [internalShowBalance, setInternalShowBalance] = useState(true);
+  const showBalance = controlledShowBalance !== undefined ? controlledShowBalance : internalShowBalance;
+
+  const handleToggle = () => {
+    if (onToggleShowBalance) {
+      onToggleShowBalance();
+    } else {
+      setInternalShowBalance(!internalShowBalance);
+    }
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
   };
 
   return (
-    <div className="bg-card rounded-[2rem] border-transparent shadow-sm flex flex-col p-5 sm:p-6 relative overflow-hidden">
+    <div className="bg-card rounded-[2rem] border border-white/5 shadow-sm flex flex-col p-5 sm:p-6 relative overflow-hidden">
       {/* Background Glow */}
       <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -24,7 +41,7 @@ export function AccountBalancesSummary({ totalBalance }: { totalBalance: number 
             <span>Saldo Total Geral</span>
             <button
               type="button"
-              onClick={() => setShowBalance(!showBalance)}
+              onClick={handleToggle}
               className="p-1 rounded-full hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               title={showBalance ? "Ocultar saldo" : "Mostrar saldo"}
               aria-label={showBalance ? "Ocultar saldo" : "Mostrar saldo"}
@@ -33,7 +50,7 @@ export function AccountBalancesSummary({ totalBalance }: { totalBalance: number 
             </button>
           </div>
           <div className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 text-xs font-bold tracking-wide border border-emerald-500/20">
-            +12.4% este mês
+            Contas Ativas
           </div>
         </div>
 

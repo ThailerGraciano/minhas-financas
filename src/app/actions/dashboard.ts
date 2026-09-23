@@ -10,6 +10,40 @@ import { and, eq, gt, gte, inArray, isNotNull, lte, ne } from "drizzle-orm";
 
 import { getTransactions } from "./transactions";
 
+export type ExpenseBreakdown = {
+  fixed: number;
+  variable: number;
+  installment: number;
+};
+
+export type ReserveSparklinePoint = {
+  month: string;
+  balance: number;
+};
+
+export type ReserveData = {
+  accountName: string;
+  currentBalance: number;
+  monthAporte: number;
+  fixedAporte: number;
+  variableAporte: number;
+  growthAmount: number;
+  growthPercentage: number;
+  coverageMonths: number | null;
+  targetAmount: number | null;
+  sparkline: ReserveSparklinePoint[];
+};
+
+export type StashAccount = {
+  id: number;
+  name: string;
+  type: string;
+  currentBalance: number;
+  monthAporte: number;
+  monthVariation: number;
+  targetAmount: number | null;
+};
+
 export async function getDashboardData(month?: string, dateMode: "due_date" | "launch_date" = "due_date") {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
@@ -33,10 +67,26 @@ export async function getDashboardData(month?: string, dateMode: "due_date" | "l
 
   let totalIncome = 0;
   let totalExpense = 0;
+  let fixedExpense = 0;
+  let variableExpense = 0;
+  let installmentExpense = 0;
 
   monthTransactions.forEach((t) => {
-    if (t.type === "income") totalIncome += Number(t.amount);
-    if (t.type === "expense" || t.type === "credit_card_expense") totalExpense += Number(t.amount);
+    const amt = Number(t.amount);
+    if (t.type === "income") {
+      totalIncome += amt;
+    } else if (t.type === "expense" || t.type === "credit_card_expense") {
+      totalExpense += amt;
+      const isInstallment = Boolean(t.installmentTotal && t.installmentTotal > 1);
+      const isFixed = Boolean(t.fixedTransactionId || t.isFixed);
+      if (isInstallment) {
+        installmentExpense += amt;
+      } else if (isFixed) {
+        fixedExpense += amt;
+      } else {
+        variableExpense += amt;
+      }
+    }
   });
 
   const cardInvoices = allCards.map((card) => {
@@ -47,11 +97,171 @@ export async function getDashboardData(month?: string, dateMode: "due_date" | "l
     return { card, invoiceTotal };
   });
 
+  // Identificação e cálculo da Reserva de Emergência
+  const reserveAccount =
+    allAccounts.find((a) => a.name.toLowerCase().includes("reserva")) ||
+    allAccounts.find((a) => a.type === "savings") ||
+    null;
+
+  let reserveData: ReserveData | null = null;
+
+  if (reserveAccount) {
+    const reserveBalance = Number(reserveAccount.currentBalance);
+
+    let monthInflows = 0;
+    let monthOutflows = 0;
+
+    monthTransactions.forEach((t) => {
+      if (t.accountId === reserveAccount.id) {
+        const amt = Number(t.amount);
+        if (t.type === "income" || (t.type === "transfer" && t.parentTransactionId !== null)) {
+          monthInflows += amt;
+        } else if (
+          (t.type === "transfer" && t.parentTransactionId === null) ||
+          t.type === "expense" ||
+          t.type === "credit_card_expense"
+        ) {
+          monthOutflows += amt;
+        }
+      }
+    });
+
+    const monthAporte = monthInflows;
+    const netVariation = monthInflows - monthOutflows;
+    const prevBalance = reserveBalance - netVariation;
+    const growthPercentage = prevBalance > 0 ? (netVariation / prevBalance) * 100 : 0;
+
+    const fixedAporte = 250;
+    const variableAporte = Math.max(0, monthAporte - fixedAporte);
+
+    const essentialExpenseBase = fixedExpense > 0 ? fixedExpense : totalExpense;
+    const coverageMonths = essentialExpenseBase > 0 ? reserveBalance / essentialExpenseBase : null;
+
+    // Sparkline dos últimos 6 meses
+    const pastMonthsDates = Array.from({ length: 6 }, (_, i) => subMonths(new Date(), 5 - i));
+    const sixMonthsAgoStr = format(pastMonthsDates[0], "yyyy-MM-01");
+
+    const reservePastTxs = await db
+      .select({
+        type: transactions.type,
+        amount: transactions.amount,
+        dueDate: transactions.dueDate,
+        parentTransactionId: transactions.parentTransactionId,
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.accountId, reserveAccount.id),
+          eq(transactions.status, "paid"),
+          gte(transactions.dueDate, sixMonthsAgoStr),
+          eq(transactions.userId, userId),
+        ),
+      );
+
+    const deltasByMonth: Record<string, number> = {};
+    reservePastTxs.forEach((t) => {
+      const m = t.dueDate ? t.dueDate.substring(0, 7) : "";
+      if (!m) return;
+      const amt = Number(t.amount);
+      let delta = 0;
+      if (t.type === "income" || (t.type === "transfer" && t.parentTransactionId !== null)) {
+        delta = amt;
+      } else if (
+        (t.type === "transfer" && t.parentTransactionId === null) ||
+        t.type === "expense" ||
+        t.type === "credit_card_expense"
+      ) {
+        delta = -amt;
+      }
+      deltasByMonth[m] = (deltasByMonth[m] || 0) + delta;
+    });
+
+    let runningBalance = reserveBalance;
+    const reversedPoints: ReserveSparklinePoint[] = [];
+    for (let i = pastMonthsDates.length - 1; i >= 0; i--) {
+      const mDate = pastMonthsDates[i];
+      const mKey = format(mDate, "yyyy-MM");
+      const mLabel = format(mDate, "MMM", { locale: ptBR });
+      const capitalized = mLabel.charAt(0).toUpperCase() + mLabel.slice(1).replace(".", "");
+
+      reversedPoints.push({
+        month: capitalized,
+        balance: Math.max(0, Math.round(runningBalance * 100) / 100),
+      });
+
+      const deltaThisMonth = deltasByMonth[mKey] || 0;
+      runningBalance -= deltaThisMonth;
+    }
+    const sparkline = reversedPoints.reverse();
+
+    reserveData = {
+      accountName: reserveAccount.name,
+      currentBalance: reserveBalance,
+      monthAporte,
+      fixedAporte,
+      variableAporte,
+      growthAmount: netVariation,
+      growthPercentage,
+      coverageMonths,
+      targetAmount: reserveAccount.targetAmount ? Number(reserveAccount.targetAmount) : null,
+      sparkline,
+    };
+  }
+
+  // Identificação e cálculo de Caixinhas / Objetivos
+  const stashAccounts: StashAccount[] = allAccounts
+    .filter((a) => {
+      const lower = a.name.toLowerCase();
+      return (
+        a.type === "stash" ||
+        a.type === "savings" ||
+        lower.includes("reserva") ||
+        lower.includes("carro") ||
+        lower.includes("casa") ||
+        lower.includes("viagem") ||
+        lower.includes("meta")
+      );
+    })
+    .map((a) => {
+      let inflows = 0;
+      let outflows = 0;
+      monthTransactions.forEach((t) => {
+        if (t.accountId === a.id) {
+          const amt = Number(t.amount);
+          if (t.type === "income" || (t.type === "transfer" && t.parentTransactionId !== null)) {
+            inflows += amt;
+          } else if (
+            (t.type === "transfer" && t.parentTransactionId === null) ||
+            t.type === "expense" ||
+            t.type === "credit_card_expense"
+          ) {
+            outflows += amt;
+          }
+        }
+      });
+      return {
+        id: a.id,
+        name: a.name,
+        type: a.type,
+        currentBalance: Number(a.currentBalance),
+        monthAporte: inflows,
+        monthVariation: inflows - outflows,
+        targetAmount: a.targetAmount ? Number(a.targetAmount) : null,
+      };
+    });
+
   return {
     currentMonth,
     totalBalance,
     totalIncome,
     totalExpense,
+    expenseBreakdown: {
+      fixed: fixedExpense,
+      variable: variableExpense,
+      installment: installmentExpense,
+    },
+    reserveData,
+    stashAccounts,
     cardInvoices: cardInvoices.filter((i) => i.invoiceTotal > 0),
     accounts: allAccounts,
   };

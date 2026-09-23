@@ -9,8 +9,15 @@ export type AccountCarouselItem = {
   type?: string | null;
 };
 
-export function AccountsCarousel({ accounts }: { accounts: AccountCarouselItem[] }) {
+export function AccountsCarousel({
+  accounts,
+  showBalance = true,
+}: {
+  accounts: AccountCarouselItem[];
+  showBalance?: boolean;
+}) {
   const formatCurrency = (value: number) => {
+    if (!showBalance) return "••••••";
     return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
   };
 
@@ -44,14 +51,14 @@ export function AccountsCarousel({ accounts }: { accounts: AccountCarouselItem[]
                 {getIcon(acc.type)}
               </div>
               <div className="text-[10px] font-bold text-muted-foreground bg-white/5 px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-white/5">
-                100% CDI
+                {acc.type === "checking" ? "Corrente" : acc.type === "savings" ? "Poupança" : "Conta"}
               </div>
             </div>
 
             <div className="flex flex-col pt-1">
               <span className="text-xs font-medium text-muted-foreground truncate">{acc.name}</span>
               <span className="text-lg font-bold text-foreground tracking-tight">
-                <span className="text-primary text-xs mr-1 font-semibold">R$</span>
+                {showBalance && <span className="text-primary text-xs mr-1 font-semibold">R$</span>}
                 {formatCurrency(Number(acc.currentBalance))}
               </span>
             </div>

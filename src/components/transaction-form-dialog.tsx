@@ -31,6 +31,7 @@ import {
   ChevronRight,
   CreditCard as CreditCardIcon,
   Landmark,
+  Lock,
   Plus,
   ReceiptText,
   RefreshCw,
@@ -100,9 +101,9 @@ export function TransactionFormDialog({
     }
   }, [open, formData]);
 
-  const resetState = () => {
+  const resetState = (nextTab?: "expense" | "income" | "transfer") => {
     setStep(1);
-    setTab(initialTab);
+    setTab(nextTab ?? initialTab);
     setAmount(undefined);
     setLaunchDate(format(new Date(), "yyyy-MM-dd"));
     setDueDate(format(new Date(), "yyyy-MM-dd"));
@@ -114,6 +115,21 @@ export function TransactionFormDialog({
     setCurrentInstallment("1");
     setInstallmentTotal("2");
     setIsTotalAmount(true);
+    setPaymentMethod("account");
+    setAccountId("");
+    setSelectedCreditCardId("");
+    setSelectedInvoiceMonth("");
+    setAccountIdIncome("");
+    setAccountIdTransferOrigin("");
+    setAccountIdTransferDest("");
+    setIsPaid(false);
+    setFormError("");
+  };
+
+  const handleTabChange = (newTab: "expense" | "income" | "transfer") => {
+    setTab(newTab);
+    setSelectedCategoryId("");
+    setSelectedSubcategoryId("");
     setPaymentMethod("account");
     setAccountId("");
     setSelectedCreditCardId("");
@@ -374,7 +390,7 @@ export function TransactionFormDialog({
     if (res.success) {
       toast.success("Transação salva com sucesso!");
       if (action === "save-and-continue") {
-        resetState();
+        resetState(tab);
       } else {
         setOpen(false);
         resetState();
@@ -538,41 +554,61 @@ export function TransactionFormDialog({
         {open && formData ? (
           <div className="w-full flex flex-col h-full">
             {/* Segmented Control - Seletor de Tipo */}
-            <div className="bg-[#1A1A22] p-1 rounded-xl flex w-full mb-6">
-              <button
-                className={`flex-1 rounded-lg text-sm font-medium transition-all py-2 flex items-center justify-center gap-2 ${tab === "expense" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                onClick={() => {
-                  setTab("expense");
-                  resetState();
-                }}
-                disabled={step > 1}
-              >
-                {tab === "expense" && <div className="w-2 h-2 rounded-full bg-rose-500" />}
-                Despesa
-              </button>
-              <button
-                className={`flex-1 rounded-lg text-sm font-medium transition-all py-2 flex items-center justify-center gap-2 ${tab === "income" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                onClick={() => {
-                  setTab("income");
-                  resetState();
-                }}
-                disabled={step > 1}
-              >
-                {tab === "income" && <div className="w-2 h-2 rounded-full bg-emerald-500" />}
-                Receita
-              </button>
-              <button
-                className={`flex-1 rounded-lg text-sm font-medium transition-all py-2 flex items-center justify-center gap-2 ${tab === "transfer" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                onClick={() => {
-                  setTab("transfer");
-                  resetState();
-                }}
-                disabled={step > 1}
-              >
-                {tab === "transfer" && <div className="w-2 h-2 rounded-full bg-blue-500" />}
-                Transferência
-              </button>
-            </div>
+            {step === 1 ? (
+              <div className="bg-[#1A1A22] p-1 rounded-xl flex w-full mb-6">
+                <button
+                  type="button"
+                  className={`flex-1 rounded-lg text-sm font-medium transition-all py-2 flex items-center justify-center gap-2 cursor-pointer ${tab === "expense" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  onClick={() => handleTabChange("expense")}
+                >
+                  {tab === "expense" && <div className="w-2 h-2 rounded-full bg-rose-500" />}
+                  Despesa
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 rounded-lg text-sm font-medium transition-all py-2 flex items-center justify-center gap-2 cursor-pointer ${tab === "income" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  onClick={() => handleTabChange("income")}
+                >
+                  {tab === "income" && <div className="w-2 h-2 rounded-full bg-emerald-500" />}
+                  Receita
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 rounded-lg text-sm font-medium transition-all py-2 flex items-center justify-center gap-2 cursor-pointer ${tab === "transfer" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  onClick={() => handleTabChange("transfer")}
+                >
+                  {tab === "transfer" && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+                  Transferência
+                </button>
+              </div>
+            ) : (
+              <div className="bg-[#1A1A22]/60 border border-white/5 p-1 rounded-xl flex w-full mb-6">
+                <div
+                  className="w-full rounded-lg text-sm font-medium py-2 flex items-center justify-center gap-2 bg-background/50 text-foreground/80 cursor-not-allowed select-none"
+                  aria-disabled="true"
+                >
+                  {tab === "expense" && (
+                    <>
+                      <div className="w-2 h-2 rounded-full bg-rose-500" />
+                      <span>Despesa</span>
+                    </>
+                  )}
+                  {tab === "income" && (
+                    <>
+                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span>Receita</span>
+                    </>
+                  )}
+                  {tab === "transfer" && (
+                    <>
+                      <div className="w-2 h-2 rounded-full bg-blue-500" />
+                      <span>Transferência</span>
+                    </>
+                  )}
+                  <Lock className="h-3.5 w-3.5 text-muted-foreground/70 ml-1" />
+                </div>
+              </div>
+            )}
 
             <div className="min-h-[200px] sm:min-h-[280px] flex flex-col justify-center">
               {step === 1 && (

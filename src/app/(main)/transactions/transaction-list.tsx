@@ -104,11 +104,15 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
             launchDate: tx.launchDate || tx.dueDate || tx.date || "",
             date: tx.dueDate || tx.date || "",
             competencyMonth: tx.competencyMonth ?? "",
+            invoiceMonth: tx.invoiceMonth ?? null,
             fixedTransactionId: tx.fixedTransactionId ?? null,
           }
         : undefined;
 
-      await toggleTransactionStatus(tx.id, tx.status, isVirtual, virtualData);
+      const result = await toggleTransactionStatus(tx.id, tx.status, isVirtual, virtualData);
+      if (!result.success && result.error) {
+        alert(result.error);
+      }
       setLoadingId(null);
     });
   };
@@ -157,27 +161,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
       return;
     }
 
-    setLoadingId(tx.id);
-    if (tx.id < 0) {
-      // Virtual transactions are implicitly "pending". Toggling means we mark them as paid.
-      await payVirtualTransaction({
-        type: tx.type,
-        accountId: tx.accountId ?? null,
-        creditCardId: tx.creditCardId ?? null,
-        categoryId: tx.categoryId ?? 0,
-        subcategoryId: tx.subcategoryId ?? null,
-        amount: String(tx.amount),
-        description: tx.description,
-        dueDate: tx.dueDate || tx.date || "",
-        launchDate: tx.launchDate || tx.dueDate || tx.date || "",
-        date: tx.dueDate || tx.date || "",
-        competencyMonth: tx.competencyMonth ?? "",
-        fixedTransactionId: tx.fixedTransactionId ?? null,
-      });
-    } else {
-      await toggleTransactionStatus(tx.id, tx.status);
-    }
-    setLoadingId(null);
+    handleToggleStatus(tx);
   };
 
   const formatCurrency = (value: string | number) => {

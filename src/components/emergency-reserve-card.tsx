@@ -50,7 +50,7 @@ export function EmergencyReserveCard({ reserveData, showBalance = true }: Emerge
   const isPositiveGrowth = growthAmount >= 0;
 
   return (
-    <div className="bg-card rounded-[2rem] border border-white/5 shadow-sm p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden">
+    <div className="bg-card rounded-[2rem] border border-white/5 shadow-sm p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden h-full">
       {/* Background glow sutil */}
       <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -69,7 +69,7 @@ export function EmergencyReserveCard({ reserveData, showBalance = true }: Emerge
         {coverageMonths !== null && coverageMonths > 0 && (
           <Badge
             variant="outline"
-            className="px-2.5 py-0.5 text-xs font-semibold rounded-full border border-blue-500/20 bg-blue-500/10 text-blue-400"
+            className="px-2.5 py-0.5 text-xs font-semibold rounded-full border border-blue-500/20 bg-blue-500/10 text-blue-400 whitespace-nowrap"
           >
             {coverageMonths.toFixed(1)} meses
           </Badge>
@@ -80,13 +80,13 @@ export function EmergencyReserveCard({ reserveData, showBalance = true }: Emerge
       <div className="space-y-1 relative z-10 mb-4">
         <span className="text-xs font-medium text-muted-foreground">Reserva Atual</span>
         <div className="flex items-baseline justify-between flex-wrap gap-2">
-          <div className="text-3xl sm:text-4xl font-black text-foreground tracking-tight">
+          <div className="text-2xl sm:text-3xl lg:text-2xl xl:text-3xl font-black text-foreground tracking-tight whitespace-nowrap">
             {formatCurrency(currentBalance)}
           </div>
 
           <div
             className={cn(
-              "flex items-center text-xs font-semibold px-2 py-0.5 rounded-full border",
+              "flex items-center text-xs font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap",
               isPositiveGrowth
                 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                 : "bg-rose-500/10 text-rose-400 border-rose-500/20",
@@ -125,19 +125,19 @@ export function EmergencyReserveCard({ reserveData, showBalance = true }: Emerge
 
       {/* Separação Visual de Aportes: Fixo (R$ 250) + Variável + Total */}
       <div className="grid grid-cols-3 gap-2 relative z-10 mb-4 text-center">
-        <div className="p-2.5 rounded-2xl bg-white/[0.03] border border-white/5 flex flex-col">
-          <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Aporte Fixo</span>
-          <span className="text-xs sm:text-sm font-bold text-foreground mt-1">{formatCurrency(fixedAporte)}</span>
+        <div className="p-2.5 rounded-2xl bg-white/[0.03] border border-white/5 flex flex-col min-w-0">
+          <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider truncate">Aporte Fixo</span>
+          <span className="text-xs sm:text-sm font-bold text-foreground mt-1 tabular-nums whitespace-nowrap">{formatCurrency(fixedAporte)}</span>
         </div>
-        <div className="p-2.5 rounded-2xl bg-white/[0.03] border border-white/5 flex flex-col">
-          <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+        <div className="p-2.5 rounded-2xl bg-white/[0.03] border border-white/5 flex flex-col min-w-0">
+          <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider truncate">
             Aporte Variável
           </span>
-          <span className="text-xs sm:text-sm font-bold text-foreground mt-1">{formatCurrency(variableAporte)}</span>
+          <span className="text-xs sm:text-sm font-bold text-foreground mt-1 tabular-nums whitespace-nowrap">{formatCurrency(variableAporte)}</span>
         </div>
-        <div className="p-2.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex flex-col">
-          <span className="text-[10px] font-medium text-blue-300 uppercase tracking-wider">Aporte Total</span>
-          <span className="text-xs sm:text-sm font-bold text-blue-400 mt-1">{formatCurrency(monthAporte)}</span>
+        <div className="p-2.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex flex-col min-w-0">
+          <span className="text-[10px] font-medium text-blue-300 uppercase tracking-wider truncate">Aporte Total</span>
+          <span className="text-xs sm:text-sm font-bold text-blue-400 mt-1 tabular-nums whitespace-nowrap">{formatCurrency(monthAporte)}</span>
         </div>
       </div>
 

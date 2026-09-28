@@ -91,9 +91,9 @@ export function DashboardClientPage({
             {/* ==================================================
                 1. LINHA PRINCIPAL: Saúde do mês + Saldo Total + Reserva de Emergência
                ================================================== */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
               {/* Saúde do Mês */}
-              <div className="lg:col-span-1">
+              <div className="lg:col-span-1 h-full">
                 <MonthlyFinancialHealth
                   totalIncome={dashboard.data.totalIncome}
                   totalExpense={dashboard.data.totalExpense}
@@ -103,16 +103,17 @@ export function DashboardClientPage({
               </div>
 
               {/* Saldo Total */}
-              <div className="lg:col-span-1">
+              <div className="lg:col-span-1 h-full">
                 <AccountBalancesSummary
                   totalBalance={dashboard.balancesData.totalBalance}
+                  balancesByType={dashboard.balancesData.balancesByType}
                   showBalance={showBalance}
                   onToggleShowBalance={() => setShowBalance(!showBalance)}
                 />
               </div>
 
               {/* Reserva de Emergência */}
-              <div className="lg:col-span-1">
+              <div className="lg:col-span-1 h-full">
                 <EmergencyReserveCard reserveData={dashboard.data.reserveData} showBalance={showBalance} />
               </div>
             </div>

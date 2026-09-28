@@ -30,7 +30,7 @@ export function MonthlyBalanceGrid({ totalIncome, totalExpense, showBalance = tr
               <span className="text-sm font-medium text-muted-foreground">Receitas</span>
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-bold text-foreground">
+          <div className="text-2xl sm:text-3xl font-bold text-foreground whitespace-nowrap tabular-nums">
             {showBalance && <span className="text-muted-foreground text-sm mr-1">R$</span>}
             {formatCurrency(totalIncome)}
           </div>
@@ -50,7 +50,7 @@ export function MonthlyBalanceGrid({ totalIncome, totalExpense, showBalance = tr
               <span className="text-sm font-medium text-muted-foreground">Despesas</span>
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-bold text-foreground">
+          <div className="text-2xl sm:text-3xl font-bold text-foreground whitespace-nowrap tabular-nums">
             {showBalance && <span className="text-muted-foreground text-sm mr-1">R$</span>}
             {formatCurrency(totalExpense)}
           </div>

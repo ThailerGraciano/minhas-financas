@@ -29,6 +29,14 @@ export function MonthlyFinancialHealth({
     }).format(value);
   };
 
+  const formatCurrencyWithoutSign = (value: number) => {
+    if (!showBalance) return "••••••";
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(Math.abs(value));
+  };
+
   const netResult = totalIncome - totalExpense;
   const committedPercent = totalIncome > 0 ? (totalExpense / totalIncome) * 100 : totalExpense > 0 ? 100 : 0;
   const marginAmount = totalIncome - totalExpense;
@@ -74,7 +82,7 @@ export function MonthlyFinancialHealth({
   const distributableSurplus = Math.max(0, netResult);
 
   return (
-    <div className="bg-card rounded-[2rem] border border-white/5 shadow-sm p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden">
+    <div className="bg-card rounded-[2rem] border border-white/5 shadow-sm p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden h-full">
       {/* Background glow sutil */}
       <div
         className={cn(
@@ -107,64 +115,68 @@ export function MonthlyFinancialHealth({
       {/* Valor Principal: Resultado Líquido */}
       <div className="space-y-1 relative z-10 mb-4">
         <span className="text-xs font-medium text-muted-foreground">Resultado Líquido</span>
-        <div className="flex items-baseline gap-2">
+        <div className="flex items-baseline justify-between flex-wrap gap-x-2 gap-y-1">
           <span
             className={cn(
-              "text-3xl sm:text-4xl font-black tracking-tight",
+              "text-2xl sm:text-3xl lg:text-2xl xl:text-3xl font-black tracking-tight whitespace-nowrap",
               netResult > 0 ? "text-emerald-400" : netResult < 0 ? "text-rose-400" : "text-foreground",
             )}
           >
             {showBalance ? (
               <>
-                {netResult > 0 ? "+" : ""}
-                {formatCurrency(netResult)}
+                {netResult > 0 ? "+" : netResult < 0 ? "-" : ""}
+                {formatCurrencyWithoutSign(netResult)}
               </>
             ) : (
               "••••••"
             )}
           </span>
           {showBalance && (
-            <span className="text-xs text-muted-foreground font-medium">
+            <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">
               {netResult >= 0 ? "livre após despesas" : "déficit no período"}
             </span>
           )}
         </div>
       </div>
 
-      {/* Grid de 4 Métricas Chave */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 relative z-10 mb-4">
-        <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/5 flex flex-col">
+      {/* Grid de 4 Métricas Chave (2x2 para evitar truncamento em colunas estreitas de desktop) */}
+      <div className="grid grid-cols-2 gap-2.5 relative z-10 mb-4">
+        <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/5 flex flex-col justify-center min-w-0">
           <span className="text-[11px] font-medium text-muted-foreground">Receitas</span>
-          <span className="text-sm sm:text-base font-bold text-emerald-400 mt-1 truncate">
+          <span className="text-sm sm:text-base font-bold text-emerald-400 mt-1 whitespace-nowrap tabular-nums">
             {formatCurrency(totalIncome)}
           </span>
         </div>
-        <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/5 flex flex-col">
+        <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/5 flex flex-col justify-center min-w-0">
           <span className="text-[11px] font-medium text-muted-foreground">Despesas</span>
-          <span className="text-sm sm:text-base font-bold text-rose-400 mt-1 truncate">
+          <span className="text-sm sm:text-base font-bold text-rose-400 mt-1 whitespace-nowrap tabular-nums">
             {formatCurrency(totalExpense)}
           </span>
         </div>
-        <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/5 flex flex-col">
+        <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/5 flex flex-col justify-center min-w-0">
           <span className="text-[11px] font-medium text-muted-foreground">Comprometido</span>
           <span
             className={cn(
-              "text-sm sm:text-base font-bold mt-1",
+              "text-sm sm:text-base font-bold mt-1 whitespace-nowrap tabular-nums",
               committedPercent > 90 ? "text-rose-400" : committedPercent > 75 ? "text-amber-400" : "text-foreground",
             )}
           >
             {committedPercent.toFixed(1)}%
           </span>
         </div>
-        <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/5 flex flex-col">
+        <div className="p-3 rounded-2xl bg-white/[0.03] border border-white/5 flex flex-col justify-center min-w-0">
           <span className="text-[11px] font-medium text-muted-foreground">Margem</span>
           <span
             className={cn(
-              "text-sm sm:text-base font-bold mt-1 truncate",
+              "text-sm sm:text-base font-bold mt-1 whitespace-nowrap tabular-nums",
               marginAmount >= 0 ? "text-primary" : "text-rose-400",
             )}
           >
-            {formatCurrency(marginAmount)}
+            {showBalance
+              ? marginAmount < 0
+                ? `-${formatCurrencyWithoutSign(marginAmount)}`
+                : formatCurrency(marginAmount)
+              : "••••••"}
           </span>
         </div>
       </div>
@@ -197,22 +209,30 @@ export function MonthlyFinancialHealth({
           <span className="text-xs font-semibold text-foreground">Comprometimento da Renda</span>
           <span className="text-[10px] text-muted-foreground">Base: 100% da Receita</span>
         </div>
-        <div className="grid grid-cols-4 gap-2 text-center text-xs">
-          <div className="p-2 rounded-xl bg-white/[0.02] border border-white/5">
-            <span className="text-[10px] text-muted-foreground block">Fixas</span>
-            <span className="font-bold text-[#eab308] mt-0.5 block">{fixedPercent.toFixed(1)}%</span>
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-2 text-center text-xs">
+          <div className="p-2 rounded-xl bg-white/[0.02] border border-white/5 min-w-0">
+            <span className="text-[10px] text-muted-foreground block truncate">Fixas</span>
+            <span className="font-bold text-[#eab308] mt-0.5 block tabular-nums text-xs whitespace-nowrap">
+              {fixedPercent.toFixed(1)}%
+            </span>
           </div>
-          <div className="p-2 rounded-xl bg-white/[0.02] border border-white/5">
-            <span className="text-[10px] text-muted-foreground block">Variáveis</span>
-            <span className="font-bold text-[#22c55e] mt-0.5 block">{variablePercent.toFixed(1)}%</span>
+          <div className="p-2 rounded-xl bg-white/[0.02] border border-white/5 min-w-0">
+            <span className="text-[10px] text-muted-foreground block truncate">Variáveis</span>
+            <span className="font-bold text-[#22c55e] mt-0.5 block tabular-nums text-xs whitespace-nowrap">
+              {variablePercent.toFixed(1)}%
+            </span>
           </div>
-          <div className="p-2 rounded-xl bg-white/[0.02] border border-white/5">
-            <span className="text-[10px] text-muted-foreground block">Parcelas</span>
-            <span className="font-bold text-[#3b82f6] mt-0.5 block">{installmentPercent.toFixed(1)}%</span>
+          <div className="p-2 rounded-xl bg-white/[0.02] border border-white/5 min-w-0">
+            <span className="text-[10px] text-muted-foreground block truncate">Parcelas</span>
+            <span className="font-bold text-[#3b82f6] mt-0.5 block tabular-nums text-xs whitespace-nowrap">
+              {installmentPercent.toFixed(1)}%
+            </span>
           </div>
-          <div className="p-2 rounded-xl bg-white/[0.02] border border-white/5">
-            <span className="text-[10px] text-muted-foreground block">Margem</span>
-            <span className="font-bold text-primary mt-0.5 block">{marginPercent.toFixed(1)}%</span>
+          <div className="p-2 rounded-xl bg-white/[0.02] border border-white/5 min-w-0">
+            <span className="text-[10px] text-muted-foreground block truncate">Margem</span>
+            <span className="font-bold text-primary mt-0.5 block tabular-nums text-xs whitespace-nowrap">
+              {marginPercent.toFixed(1)}%
+            </span>
           </div>
         </div>
       </div>
@@ -223,7 +243,9 @@ export function MonthlyFinancialHealth({
           <Sparkles className="w-3.5 h-3.5 text-primary" />
           Sobra para distribuição:
         </span>
-        <span className="font-bold text-foreground tabular-nums">{formatCurrency(distributableSurplus)}</span>
+        <span className="font-bold text-foreground tabular-nums whitespace-nowrap">
+          {formatCurrency(distributableSurplus)}
+        </span>
       </div>
     </div>
   );

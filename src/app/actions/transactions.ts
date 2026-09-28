@@ -742,26 +742,34 @@ export async function markTransactionAsPaid(id: string | number) {
   }
 }
 
+export type VirtualTransactionInput = {
+  type: string;
+  accountId: number | null;
+  creditCardId: number | null;
+  categoryId: number;
+  subcategoryId: number | null;
+  amount: string;
+  description: string;
+  dueDate?: string;
+  launchDate?: string;
+  date?: string;
+  competencyMonth: string;
+  invoiceMonth?: string | null;
+  fixedTransactionId: string | null;
+};
+
 export async function toggleTransactionStatus(
   id: string | number,
   currentStatus: string,
   isFixedVirtual: boolean = false,
-  virtualData?: {
-    type: string;
-    accountId: number | null;
-    creditCardId: number | null;
-    categoryId: number;
-    subcategoryId: number | null;
-    amount: string;
-    description: string;
-    date: string;
-    competencyMonth: string;
-    fixedTransactionId: string | null;
-  },
+  virtualData?: VirtualTransactionInput,
 ): Promise<{ success: boolean; newStatus?: string; error?: string }> {
   try {
     if (isFixedVirtual && virtualData) {
-      await payVirtualTransaction(virtualData);
+      const result = await payVirtualTransaction(virtualData);
+      if (!result.success) {
+        return { success: false, error: result.error || "Failed to pay virtual transaction" };
+      }
       return { success: true, newStatus: "paid" };
     }
 
@@ -779,20 +787,7 @@ export async function toggleTransactionStatus(
   }
 }
 
-export async function payVirtualTransaction(txData: {
-  type: string;
-  accountId: number | null;
-  creditCardId: number | null;
-  categoryId: number;
-  subcategoryId: number | null;
-  amount: string;
-  description: string;
-  dueDate?: string;
-  launchDate?: string;
-  date?: string;
-  competencyMonth: string;
-  fixedTransactionId: string | null;
-}) {
+export async function payVirtualTransaction(txData: VirtualTransactionInput) {
   try {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
@@ -820,6 +815,7 @@ export async function payVirtualTransaction(txData: {
               dueDate,
               launchDate,
               competencyMonth: txData.competencyMonth,
+              invoiceMonth: txData.invoiceMonth || null,
               status: "paid",
               paidAt: new Date(),
               fixedTransactionId: ft.id,
@@ -841,6 +837,7 @@ export async function payVirtualTransaction(txData: {
               dueDate,
               launchDate,
               competencyMonth: txData.competencyMonth,
+              invoiceMonth: txData.invoiceMonth || null,
               status: "paid",
               paidAt: new Date(),
               fixedTransactionId: ft.id,
@@ -853,6 +850,24 @@ export async function payVirtualTransaction(txData: {
       }
     } else {
       await db.transaction(async (tx) => {
+        await tx.insert(transactions).values({
+          userId,
+          type: txData.type,
+          accountId: txData.accountId,
+          creditCardId: txData.creditCardId,
+          categoryId: txData.categoryId,
+          subcategoryId: txData.subcategoryId && txData.subcategoryId > 0 ? txData.subcategoryId : null,
+          amount: txData.amount,
+          description: txData.description,
+          dueDate,
+          launchDate,
+          competencyMonth: txData.competencyMonth,
+          invoiceMonth: txData.invoiceMonth || (txData.type === "credit_card_expense" ? txData.competencyMonth : null),
+          status: "paid",
+          paidAt: new Date(),
+          fixedTransactionId: txData.fixedTransactionId,
+        });
+
         await applyBalanceDelta(tx, txData.accountId, txData.amount, txData.type, "paid", null);
       });
     }
@@ -1091,7 +1106,11 @@ export async function deleteTransaction(
                 transactionItem.parentTransactionId,
                 true,
               );
-              await tx.delete(transactions).where(eq(transactions.id, transactionItem.id));
+              if (targetFixedId) {
+                await tx.update(transactions).set({ status: "ignored" }).where(eq(transactions.id, transactionItem.id));
+              } else {
+                await tx.delete(transactions).where(eq(transactions.id, transactionItem.id));
+              }
               await applyBalanceDelta(
                 tx,
                 otherTx.accountId,
@@ -1101,7 +1120,11 @@ export async function deleteTransaction(
                 otherTx.parentTransactionId,
                 true,
               );
-              await tx.delete(transactions).where(eq(transactions.id, otherTx.id));
+              if (targetFixedId) {
+                await tx.update(transactions).set({ status: "ignored" }).where(eq(transactions.id, otherTx.id));
+              } else {
+                await tx.delete(transactions).where(eq(transactions.id, otherTx.id));
+              }
             } else {
               await applyBalanceDelta(
                 tx,
@@ -1112,7 +1135,11 @@ export async function deleteTransaction(
                 otherTx.parentTransactionId,
                 true,
               );
-              await tx.delete(transactions).where(eq(transactions.id, otherTx.id));
+              if (targetFixedId) {
+                await tx.update(transactions).set({ status: "ignored" }).where(eq(transactions.id, otherTx.id));
+              } else {
+                await tx.delete(transactions).where(eq(transactions.id, otherTx.id));
+              }
               await applyBalanceDelta(
                 tx,
                 transactionItem.accountId,
@@ -1122,7 +1149,11 @@ export async function deleteTransaction(
                 transactionItem.parentTransactionId,
                 true,
               );
-              await tx.delete(transactions).where(eq(transactions.id, transactionItem.id));
+              if (targetFixedId) {
+                await tx.update(transactions).set({ status: "ignored" }).where(eq(transactions.id, transactionItem.id));
+              } else {
+                await tx.delete(transactions).where(eq(transactions.id, transactionItem.id));
+              }
             }
           } else {
             await applyBalanceDelta(
@@ -1134,7 +1165,11 @@ export async function deleteTransaction(
               transactionItem.parentTransactionId,
               true,
             );
-            await tx.delete(transactions).where(eq(transactions.id, transactionItem.id));
+            if (targetFixedId) {
+              await tx.update(transactions).set({ status: "ignored" }).where(eq(transactions.id, transactionItem.id));
+            } else {
+              await tx.delete(transactions).where(eq(transactions.id, transactionItem.id));
+            }
           }
         } else {
           await applyBalanceDelta(
@@ -1146,7 +1181,11 @@ export async function deleteTransaction(
             transactionItem.parentTransactionId,
             true,
           );
-          await tx.delete(transactions).where(eq(transactions.id, id));
+          if (targetFixedId) {
+            await tx.update(transactions).set({ status: "ignored" }).where(eq(transactions.id, id));
+          } else {
+            await tx.delete(transactions).where(eq(transactions.id, id));
+          }
         }
       }
 

@@ -1,16 +1,37 @@
 "use client";
 
 import { TransactionFormDialog } from "@/components/transaction-form-dialog";
-import { ArrowDownLeft, ArrowLeftRight, Barcode, Eye, EyeOff, MoreHorizontal } from "lucide-react";
+import {
+  Archive,
+  ArrowDownLeft,
+  ArrowLeftRight,
+  Barcode,
+  Coffee,
+  Eye,
+  EyeOff,
+  Landmark,
+  MoreHorizontal,
+  PiggyBank,
+  Utensils,
+  Wallet,
+} from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
+export type BalanceSummary = {
+  type: string;
+  label: string;
+  total: number;
+};
+
 export function AccountBalancesSummary({
   totalBalance,
+  balancesByType,
   showBalance: controlledShowBalance,
   onToggleShowBalance,
 }: {
   totalBalance: number;
+  balancesByType?: BalanceSummary[];
   showBalance?: boolean;
   onToggleShowBalance?: () => void;
 }) {
@@ -29,8 +50,25 @@ export function AccountBalancesSummary({
     return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
   };
 
+  const getAccountTypeIcon = (type: string) => {
+    switch (type) {
+      case "savings":
+        return <PiggyBank className="w-3.5 h-3.5 text-blue-400" />;
+      case "wallet":
+        return <Wallet className="w-3.5 h-3.5 text-emerald-400" />;
+      case "stash":
+        return <Archive className="w-3.5 h-3.5 text-amber-400" />;
+      case "food":
+        return <Utensils className="w-3.5 h-3.5 text-orange-400" />;
+      case "meal":
+        return <Coffee className="w-3.5 h-3.5 text-amber-400" />;
+      default:
+        return <Landmark className="w-3.5 h-3.5 text-purple-400" />;
+    }
+  };
+
   return (
-    <div className="bg-card rounded-[2rem] border border-white/5 shadow-sm flex flex-col p-5 sm:p-6 relative overflow-hidden">
+    <div className="bg-card rounded-[2rem] border border-white/5 shadow-sm flex flex-col justify-between p-5 sm:p-6 relative overflow-hidden h-full">
       {/* Background Glow */}
       <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -54,11 +92,13 @@ export function AccountBalancesSummary({
           </div>
         </div>
 
-        <div className="text-4xl sm:text-5xl md:text-6xl font-black text-foreground tracking-tight">
+        <div className="text-3xl sm:text-4xl lg:text-3xl xl:text-4xl font-black text-foreground tracking-tight whitespace-nowrap min-w-0">
           {showBalance ? (
             <>
-              <span className="text-primary text-2xl sm:text-3xl md:text-4xl mr-2 font-bold tracking-normal">R$</span>
-              {formatCurrency(totalBalance)}
+              <span className="text-primary text-xl sm:text-2xl lg:text-xl xl:text-2xl mr-1.5 font-bold tracking-normal">
+                R$
+              </span>
+              <span className="tabular-nums">{formatCurrency(totalBalance)}</span>
             </>
           ) : (
             <span className="tracking-widest">••••••</span>
@@ -66,8 +106,34 @@ export function AccountBalancesSummary({
         </div>
       </div>
 
+      {/* Distribuição por Tipo de Conta */}
+      {balancesByType && balancesByType.length > 0 && (
+        <div className="border-t border-white/5 pt-3.5 my-3 relative z-10 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-foreground">Distribuição por Tipo</span>
+            <span className="text-[10px] text-muted-foreground">{balancesByType.length} tipos de conta</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {balancesByType.slice(0, 4).map((b) => (
+              <div
+                key={b.type}
+                className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 flex flex-col justify-center min-w-0"
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {getAccountTypeIcon(b.type)}
+                  <span className="text-[11px] font-medium text-muted-foreground truncate">{b.label}</span>
+                </div>
+                <span className="text-xs sm:text-sm font-bold text-foreground mt-1 tabular-nums whitespace-nowrap">
+                  {showBalance ? `R$ ${formatCurrency(b.total)}` : "••••••"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Quick Actions Grid (Thumb Zone) */}
-      <div className="grid grid-cols-4 gap-2 mt-6 pt-4 border-t border-white/5 relative z-10">
+      <div className="grid grid-cols-4 gap-2 mt-auto pt-4 border-t border-white/5 relative z-10">
         {/* Transferir */}
         <TransactionFormDialog
           initialTab="transfer"

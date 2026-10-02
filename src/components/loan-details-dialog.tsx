@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Loader2, Percent } from "lucide-react";
+import { Loader2, Percent, PiggyBank } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -66,6 +66,14 @@ export type LoanDetails = {
   remaining: number;
   progressPercent: number;
   installmentList: LoanInstallment[];
+  originAccount?: {
+    id: number;
+    name: string;
+    type: string;
+    currentBalance: number;
+    totalOwed: number;
+    finalProjectedBalance: number;
+  } | null;
 };
 
 type LoanDetailsDialogProps = {
@@ -90,7 +98,7 @@ export function LoanDetailsDialog({ open, onOpenChange, loan, closingDay }: Loan
       setIsUpdating(installment.id);
       await updateInstallmentDate(installment.id, newDateStr, newCompetency);
       toast.success("Data da parcela atualizada!");
-    } catch (error) {
+    } catch {
       toast.error("Erro ao atualizar a data");
     } finally {
       setIsUpdating(null);
@@ -132,6 +140,40 @@ export function LoanDetailsDialog({ open, onOpenChange, loan, closingDay }: Loan
             <p className="font-semibold text-green-500">{formatCurrency(loan.totalPaid)}</p>
           </div>
         </div>
+
+        {loan.type === "personal" && loan.originAccount && (
+          <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-lg bg-orange-500/20 text-orange-500 flex items-center justify-center shrink-0">
+                <PiggyBank className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Conta Credora (Origem do Dinheiro)</p>
+                <p className="font-bold text-foreground">{loan.originAccount.name}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 text-xs">
+              <div>
+                <span className="text-muted-foreground block">Saldo Atual</span>
+                <span className="font-semibold text-foreground">
+                  {formatCurrency(loan.originAccount.currentBalance)}
+                </span>
+              </div>
+              <div className="h-6 w-px bg-orange-500/20" />
+              <div>
+                <span className="text-muted-foreground block">Devendo neste Emp.</span>
+                <span className="font-semibold text-orange-500">{formatCurrency(loan.remaining)}</span>
+              </div>
+              <div className="h-6 w-px bg-orange-500/20" />
+              <div>
+                <span className="text-muted-foreground block">Saldo Final da Conta</span>
+                <span className="font-semibold text-emerald-500">
+                  {formatCurrency(loan.originAccount.finalProjectedBalance)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-1.5 shrink-0 py-2 border-b">
           <div className="flex justify-between text-xs text-muted-foreground">

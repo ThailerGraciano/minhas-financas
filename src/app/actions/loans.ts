@@ -2,9 +2,9 @@
 
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { accounts, categories, loans, settings, transactions } from "@/db/schema";
+import { accounts, categories, fixedTransactions, loans, settings, transactions } from "@/db/schema";
 import { addMonths, format, getDate, parseISO } from "date-fns";
-import { and, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 type Transaction = typeof transactions.$inferSelect;
@@ -317,6 +317,41 @@ export async function createLoan(input: CreateLoanInput) {
   revalidatePath("/loans");
 }
 
+export type OriginAccountProgressionMonth = {
+  month: string;
+  startingBalance: number;
+  loanReimbursements: number;
+  otherIncomes: number;
+  otherOutflows: number;
+  netMonth: number;
+  projectedBalance: number;
+  loanItems: Array<{ description: string; amount: number }>;
+  otherItems: Array<{ description: string; amount: number }>;
+};
+
+export type LoanOriginAccount = {
+  accountId: number;
+  accountName: string;
+  accountType: string;
+  currentBalance: number;
+  totalOwed: number;
+  totalPaid: number;
+  otherRevenuesTotal: number;
+  finalProjectedBalance: number;
+  loansCount: number;
+  associatedLoans: Array<{ id: string; name: string; remaining: number }>;
+  monthlyProgression: OriginAccountProgressionMonth[];
+};
+
+export type EnrichedLoanOriginAccountSummary = {
+  id: number;
+  name: string;
+  type: string;
+  currentBalance: number;
+  totalOwed: number;
+  finalProjectedBalance: number;
+};
+
 export async function getLoansPageData() {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
@@ -336,26 +371,23 @@ export async function getLoansPageData() {
       personalDebtTotal: 0,
       amortizationData: [],
       closingDay,
+      originAccounts: [],
     };
   }
 
   const loanIds = userLoans.map((l) => l.id);
 
-  // For bank loans: expense/credit_card_expense transactions
-  // For personal loans: transfer transactions that are "saída" (no parentTransactionId = origin transfer out)
-  const loanTransactions = await db
+  // Fetch all transactions linked to loans
+  const allLoanTransactions = await db
     .select()
     .from(transactions)
-    .where(
-      and(
-        eq(transactions.userId, userId),
-        inArray(transactions.loanId, loanIds),
-        // Exclude income transactions (the initial deposit) and "Entrada" transfer legs
-        ne(transactions.type, "income"),
-        isNull(transactions.parentTransactionId),
-        isNotNull(transactions.installmentTotal),
-      ),
-    );
+    .where(and(eq(transactions.userId, userId), inArray(transactions.loanId, loanIds)));
+
+  // For bank loans: expense/credit_card_expense transactions
+  // For personal loans: transfer transactions that are "saída" (no parentTransactionId = origin transfer out)
+  const loanTransactions = allLoanTransactions.filter(
+    (tx) => tx.type !== "income" && tx.parentTransactionId === null && tx.installmentTotal !== null,
+  );
 
   const loanDataMap = new Map<
     string,
@@ -411,6 +443,283 @@ export async function getLoansPageData() {
     }
   }
 
+  // Map personal loans to their origin account (the account that lent the money)
+  const loanOriginAccountIdMap = new Map<string, number>();
+  for (const loan of userLoans) {
+    if (loan.type === "personal") {
+      // Find devIn transaction (the return transfer leg entering into the reserve account)
+      const devInTx = allLoanTransactions.find(
+        (tx) => tx.loanId === loan.id && tx.type === "transfer" && tx.parentTransactionId !== null,
+      );
+      if (devInTx?.accountId) {
+        loanOriginAccountIdMap.set(loan.id, devInTx.accountId);
+      } else {
+        // Fallback: check initial transfer out from the reserve account
+        const transferOutTx = allLoanTransactions.find(
+          (tx) =>
+            tx.loanId === loan.id &&
+            tx.type === "transfer" &&
+            tx.parentTransactionId === null &&
+            tx.installmentTotal === null,
+        );
+        if (transferOutTx?.accountId) {
+          loanOriginAccountIdMap.set(loan.id, transferOutTx.accountId);
+        }
+      }
+    }
+  }
+
+  const distinctOriginAccountIds = Array.from(new Set(Array.from(loanOriginAccountIdMap.values())));
+  const originAccounts: LoanOriginAccount[] = [];
+  const loanOriginSummaryMap = new Map<string, EnrichedLoanOriginAccountSummary>();
+
+  if (distinctOriginAccountIds.length > 0) {
+    const originAccountsList = await db
+      .select()
+      .from(accounts)
+      .where(and(eq(accounts.userId, userId), inArray(accounts.id, distinctOriginAccountIds)));
+
+    const pendingOriginTxs = await db
+      .select()
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.userId, userId),
+          inArray(transactions.accountId, distinctOriginAccountIds),
+          eq(transactions.status, "pending"),
+        ),
+      );
+
+    const allAccountFixedTxs = await db
+      .select({
+        competencyMonth: transactions.competencyMonth,
+        fixedTransactionId: transactions.fixedTransactionId,
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.userId, userId),
+          inArray(transactions.accountId, distinctOriginAccountIds),
+          isNotNull(transactions.fixedTransactionId),
+        ),
+      );
+
+    const materializedFixed = new Set<string>();
+    for (const t of allAccountFixedTxs) {
+      if (t.fixedTransactionId && t.competencyMonth) {
+        materializedFixed.add(`${t.competencyMonth}-${t.fixedTransactionId}`);
+      }
+    }
+
+    const activeFixedInflows = await db
+      .select()
+      .from(fixedTransactions)
+      .where(
+        and(
+          eq(fixedTransactions.userId, userId),
+          eq(fixedTransactions.active, true),
+          or(
+            and(eq(fixedTransactions.type, "income"), inArray(fixedTransactions.accountId, distinctOriginAccountIds)),
+            and(
+              eq(fixedTransactions.type, "transfer"),
+              inArray(fixedTransactions.destinationAccountId, distinctOriginAccountIds),
+            ),
+          ),
+        ),
+      );
+
+    const activeFixedOutflows = await db
+      .select()
+      .from(fixedTransactions)
+      .where(
+        and(
+          eq(fixedTransactions.userId, userId),
+          eq(fixedTransactions.active, true),
+          or(
+            and(eq(fixedTransactions.type, "expense"), inArray(fixedTransactions.accountId, distinctOriginAccountIds)),
+            and(eq(fixedTransactions.type, "transfer"), inArray(fixedTransactions.accountId, distinctOriginAccountIds)),
+          ),
+        ),
+      );
+
+    const today = new Date();
+    const currentCompetencyMonth = getCompetencyMonth(today, closingDay);
+
+    for (const acc of originAccountsList) {
+      const currentBalance = Number(acc.currentBalance);
+      const loansForAcc = userLoans.filter((l) => loanOriginAccountIdMap.get(l.id) === acc.id);
+      const loanIdsForAcc = new Set(loansForAcc.map((l) => l.id));
+
+      const pendingLoanReturns = pendingOriginTxs.filter(
+        (t) => t.loanId && loanIdsForAcc.has(t.loanId) && t.type === "transfer" && t.parentTransactionId !== null,
+      );
+      const totalOwed = pendingLoanReturns.reduce((sum, t) => sum + Number(t.amount), 0);
+
+      const paidLoanReturns = allLoanTransactions.filter(
+        (t) =>
+          t.loanId &&
+          loanIdsForAcc.has(t.loanId) &&
+          t.type === "transfer" &&
+          t.parentTransactionId !== null &&
+          t.status === "paid",
+      );
+      const totalPaid = paidLoanReturns.reduce((sum, t) => sum + Number(t.amount), 0);
+
+      const otherPendingTxs = pendingOriginTxs.filter((t) => !t.loanId || !loanIdsForAcc.has(t.loanId));
+
+      const returnMonths = pendingLoanReturns.map((t) => t.competencyMonth).filter(Boolean);
+      let minMonth = currentCompetencyMonth;
+      let maxMonth = currentCompetencyMonth;
+      for (const m of returnMonths) {
+        if (m < minMonth) minMonth = m;
+        if (m > maxMonth) maxMonth = m;
+      }
+
+      // Check for overdue pending non-loan transactions before minMonth
+      let runningBalance = currentBalance;
+      const overduePendingTxs = otherPendingTxs.filter((t) => t.competencyMonth < minMonth);
+      for (const t of overduePendingTxs) {
+        const amt = Number(t.amount);
+        if (t.type === "income" || (t.type === "transfer" && t.parentTransactionId !== null)) {
+          runningBalance += amt;
+        } else if (t.type === "expense" || (t.type === "transfer" && t.parentTransactionId === null)) {
+          runningBalance -= amt;
+        }
+      }
+
+      let cursorDate = parseISO(`${minMonth}-01`);
+      const endDate = parseISO(`${maxMonth}-01`);
+      const monthlyProgression: OriginAccountProgressionMonth[] = [];
+      let otherRevenuesTotal = 0;
+
+      while (cursorDate <= endDate) {
+        const monthStr = format(cursorDate, "yyyy-MM");
+
+        // 1. Loan reimbursements in monthStr
+        const monthLoanTxs = pendingLoanReturns.filter((t) => t.competencyMonth === monthStr);
+        const loanAmt = monthLoanTxs.reduce((sum, t) => sum + Number(t.amount), 0);
+        const loanItems = monthLoanTxs.map((t) => ({
+          description: t.description,
+          amount: Number(t.amount),
+        }));
+
+        // 2. Other incomes in monthStr
+        let monthOtherIncomes = 0;
+        const otherItems: Array<{ description: string; amount: number }> = [];
+
+        // Real pending inflows
+        const monthPendingInflows = otherPendingTxs.filter(
+          (t) =>
+            t.competencyMonth === monthStr &&
+            (t.type === "income" || (t.type === "transfer" && t.parentTransactionId !== null)),
+        );
+        for (const t of monthPendingInflows) {
+          const amt = Number(t.amount);
+          monthOtherIncomes += amt;
+          otherItems.push({
+            description: t.description,
+            amount: amt,
+          });
+        }
+
+        // Virtual fixed inflows
+        for (const ft of activeFixedInflows) {
+          if (ft.accountId === acc.id || ft.destinationAccountId === acc.id) {
+            const ftStartMonth = ft.startDate.substring(0, 7);
+            if (monthStr >= ftStartMonth && !materializedFixed.has(`${monthStr}-${ft.id}`)) {
+              const amt = Number(ft.amount);
+              monthOtherIncomes += amt;
+              otherItems.push({
+                description: `${ft.description} (Fixo)`,
+                amount: amt,
+              });
+            }
+          }
+        }
+
+        // 3. Other outflows in monthStr
+        let monthOtherOutflows = 0;
+        const monthPendingOutflows = otherPendingTxs.filter(
+          (t) =>
+            t.competencyMonth === monthStr &&
+            (t.type === "expense" || (t.type === "transfer" && t.parentTransactionId === null)),
+        );
+        for (const t of monthPendingOutflows) {
+          const amt = Number(t.amount);
+          monthOtherOutflows += amt;
+          otherItems.push({
+            description: t.description,
+            amount: -amt,
+          });
+        }
+
+        for (const ft of activeFixedOutflows) {
+          if (ft.accountId === acc.id) {
+            const ftStartMonth = ft.startDate.substring(0, 7);
+            if (monthStr >= ftStartMonth && !materializedFixed.has(`${monthStr}-${ft.id}`)) {
+              const amt = Number(ft.amount);
+              monthOtherOutflows += amt;
+              otherItems.push({
+                description: `${ft.description} (Fixo)`,
+                amount: -amt,
+              });
+            }
+          }
+        }
+
+        const netMonth = loanAmt + monthOtherIncomes - monthOtherOutflows;
+        const startBal = runningBalance;
+        runningBalance += netMonth;
+        otherRevenuesTotal += monthOtherIncomes - monthOtherOutflows;
+
+        monthlyProgression.push({
+          month: monthStr,
+          startingBalance: Math.round(startBal * 100) / 100,
+          loanReimbursements: Math.round(loanAmt * 100) / 100,
+          otherIncomes: Math.round(monthOtherIncomes * 100) / 100,
+          otherOutflows: Math.round(monthOtherOutflows * 100) / 100,
+          netMonth: Math.round(netMonth * 100) / 100,
+          projectedBalance: Math.round(runningBalance * 100) / 100,
+          loanItems,
+          otherItems,
+        });
+
+        cursorDate = addMonths(cursorDate, 1);
+      }
+
+      const finalProjectedBalance = Math.round(runningBalance * 100) / 100;
+
+      originAccounts.push({
+        accountId: acc.id,
+        accountName: acc.name,
+        accountType: acc.type,
+        currentBalance: Math.round(currentBalance * 100) / 100,
+        totalOwed: Math.round(totalOwed * 100) / 100,
+        totalPaid: Math.round(totalPaid * 100) / 100,
+        otherRevenuesTotal: Math.round(otherRevenuesTotal * 100) / 100,
+        finalProjectedBalance,
+        loansCount: loansForAcc.length,
+        associatedLoans: loansForAcc.map((l) => {
+          const lData = loanDataMap.get(l.id);
+          const rem = (lData?.totalToPay ?? 0) - (lData?.totalPaid ?? 0);
+          return { id: l.id, name: l.name, remaining: Math.round(rem * 100) / 100 };
+        }),
+        monthlyProgression,
+      });
+
+      for (const l of loansForAcc) {
+        loanOriginSummaryMap.set(l.id, {
+          id: acc.id,
+          name: acc.name,
+          type: acc.type,
+          currentBalance: Math.round(currentBalance * 100) / 100,
+          totalOwed: Math.round(totalOwed * 100) / 100,
+          finalProjectedBalance,
+        });
+      }
+    }
+  }
+
   let bankDebtTotal = 0;
   let personalDebtTotal = 0;
 
@@ -441,6 +750,7 @@ export async function getLoansPageData() {
       remaining,
       progressPercent,
       installmentList: data.installments,
+      originAccount: loanOriginSummaryMap.get(loan.id) ?? null,
     };
   });
 
@@ -501,6 +811,7 @@ export async function getLoansPageData() {
     personalDebtTotal: Math.round(personalDebtTotal * 100) / 100,
     amortizationData,
     closingDay,
+    originAccounts,
   };
 }
 

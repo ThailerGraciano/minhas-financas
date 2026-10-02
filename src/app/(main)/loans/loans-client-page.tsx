@@ -1,12 +1,13 @@
 "use client";
 
-import { HandCoins, Landmark, Percent, TrendingDown } from "lucide-react";
+import { HandCoins, Landmark, Percent, PiggyBank, TrendingDown } from "lucide-react";
 import { useState } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { getLoansPageData } from "@/app/actions/loans";
 import { LoanDetailsDialog } from "@/components/loan-details-dialog";
 import { LoanFormDialog } from "@/components/loan-form-dialog";
+import { LoanOriginAccountCard } from "@/components/loan-origin-account-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip } from "@/components/ui/chart";
 import { Progress } from "@/components/ui/progress";
@@ -62,7 +63,7 @@ const AmortizationTooltip = ({ active, payload, label }: CustomTooltipProps) => 
 };
 
 export function LoansClientPage({ data }: { data: LoansPageData }) {
-  const { loans, bankDebtTotal, personalDebtTotal, amortizationData, closingDay } = data;
+  const { loans, bankDebtTotal, personalDebtTotal, amortizationData, closingDay, originAccounts } = data;
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
 
   const selectedLoan = loans.find((l) => l.id === selectedLoanId) || null;
@@ -108,6 +109,9 @@ export function LoansClientPage({ data }: { data: LoansPageData }) {
         </Card>
       </div>
 
+      {/* Origin Account(s) Section (Personal Loans Lending Account) */}
+      {originAccounts && originAccounts.length > 0 && <LoanOriginAccountCard originAccounts={originAccounts} />}
+
       {/* Loan Contract Cards */}
       {hasLoans ? (
         <div className="space-y-4">
@@ -152,6 +156,20 @@ export function LoansClientPage({ data }: { data: LoansPageData }) {
                       <p className="font-semibold text-green-500">{formatCurrency(loan.totalPaid)}</p>
                     </div>
                   </div>
+
+                  {loan.type === "personal" && loan.originAccount && (
+                    <div className="flex items-center justify-between text-xs text-muted-foreground bg-orange-500/5 border border-orange-500/10 px-2.5 py-1.5 rounded-xl">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <PiggyBank className="h-3.5 w-3.5 text-orange-500 shrink-0" />
+                        <span className="truncate">
+                          Conta Credora: <strong className="text-foreground">{loan.originAccount.name}</strong>
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-medium text-muted-foreground whitespace-nowrap pl-2">
+                        Saldo: {formatCurrency(loan.originAccount.currentBalance)}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs text-muted-foreground">

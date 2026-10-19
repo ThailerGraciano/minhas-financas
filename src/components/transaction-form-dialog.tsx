@@ -89,7 +89,7 @@ export function TransactionFormDialog({
   const [accountIdTransferOrigin, setAccountIdTransferOrigin] = useState("");
   const [accountIdTransferDest, setAccountIdTransferDest] = useState("");
 
-  const [isPaid, setIsPaid] = useState(false);
+  const [isPaid, setIsPaid] = useState(true);
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
 
@@ -122,7 +122,7 @@ export function TransactionFormDialog({
     setAccountIdIncome("");
     setAccountIdTransferOrigin("");
     setAccountIdTransferDest("");
-    setIsPaid(false);
+    setIsPaid(true);
     setFormError("");
   };
 
@@ -137,7 +137,7 @@ export function TransactionFormDialog({
     setAccountIdIncome("");
     setAccountIdTransferOrigin("");
     setAccountIdTransferDest("");
-    setIsPaid(false);
+    setIsPaid(dueDate <= todayStr);
     setFormError("");
   };
 
@@ -661,6 +661,7 @@ export function TransactionFormDialog({
                           setLaunchDate(val);
                           if (!isDueDateManuallyEdited) {
                             setDueDate(val);
+                            setIsPaid(val <= todayStr);
                           }
                         }}
                       />
@@ -677,6 +678,7 @@ export function TransactionFormDialog({
                         onChange={(val) => {
                           setDueDate(val);
                           setIsDueDateManuallyEdited(true);
+                          setIsPaid(val <= todayStr);
                         }}
                       />
                     </div>

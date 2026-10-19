@@ -1,4 +1,5 @@
 import { getAccounts } from "@/app/actions/accounts";
+import { getCategories } from "@/app/actions/categories";
 import { getCreditCard, getInvoiceSummary } from "@/app/actions/credit-cards";
 import { CompetencyFilter } from "@/components/competency-filter";
 import { Button } from "@/components/ui/button";
@@ -35,21 +36,17 @@ export default async function CreditCardInvoicePage(props: {
 
   const currentMonth = monthParam || getDefaultCompetencyMonth(card.closingDay);
 
-  const summary = await getInvoiceSummary(id, currentMonth);
-
-  console.log("summary - ", summary);
-  const accounts = await getAccounts();
+  const [summary, accounts, categories] = await Promise.all([
+    getInvoiceSummary(id, currentMonth),
+    getAccounts(),
+    getCategories(),
+  ]);
 
   const progressPercentage =
     summary.total_amount > 0 ? Math.round((summary.paid_amount / summary.total_amount) * 100) : 0;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-  };
-
-  const formatDate = (dateStr: string) => {
-    const [, month, day] = dateStr.split("-");
-    return `${day}/${month}`;
   };
 
   return (
@@ -156,17 +153,17 @@ export default async function CreditCardInvoicePage(props: {
 
       {/* Expenses Table */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
+        <CardHeader className="flex flex-row items-center justify-between gap-2 px-4 sm:px-6">
           <CardTitle className="text-sm md:text-lg shrink-0">Despesas da Fatura - {currentMonth}</CardTitle>
           <ExportCSVButton transactions={summary.transactions} invoiceMonth={currentMonth} cardName={card.name} />
         </CardHeader>
-        <CardContent className="p-2 sm:p-6 pt-0">
+        <CardContent className="px-2 sm:px-6">
           {summary.transactions.length === 0 ? (
             <div className="text-center p-8 text-muted-foreground border rounded-lg border-dashed">
               Nenhuma despesa registrada nesta fatura.
             </div>
           ) : (
-            <InvoiceTransactionList transactions={summary.transactions} />
+            <InvoiceTransactionList transactions={summary.transactions} categories={categories} />
           )}
         </CardContent>
       </Card>

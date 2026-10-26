@@ -754,6 +754,97 @@ export async function getExpenseTreemapData(
   return roots;
 }
 
+export async function getIncomeTreemapData(
+  competencyMonth: string,
+  dateMode: "due_date" | "launch_date" = "due_date",
+): Promise<TreemapDataSets> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
+  const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
+  const closingDay = appSettings?.closingDay || 25;
+  const userCards = await db
+    .select({ id: creditCards.id, dueDay: creditCards.dueDay, closingDay: creditCards.closingDay })
+    .from(creditCards)
+    .where(eq(creditCards.userId, userId));
+  const condition = buildGlobalCompetencyCondition(competencyMonth, closingDay, userId, userCards, dateMode);
+
+  const rawTransactions = await db.query.transactions.findMany({
+    where: and(eq(transactions.type, "income"), ne(transactions.status, "ignored"), condition),
+    with: {
+      category: true,
+      subcategory: true,
+    },
+  });
+
+  const roots: TreemapDataSets = {
+    all: { name: "Receitas", children: [] },
+    variable: { name: "Receitas Variáveis", children: [] },
+    installment: { name: "Receitas Parceladas", children: [] },
+    fixed: { name: "Receitas Fixas", children: [] },
+  };
+
+  const maps = {
+    all: { cat: new Map<string, TreemapNode>(), sub: new Map<string, TreemapNode>() },
+    variable: { cat: new Map<string, TreemapNode>(), sub: new Map<string, TreemapNode>() },
+    installment: { cat: new Map<string, TreemapNode>(), sub: new Map<string, TreemapNode>() },
+    fixed: { cat: new Map<string, TreemapNode>(), sub: new Map<string, TreemapNode>() },
+  };
+
+  const addToTree = (
+    treeType: keyof TreemapDataSets,
+    desc: string,
+    id: string | number,
+    val: number,
+    catName: string,
+    subName: string,
+  ) => {
+    const root = roots[treeType];
+    const { cat, sub } = maps[treeType];
+
+    if (!cat.has(catName)) {
+      const newCat: TreemapNode = { name: catName, children: [] };
+      cat.set(catName, newCat);
+      root.children!.push(newCat);
+    }
+    const catNode = cat.get(catName)!;
+    const subcatKey = `${catName}-${subName}`;
+    if (!sub.has(subcatKey)) {
+      const newSub: TreemapNode = { name: subName, children: [] };
+      sub.set(subcatKey, newSub);
+      catNode.children!.push(newSub);
+    }
+    const subNode = sub.get(subcatKey)!;
+    subNode.children!.push({
+      name: desc,
+      value: val,
+      id: String(id),
+    });
+  };
+
+  rawTransactions.forEach((t) => {
+    const catName = t.category?.name || "Sem Categoria";
+    const subName = t.subcategory?.name || "Geral";
+    const val = Number(t.amount);
+
+    const isInstallment = t.installmentTotal && t.installmentTotal > 1;
+    const isFixed = t.fixedTransactionId || t.isFixed;
+
+    addToTree("all", t.description, t.id, val, catName, subName);
+
+    if (isInstallment) {
+      addToTree("installment", t.description, t.id, val, catName, subName);
+    } else if (isFixed) {
+      addToTree("fixed", t.description, t.id, val, catName, subName);
+    } else {
+      addToTree("variable", t.description, t.id, val, catName, subName);
+    }
+  });
+
+  return roots;
+}
+
 export async function getExpensesForecastData() {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");

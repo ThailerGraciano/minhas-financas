@@ -7,6 +7,7 @@ import {
   getDashboardData,
   getExpenseTreemapData,
   getExpensesForecastData,
+  getIncomeTreemapData,
   getIncomeVsExpenseData,
   getInstallmentsChartData,
 } from "./dashboard";
@@ -23,10 +24,11 @@ export async function getDashboardFullData(month: string, dateMode: "due_date" |
   ]);
 
   // Lote 2: Gráficos e agrupamentos
-  const [installmentsData, incomeVsExpenseData, treemapData] = await Promise.all([
+  const [installmentsData, incomeVsExpenseData, treemapData, incomeTreemapData] = await Promise.all([
     getInstallmentsChartData(),
     getIncomeVsExpenseData(month, false, dateMode),
     getExpenseTreemapData(month, dateMode),
+    getIncomeTreemapData(month, dateMode),
   ]);
 
   // Lote 3: Previsões e estimativas
@@ -42,6 +44,7 @@ export async function getDashboardFullData(month: string, dateMode: "due_date" |
     installmentsData,
     incomeVsExpenseData,
     treemapData,
+    incomeTreemapData,
     forecastData,
     categoryForecastData,
   };

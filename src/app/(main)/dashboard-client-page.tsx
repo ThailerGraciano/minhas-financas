@@ -7,6 +7,7 @@ import { AdvancedAnalyticsSection } from "@/components/advanced-analytics-sectio
 import { BalanceEvolutionChart, COLOR_FUTURE, COLOR_PAST } from "@/components/balance-evolution-chart";
 import { CategoryForecastChart } from "@/components/category-forecast-chart";
 import { ExpenseTreemap } from "@/components/charts/ExpenseTreemap";
+import { IncomeTreemap } from "@/components/charts/IncomeTreemap";
 import { ClientDataLoader } from "@/components/client-data-loader";
 import { CreditCardInvoicesList } from "@/components/credit-card-invoices-list";
 import { EmergencyReserveCard } from "@/components/emergency-reserve-card";
@@ -211,6 +212,22 @@ export function DashboardClientPage({
                 </div>
               </div>
               <ExpenseTreemap data={dashboard.treemapData} showBalance={showBalance} />
+            </div>
+
+            {/* ==================================================
+                6.1. MAPEAMENTO DE RECEITAS (Treemap Proporcional)
+               ================================================== */}
+            <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border border-white/5 shadow-sm w-full min-w-0">
+              <div className="flex flex-row items-center gap-2 mb-4">
+                <Grid3X3 className="h-5 w-5 text-emerald-500" />
+                <div>
+                  <h2 className="text-xl font-bold">Mapeamento de Receitas</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Distribuição proporcional de receitas por categoria neste mês
+                  </p>
+                </div>
+              </div>
+              <IncomeTreemap data={dashboard.incomeTreemapData} showBalance={showBalance} />
             </div>
 
             {/* ==================================================

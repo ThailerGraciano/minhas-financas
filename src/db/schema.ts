@@ -394,7 +394,18 @@ export const budgets = pgTable("budgets", {
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   pillar: varchar("pillar", { length: 50 }).notNull(), // needs, lifestyle, goals
   month: varchar("month", { length: 7 }).notNull(), // YYYY-MM
+  incomeSourceId: varchar("income_source_id", { length: 100 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const budgetMonthConfigs = pgTable("budget_month_configs", {
+  id: serial("id").primaryKey(),
+  userId: uuid("user_id")
+    .references(() => users.id)
+    .notNull(),
+  month: varchar("month", { length: 7 }).notNull(), // YYYY-MM
+  selectedIncomeIds: jsonb("selected_income_ids").$type<string[]>().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -410,5 +421,12 @@ export const budgetsRelations = relations(budgets, ({ one }) => ({
   subcategory: one(subcategories, {
     fields: [budgets.subcategoryId],
     references: [subcategories.id],
+  }),
+}));
+
+export const budgetMonthConfigsRelations = relations(budgetMonthConfigs, ({ one }) => ({
+  user: one(users, {
+    fields: [budgetMonthConfigs.userId],
+    references: [users.id],
   }),
 }));

@@ -3,11 +3,29 @@
 import { deleteBudgetLimit, saveBudgetLimit, type BudgetPillar } from "@/app/actions/budgets";
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  roundCurrency,
+  validateAllocationToIncome,
+  type BudgetIncomeSource,
+  type BudgetPlanItem,
+} from "@/lib/budget-planner-utils";
 import { cn } from "@/lib/utils";
-import { Heart, Sparkles, Target, Trash2 } from "lucide-react";
+import { AlertCircle, Heart, Sparkles, Target, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -20,6 +38,7 @@ export interface BudgetEditTarget {
   subcategoryName?: string;
   amount: number;
   pillar: BudgetPillar;
+  incomeSourceId?: string | null;
 }
 
 interface BudgetLimitDialogProps {
@@ -32,6 +51,8 @@ interface BudgetLimitDialogProps {
     name: string;
     subcategories: Array<{ id: number; name: string }>;
   }>;
+  selectedIncomes?: BudgetIncomeSource[];
+  allItems?: BudgetPlanItem[];
   editTarget?: BudgetEditTarget | null;
   onSuccess?: () => void;
 }
@@ -44,12 +65,23 @@ interface BudgetLimitFormProps {
     name: string;
     subcategories: Array<{ id: number; name: string }>;
   }>;
+  selectedIncomes: BudgetIncomeSource[];
+  allItems: BudgetPlanItem[];
   editTarget?: BudgetEditTarget | null;
   onClose: () => void;
   onSuccess?: () => void;
 }
 
-function BudgetLimitForm({ month, freeBalance, categories, editTarget, onClose, onSuccess }: BudgetLimitFormProps) {
+function BudgetLimitForm({
+  month,
+  freeBalance,
+  categories,
+  selectedIncomes,
+  allItems,
+  editTarget,
+  onClose,
+  onSuccess,
+}: BudgetLimitFormProps) {
   const router = useRouter();
   const [isPending, setIsPending] = useState(false);
 
@@ -63,12 +95,28 @@ function BudgetLimitForm({ month, freeBalance, categories, editTarget, onClose, 
     editTarget?.amount && editTarget.amount > 0 ? editTarget.amount : undefined,
   );
   const [pillar, setPillar] = useState<BudgetPillar>(editTarget?.pillar || "needs");
+  const [incomeSourceId, setIncomeSourceId] = useState<string>(
+    editTarget?.incomeSourceId ?? "__none__",
+  );
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
 
   const selectedCategory = categories.find((c) => String(c.id) === categoryId);
   const availableSubcategories = selectedCategory?.subcategories || [];
+
+  const currentItemKey =
+    subcategoryId === "all" ? `cat:${categoryId}` : `sub:${subcategoryId}`;
+  const targetIncomeId = incomeSourceId === "__none__" ? null : incomeSourceId;
+  const candidateAmount = amount && amount > 0 ? roundCurrency(amount) : 0;
+
+  const validation = validateAllocationToIncome(
+    currentItemKey,
+    candidateAmount,
+    targetIncomeId,
+    selectedIncomes,
+    allItems,
+  );
 
   const handleCategoryChange = (newCatId: string) => {
     setCategoryId(newCatId);
@@ -88,6 +136,11 @@ function BudgetLimitForm({ month, freeBalance, categories, editTarget, onClose, 
       return;
     }
 
+    if (!validation.valid) {
+      toast.error(validation.reason || "Capacidade insuficiente na receita selecionada.");
+      return;
+    }
+
     setIsPending(true);
 
     const res = await saveBudgetLimit({
@@ -97,6 +150,7 @@ function BudgetLimitForm({ month, freeBalance, categories, editTarget, onClose, 
       amount,
       pillar,
       month,
+      incomeSourceId: targetIncomeId,
     });
 
     setIsPending(false);
@@ -130,12 +184,16 @@ function BudgetLimitForm({ month, freeBalance, categories, editTarget, onClose, 
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {/* Categoria Principal */}
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">Categoria Principal</Label>
-        <Select value={categoryId} onValueChange={handleCategoryChange} disabled={Boolean(editTarget?.id)}>
-          <SelectTrigger className="h-12 w-full rounded-xl bg-muted/40 border-input focus:ring-2 focus:ring-primary">
+        <Select
+          value={categoryId}
+          onValueChange={handleCategoryChange}
+          disabled={Boolean(editTarget?.id)}
+        >
+          <SelectTrigger className="h-11 w-full rounded-xl bg-muted/40 border-input focus:ring-2 focus:ring-primary">
             <SelectValue placeholder="Selecione a categoria..." />
           </SelectTrigger>
           <SelectContent>
@@ -149,10 +207,14 @@ function BudgetLimitForm({ month, freeBalance, categories, editTarget, onClose, 
       </div>
 
       {/* Subcategoria */}
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">Subcategoria</Label>
-        <Select value={subcategoryId} onValueChange={setSubcategoryId} disabled={Boolean(editTarget?.id)}>
-          <SelectTrigger className="h-12 w-full rounded-xl bg-muted/40 border-input focus:ring-2 focus:ring-primary">
+        <Select
+          value={subcategoryId}
+          onValueChange={setSubcategoryId}
+          disabled={Boolean(editTarget?.id)}
+        >
+          <SelectTrigger className="h-11 w-full rounded-xl bg-muted/40 border-input focus:ring-2 focus:ring-primary">
             <SelectValue placeholder="Selecione..." />
           </SelectTrigger>
           <SelectContent>
@@ -166,13 +228,52 @@ function BudgetLimitForm({ month, freeBalance, categories, editTarget, onClose, 
         </Select>
       </div>
 
-      {/* Tipo de Gasto Mensal (R$) */}
-      <div className="space-y-2">
+      {/* Receita de Origem (Opcional) */}
+      {selectedIncomes.length > 0 && (
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">
+            Vincular a uma Receita Fixa (Opcional)
+          </Label>
+          <Select value={incomeSourceId} onValueChange={setIncomeSourceId}>
+            <SelectTrigger className="h-11 w-full rounded-xl bg-muted/40 border-input focus:ring-2 focus:ring-primary">
+              <SelectValue placeholder="Sem receita vinculada..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Sem receita vinculada (Bandeja externa)</SelectItem>
+              {selectedIncomes.map((inc) => {
+                const otherAllocated = allItems
+                  .filter((i) => i.itemKey !== currentItemKey && i.incomeSourceId === inc.id)
+                  .reduce((acc, curr) => acc + curr.amount, 0);
+                const avail = roundCurrency(Math.max(0, inc.amount - otherAllocated));
+                return (
+                  <SelectItem key={inc.id} value={inc.id}>
+                    {inc.name} — Disponível: {formatCurrency(avail)}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+
+          {!validation.valid && (
+            <div className="flex items-start gap-2 rounded-xl bg-rose-500/10 border border-rose-500/30 p-2.5 text-xs text-rose-300">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <span>{validation.reason}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Valor Mensal (R$) */}
+      <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <Label className="text-xs text-muted-foreground">Tipo de Gasto Mensal (R$)</Label>
-          <span className="text-[11px] text-muted-foreground">
-            Disponível para alocar:{" "}
-            <strong className={freeBalance >= 0 ? "text-emerald-500 font-bold" : "text-rose-500 font-bold"}>
+          <Label className="text-xs text-muted-foreground">Teto de Gasto Mensal (R$)</Label>
+          <span className="text-[11px] text-muted-foreground tabular-nums">
+            Saldo previsto:{" "}
+            <strong
+              className={
+                freeBalance >= 0 ? "text-emerald-500 font-bold" : "text-rose-500 font-bold"
+              }
+            >
               {formatCurrency(freeBalance)}
             </strong>
           </span>
@@ -182,17 +283,16 @@ function BudgetLimitForm({ month, freeBalance, categories, editTarget, onClose, 
           value={amount}
           onValueChange={setAmount}
           placeholder="R$ 0,00"
-          className="h-14 text-2xl font-black text-center rounded-xl bg-muted/40 border-input focus:ring-2 focus:ring-primary text-foreground"
+          className="h-13 text-2xl font-black text-center rounded-xl bg-muted/40 border-input focus:ring-2 focus:ring-primary text-foreground"
           required
           autoFocus
         />
       </div>
 
       {/* Seleção de Pilar (Zero-Based Budgeting) */}
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">Pilar (Zero-Based Budgeting)</Label>
         <div className="grid grid-cols-3 gap-2.5">
-          {/* Necessidades Fixas */}
           <button
             type="button"
             onClick={() => setPillar("needs")}
@@ -207,7 +307,6 @@ function BudgetLimitForm({ month, freeBalance, categories, editTarget, onClose, 
             <span className="text-xs font-semibold leading-tight">Necessidades Fixas</span>
           </button>
 
-          {/* Estilo de Vida */}
           <button
             type="button"
             onClick={() => setPillar("lifestyle")}
@@ -222,7 +321,6 @@ function BudgetLimitForm({ month, freeBalance, categories, editTarget, onClose, 
             <span className="text-xs font-semibold leading-tight">Estilo de Vida</span>
           </button>
 
-          {/* Metas & Aportes */}
           <button
             type="button"
             onClick={() => setPillar("goals")}
@@ -257,7 +355,7 @@ function BudgetLimitForm({ month, freeBalance, categories, editTarget, onClose, 
 
         <Button
           type="submit"
-          disabled={isPending}
+          disabled={isPending || !validation.valid}
           className="w-full h-12 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold text-base shadow-md cursor-pointer transition-all"
         >
           {isPending ? "Salvando..." : "Salvar Orçamento"}
@@ -273,6 +371,8 @@ export function BudgetLimitDialog({
   month,
   freeBalance,
   categories,
+  selectedIncomes = [],
+  allItems = [],
   editTarget,
   onSuccess,
 }: BudgetLimitDialogProps) {
@@ -290,10 +390,16 @@ export function BudgetLimitDialog({
 
         {open && (
           <BudgetLimitForm
-            key={editTarget?.id ? `edit-${editTarget.id}` : `new-${categories[0]?.id || 0}`}
+            key={
+              editTarget?.id
+                ? `edit-${editTarget.id}`
+                : `new-${editTarget?.categoryId || categories[0]?.id || 0}-${editTarget?.subcategoryId || "all"}`
+            }
             month={month}
             freeBalance={freeBalance}
             categories={categories}
+            selectedIncomes={selectedIncomes}
+            allItems={allItems}
             editTarget={editTarget}
             onClose={() => onOpenChange(false)}
             onSuccess={onSuccess}

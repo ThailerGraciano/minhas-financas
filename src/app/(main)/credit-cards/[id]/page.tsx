@@ -11,6 +11,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdjustInvoiceDialog } from "./adjust-invoice-dialog";
 import { ExportCSVButton } from "./export-csv-button";
+import { InvoiceDashboardSection } from "./invoice-dashboard-section";
 import { InvoiceTransactionList } from "./invoice-transaction-list";
 import { PayInvoiceDialog } from "./pay-invoice-dialog";
 import { PrepayInvoiceDialog } from "./prepay-invoice-dialog";
@@ -87,6 +88,9 @@ export default async function CreditCardInvoicePage(props: {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-muted/30 rounded-lg border">
         <CompetencyFilter closingDay={card.closingDay} defaultMonth={getDefaultCompetencyMonth(card.closingDay)} />
       </div>
+
+      {/* Collapsible Dashboard Group */}
+      <InvoiceDashboardSection transactions={summary.transactions} />
 
       {/* Visual Summary */}
       <div className="grid gap-6 md:grid-cols-4">

@@ -3,12 +3,22 @@
 import type { CategoryBudgetHierarchy, SubcategoryBudgetHierarchy } from "@/app/actions/budgets";
 import { CategoryIcon } from "@/components/category-icon";
 import { Progress } from "@/components/ui/progress";
+import type { BudgetIncomeSource } from "@/lib/budget-planner-utils";
 import { cn } from "@/lib/utils";
-import { ChevronDown, ChevronUp, Edit3, Plus, ShieldAlert } from "lucide-react";
+import {
+  Banknote,
+  ChevronDown,
+  ChevronUp,
+  Edit3,
+  FolderOpen,
+  Plus,
+  ShieldAlert,
+} from "lucide-react";
 import { useState } from "react";
 
 interface BudgetHierarchyListProps {
   categories: CategoryBudgetHierarchy[];
+  selectedIncomes: BudgetIncomeSource[];
   onEditLimit: (item: {
     categoryId: number;
     categoryName: string;
@@ -17,15 +27,25 @@ interface BudgetHierarchyListProps {
     amount: number;
     pillar: "needs" | "lifestyle" | "goals";
     id?: number;
+    incomeSourceId?: string | null;
   }) => void;
+  onOpenItemDetails?: (itemKey: string) => void;
   onAddNew: () => void;
 }
 
-export function BudgetHierarchyList({ categories, onEditLimit, onAddNew }: BudgetHierarchyListProps) {
+export function BudgetHierarchyList({
+  categories,
+  selectedIncomes,
+  onEditLimit,
+  onOpenItemDetails,
+  onAddNew,
+}: BudgetHierarchyListProps) {
   const [expandedCategories, setExpandedCategories] = useState<Record<number, boolean>>({});
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
+
+  const incomeMap = new Map(selectedIncomes.map((inc) => [inc.id, inc.name]));
 
   const toggleExpand = (catId: number) => {
     setExpandedCategories((prev) => ({
@@ -69,6 +89,41 @@ export function BudgetHierarchyList({ categories, onEditLimit, onAddNew }: Budge
     }
   };
 
+  const renderIncomeLinkBadge = (
+    itemKey: string,
+    incomeSourceId: string | null,
+    isBudgeted: boolean,
+  ) => {
+    if (!isBudgeted) return null;
+    const incomeName = incomeSourceId ? incomeMap.get(incomeSourceId) : null;
+
+    return (
+      <button
+        type="button"
+        onClick={() => onOpenItemDetails?.(itemKey)}
+        title="Clique para alterar o vínculo de receita no painel de detalhes"
+        className={cn(
+          "text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 transition-colors cursor-pointer",
+          incomeName
+            ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/25 hover:bg-emerald-500/20"
+            : "bg-amber-500/10 text-amber-300 border-amber-500/25 hover:bg-amber-500/20",
+        )}
+      >
+        {incomeName ? (
+          <>
+            <Banknote className="w-3 h-3 shrink-0" />
+            <span className="truncate max-w-[140px]">{incomeName}</span>
+          </>
+        ) : (
+          <>
+            <FolderOpen className="w-3 h-3 shrink-0" />
+            <span>Sem receita vinculada</span>
+          </>
+        )}
+      </button>
+    );
+  };
+
   if (categories.length === 0) {
     return (
       <div className="bg-[#1A1A22] rounded-3xl p-8 border border-white/5 text-center flex flex-col items-center justify-center space-y-4 shadow-sm">
@@ -76,9 +131,12 @@ export function BudgetHierarchyList({ categories, onEditLimit, onAddNew }: Budge
           <ShieldAlert className="w-6 h-6" />
         </div>
         <div className="space-y-1">
-          <h3 className="font-semibold text-lg text-foreground">Nenhum orçamento definido para este mês</h3>
+          <h3 className="font-semibold text-lg text-foreground">
+            Nenhum orçamento definido para este mês
+          </h3>
           <p className="text-sm text-muted-foreground max-w-md">
-            Comece distribuindo limites para suas categorias essenciais seguindo a metodologia de Orçamento Base Zero.
+            Comece distribuindo limites para suas categorias essenciais seguindo a metodologia de
+            Orçamento Base Zero.
           </p>
         </div>
         <button
@@ -97,15 +155,18 @@ export function BudgetHierarchyList({ categories, onEditLimit, onAddNew }: Budge
     <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
         <h3 className="text-lg font-bold text-foreground">Categorias e Subcategorias Orçadas</h3>
-        <span className="text-xs text-muted-foreground">{categories.length} categorias cadastradas</span>
+        <span className="text-xs text-muted-foreground">
+          {categories.length} categorias cadastradas
+        </span>
       </div>
 
       <div className="space-y-3">
         {categories.map((cat) => {
-          // Default: open unless explicitly set to false
           const isExpanded = expandedCategories[cat.id] !== false;
           const progressColor = getProgressColor(cat.percent);
           const percentColor = getPercentTextColor(cat.percent);
+          const hasBudgetedSubs = cat.subcategories.some((s) => s.limit > 0);
+          const isParentDraggableUnit = !hasBudgetedSubs && cat.limit > 0;
 
           return (
             <div
@@ -121,25 +182,31 @@ export function BudgetHierarchyList({ categories, onEditLimit, onAddNew }: Budge
                     </div>
                     <div className="flex flex-col min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-foreground text-sm sm:text-base truncate">{cat.name}</span>
+                        <span className="font-bold text-foreground text-sm sm:text-base truncate">
+                          {cat.name}
+                        </span>
                         {getPillarBadge(cat.pillar)}
+                        {isParentDraggableUnit &&
+                          renderIncomeLinkBadge(`cat:${cat.id}`, cat.incomeSourceId, true)}
                       </div>
                       <span className="text-xs text-muted-foreground mt-0.5">
-                        {cat.subcategories.length} {cat.subcategories.length === 1 ? "subcategoria" : "subcategorias"}
+                        {cat.subcategories.length}{" "}
+                        {cat.subcategories.length === 1 ? "subcategoria" : "subcategorias"}
+                        {hasBudgetedSubs ? " • Orçado por subcategorias" : ""}
                       </span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
                     <div className="flex flex-col items-end">
-                      <div className="text-sm sm:text-base font-bold text-foreground">
+                      <div className="text-sm sm:text-base font-bold text-foreground tabular-nums">
                         <span className={percentColor}>{formatCurrency(cat.consumed)}</span>
                         <span className="text-muted-foreground font-normal text-xs sm:text-sm">
                           {" "}
                           / {formatCurrency(cat.limit)}
                         </span>
                       </div>
-                      <span className={cn("text-xs font-semibold", percentColor)}>
+                      <span className={cn("text-xs font-semibold tabular-nums", percentColor)}>
                         {cat.percent.toFixed(1)}% utilizado
                       </span>
                     </div>
@@ -153,6 +220,7 @@ export function BudgetHierarchyList({ categories, onEditLimit, onAddNew }: Budge
                           amount: cat.limit,
                           pillar: cat.pillar,
                           id: cat.budgetId,
+                          incomeSourceId: cat.incomeSourceId,
                         })
                       }
                       title="Editar Limite da Categoria"
@@ -167,7 +235,11 @@ export function BudgetHierarchyList({ categories, onEditLimit, onAddNew }: Budge
                       title={isExpanded ? "Recolher subcategorias" : "Expandir subcategorias"}
                       className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors cursor-pointer"
                     >
-                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      {isExpanded ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                 </div>
@@ -181,16 +253,20 @@ export function BudgetHierarchyList({ categories, onEditLimit, onAddNew }: Budge
                 </div>
 
                 {/* Detalhes de Consumo (Efetivado vs Pendente) */}
-                <div className="flex items-center justify-between text-[11px] sm:text-xs text-muted-foreground pt-0.5">
+                <div className="flex items-center justify-between text-[11px] sm:text-xs text-muted-foreground pt-0.5 tabular-nums">
                   <div className="flex items-center gap-3">
                     <span>
                       Efetivado:{" "}
-                      <strong className="text-foreground font-medium">{formatCurrency(cat.effective)}</strong>
+                      <strong className="text-foreground font-medium">
+                        {formatCurrency(cat.effective)}
+                      </strong>
                     </span>
                     <span>•</span>
                     <span>
                       Pendente / Fatura:{" "}
-                      <strong className="text-foreground font-medium">{formatCurrency(cat.pending)}</strong>
+                      <strong className="text-foreground font-medium">
+                        {formatCurrency(cat.pending)}
+                      </strong>
                     </span>
                   </div>
                   {cat.consumed > cat.limit && cat.limit > 0 && (
@@ -201,7 +277,7 @@ export function BudgetHierarchyList({ categories, onEditLimit, onAddNew }: Budge
                 </div>
               </div>
 
-              {/* Linhas das Subcategorias (Cascata com recuo e borda lateral) */}
+              {/* Linhas das Subcategorias */}
               {isExpanded && cat.subcategories.length > 0 && (
                 <div className="px-4 sm:px-5 pb-4 pt-1 bg-black/20 border-t border-white/5">
                   <div className="space-y-3 pt-3 border-l-2 border-white/10 pl-3 sm:pl-4 ml-2">
@@ -211,19 +287,29 @@ export function BudgetHierarchyList({ categories, onEditLimit, onAddNew }: Budge
 
                       return (
                         <div key={sub.id} className="space-y-1.5 py-1">
-                          <div className="flex items-center justify-between text-xs gap-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-medium text-foreground/90 truncate">{sub.name}</span>
-                              {sub.limit === 0 && (
+                          <div className="flex items-center justify-between text-xs gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                              <span className="font-medium text-foreground/90 truncate">
+                                {sub.name}
+                              </span>
+                              {sub.limit === 0 ? (
                                 <span className="text-[10px] text-muted-foreground bg-white/5 px-1.5 py-0.2 rounded">
                                   Teto Pai
                                 </span>
+                              ) : (
+                                renderIncomeLinkBadge(
+                                  `sub:${sub.id}`,
+                                  sub.incomeSourceId,
+                                  sub.limit > 0,
+                                )
                               )}
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-2 shrink-0 tabular-nums">
                               <span className="font-medium text-muted-foreground">
-                                <span className={subPercentColor}>{formatCurrency(sub.consumed)}</span>
+                                <span className={subPercentColor}>
+                                  {formatCurrency(sub.consumed)}
+                                </span>
                                 {sub.limit > 0 && <span> / {formatCurrency(sub.limit)}</span>}
                               </span>
                               {sub.limit > 0 && (
@@ -242,6 +328,7 @@ export function BudgetHierarchyList({ categories, onEditLimit, onAddNew }: Budge
                                     amount: sub.limit,
                                     pillar: cat.pillar,
                                     id: sub.budgetId,
+                                    incomeSourceId: sub.incomeSourceId,
                                   })
                                 }
                                 title="Editar Limite da Subcategoria"
@@ -261,7 +348,7 @@ export function BudgetHierarchyList({ categories, onEditLimit, onAddNew }: Budge
                           )}
 
                           {/* Resumo de valores (Efetivado vs Pendente) da Subcategoria */}
-                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground/80">
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground/80 tabular-nums">
                             <span>Efetivado: {formatCurrency(sub.effective)}</span>
                             <span>•</span>
                             <span>Pendente: {formatCurrency(sub.pending)}</span>

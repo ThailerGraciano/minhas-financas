@@ -4,6 +4,16 @@ import { getTransactionFormData } from "@/app/actions/form-data";
 import { createTransaction } from "@/app/actions/transactions";
 import { CategoryIcon } from "@/components/category-icon";
 import { QuickCategoryDialog } from "@/components/quick-category-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -90,6 +100,7 @@ export function TransactionFormDialog({
   const [accountIdTransferDest, setAccountIdTransferDest] = useState("");
 
   const [isPaid, setIsPaid] = useState(true);
+  const [showClosedInvoiceConfirm, setShowClosedInvoiceConfirm] = useState(false);
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
 
@@ -123,6 +134,7 @@ export function TransactionFormDialog({
     setAccountIdTransferOrigin("");
     setAccountIdTransferDest("");
     setIsPaid(true);
+    setShowClosedInvoiceConfirm(false);
     setFormError("");
   };
 
@@ -289,9 +301,8 @@ export function TransactionFormDialog({
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             if (today >= closingDate) {
-              if (!window.confirm("Esta fatura já está fechada. Deseja realmente incluir uma despesa nela?")) {
-                return;
-              }
+              setShowClosedInvoiceConfirm(true);
+              return;
             }
           }
         }
@@ -515,13 +526,14 @@ export function TransactionFormDialog({
   };
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(val) => {
-        setOpen(val);
-        if (!val) resetState();
-      }}
-    >
+    <>
+      <Dialog
+        open={open}
+        onOpenChange={(val) => {
+          setOpen(val);
+          if (!val) resetState();
+        }}
+      >
       <DialogTrigger asChild>
         {trigger ? (
           trigger
@@ -1079,6 +1091,30 @@ export function TransactionFormDialog({
           </div>
         ) : null}
       </DialogContent>
-    </Dialog>
+      </Dialog>
+
+      <AlertDialog open={showClosedInvoiceConfirm} onOpenChange={setShowClosedInvoiceConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Fatura já fechada</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta fatura já está fechada. Deseja realmente incluir uma despesa nela?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="cursor-pointer">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowClosedInvoiceConfirm(false);
+                setStep(stepsList[currentIndex + 1]);
+              }}
+              className="cursor-pointer"
+            >
+              Continuar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { TransactionDetailsDialog } from "@/components/transaction-details-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -36,6 +37,7 @@ export function UpcomingTransactionsManager({
   overdueTransactions,
 }: UpcomingTransactionsManagerProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [viewingTransaction, setViewingTransaction] = useState<Transaction | null>(null);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -190,7 +192,8 @@ export function UpcomingTransactionsManager({
                 return (
                   <div
                     key={tx.id}
-                    className="p-3 sm:p-3.5 rounded-2xl bg-muted/20 hover:bg-muted/40 border border-white/5 transition-all flex items-center justify-between gap-3 text-sm"
+                    onClick={() => setViewingTransaction(tx)}
+                    className="p-3 sm:p-3.5 rounded-2xl bg-muted/20 hover:bg-muted/40 border border-white/5 transition-all flex items-center justify-between gap-3 text-sm cursor-pointer"
                   >
                     {/* Esquerda: Data na lateral */}
                     <div className="flex items-center gap-3 min-w-0">
@@ -280,7 +283,11 @@ export function UpcomingTransactionsManager({
                 {overdueTransactions.map((tx) => {
                   const isIncome = tx.type === "income" || (tx.type === "transfer" && !!tx.parentTransactionId);
                   return (
-                    <TableRow key={tx.id} className="hover:bg-muted/40">
+                    <TableRow
+                      key={tx.id}
+                      onClick={() => setViewingTransaction(tx)}
+                      className="hover:bg-muted/40 cursor-pointer"
+                    >
                       <TableCell className="font-medium whitespace-nowrap text-xs text-rose-500 tabular-nums">
                         {formatFullDate(tx.dueDate || tx.date || "")}
                       </TableCell>
@@ -309,6 +316,12 @@ export function UpcomingTransactionsManager({
           </div>
         </DialogContent>
       </Dialog>
+
+      <TransactionDetailsDialog
+        transaction={viewingTransaction}
+        open={!!viewingTransaction}
+        onOpenChange={(open) => !open && setViewingTransaction(null)}
+      />
     </>
   );
 }

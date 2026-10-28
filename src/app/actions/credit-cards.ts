@@ -172,7 +172,7 @@ export async function payFullInvoice(
       // 2. Update transactions to 'paid'
       await tx
         .update(transactions)
-        .set({ status: "paid" })
+        .set({ status: "paid", paidAt: new Date() })
         .where(
           and(
             eq(transactions.creditCardId, parsedCardId),
@@ -711,7 +711,7 @@ export async function revertInvoicePayment(
       // 1. Mark expenses as pending
       await tx
         .update(transactions)
-        .set({ status: "pending" })
+        .set({ status: "pending", paidAt: null })
         .where(
           and(
             eq(transactions.creditCardId, parsedCardId),

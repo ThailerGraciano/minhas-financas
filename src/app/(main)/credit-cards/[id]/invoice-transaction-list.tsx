@@ -3,6 +3,7 @@
 import { deleteTransaction } from "@/app/actions/transactions";
 import { CategoryIcon } from "@/components/category-icon";
 import { EditTransactionDialog } from "@/components/edit-transaction-dialog";
+import { TransactionDetailsDialog } from "@/components/transaction-details-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,6 +71,7 @@ export function InvoiceTransactionList({
 }) {
   const [sortField, setSortField] = useState<"date" | "description" | "amount">("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [viewingTransaction, setViewingTransaction] = useState<Transaction | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -427,7 +429,11 @@ export function InvoiceTransactionList({
             </TableHeader>
             <TableBody>
               {sortedTransactions.map((tx) => (
-                <TableRow key={tx.id}>
+                <TableRow
+                  key={tx.id}
+                  onClick={() => setViewingTransaction(tx)}
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                >
                   <TableCell className="font-medium whitespace-nowrap px-1 sm:px-4 py-2 sm:py-4">
                     {formatDate(tx.launchDate || tx.dueDate || tx.date || "")}
                   </TableCell>
@@ -462,7 +468,10 @@ export function InvoiceTransactionList({
                   >
                     {formatCurrency(Number(tx.amount))}
                   </TableCell>
-                  <TableCell className="text-right px-1 sm:px-4 py-2 sm:py-4">
+                  <TableCell
+                    className="text-right px-1 sm:px-4 py-2 sm:py-4"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <div className="flex items-center justify-end gap-0.5 sm:gap-2">
                       <TransactionStatusToggle transactionId={tx.id} initialStatus={tx.status} />
                       <Button
@@ -489,6 +498,18 @@ export function InvoiceTransactionList({
           </Table>
         </div>
       )}
+
+      <TransactionDetailsDialog
+        transaction={viewingTransaction}
+        open={!!viewingTransaction}
+        onOpenChange={(open) => !open && setViewingTransaction(null)}
+        onEdit={() => {
+          if (viewingTransaction) setEditingTransaction(viewingTransaction);
+        }}
+        onDelete={() => {
+          if (viewingTransaction) setTransactionToDelete(viewingTransaction);
+        }}
+      />
 
       <EditTransactionDialog
         transaction={editingTransaction}

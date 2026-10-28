@@ -1,6 +1,7 @@
 "use client";
 
 import { DaySelectorCarousel } from "@/components/day-selector-carousel";
+import { TransactionDetailsDialog } from "@/components/transaction-details-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,6 +52,7 @@ export function DayByDayForecast({ projection }: { projection: DayProjection[] }
   }, [projection, todayStr]);
 
   const [selectedDate, setSelectedDate] = useState<string>(initialDate);
+  const [viewingTransaction, setViewingTransaction] = useState<ForecastTransaction | null>(null);
 
   const activeDay = useMemo(() => {
     return (
@@ -238,7 +240,8 @@ export function DayByDayForecast({ projection }: { projection: DayProjection[] }
                   return (
                     <div
                       key={tx.id}
-                      className="p-3 rounded-xl bg-card/70 border border-white/5 hover:border-white/15 transition-all flex items-center justify-between gap-3 text-xs"
+                      onClick={() => setViewingTransaction(tx)}
+                      className="p-3 rounded-xl bg-card/70 border border-white/5 hover:border-white/15 transition-all flex items-center justify-between gap-3 text-xs cursor-pointer"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div
@@ -284,6 +287,12 @@ export function DayByDayForecast({ projection }: { projection: DayProjection[] }
           </div>
         </div>
       </CardContent>
+
+      <TransactionDetailsDialog
+        transaction={viewingTransaction}
+        open={!!viewingTransaction}
+        onOpenChange={(open) => !open && setViewingTransaction(null)}
+      />
     </Card>
   );
 }

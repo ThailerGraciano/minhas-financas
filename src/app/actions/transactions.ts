@@ -6,7 +6,7 @@ import { accounts, creditCards, fixedTransactions, settings, transactions } from
 import { buildGlobalCompetencyCondition, getTargetInvoiceMonth } from "@/lib/competency-utils";
 import { calculateCreditCardDueDate } from "@/lib/utils/competency";
 import { addMonths, endOfMonth, format, getDate, parseISO, subMonths } from "date-fns";
-import { and, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -152,6 +152,7 @@ export async function getTransactions(
     with: {
       account: true,
       category: true,
+      subcategory: true,
       creditCard: true,
     },
     // Forced recompile to clear Next.js cache
@@ -175,6 +176,7 @@ export async function getTransactions(
     with: {
       account: true,
       category: true,
+      subcategory: true,
       creditCard: true,
       destinationAccount: true,
     },
@@ -239,6 +241,7 @@ export async function getTransactions(
         loanId: null,
         account: ft.account,
         category: ft.category,
+        subcategory: ft.subcategory,
         creditCard: ft.creditCard,
       };
 
@@ -1618,4 +1621,296 @@ export async function backfillInvoiceMonths() {
   }
 
   return { success: true, count: updatedCount };
+}
+
+export type TransactionInstallmentItem = {
+  id: number;
+  installmentCurrent: number;
+  installmentTotal: number;
+  description: string;
+  amount: string;
+  dueDate: string;
+  launchDate: string;
+  competencyMonth: string;
+  invoiceMonth: string | null;
+  status: string;
+  paidAt: Date | null;
+  isVirtual: boolean;
+};
+
+export type TransactionFullDetails = {
+  id: number;
+  type: string;
+  description: string;
+  amount: string;
+  dueDate: string;
+  launchDate: string;
+  competencyMonth: string;
+  invoiceMonth: string | null;
+  status: string;
+  paidAt: Date | null;
+  observations: string | null;
+  isFixed: boolean;
+  fixedTransactionId: string | null;
+  installmentCurrent: number | null;
+  installmentTotal: number | null;
+  parentTransactionId: number | null;
+  installmentParentId: number | null;
+  accountId: number | null;
+  creditCardId: number | null;
+  categoryId: number;
+  subcategoryId: number | null;
+  account: { id: number; name: string; type: string } | null;
+  destinationAccount: { id: number; name: string; type: string } | null;
+  originAccount: { id: number; name: string; type: string } | null;
+  creditCard: { id: number; name: string; closingDay: number; dueDay: number; creditLimit: string } | null;
+  category: { id: number; name: string; icon: string; type: string } | null;
+  subcategory: { id: number; name: string } | null;
+  fixedTransaction: { id: string; startDate: string; active: boolean } | null;
+  loan: { id: string; name: string; type: string; installments: number } | null;
+  installments: TransactionInstallmentItem[];
+};
+
+function cleanBaseInstallmentDescription(desc: string): string {
+  return desc
+    .replace(/\s*\(\d+\/\d+\)/g, "")
+    .replace(/\s*\((Saída|Entrada)\)/gi, "")
+    .trim()
+    .toLowerCase();
+}
+
+export async function getTransactionFullDetails(id: number): Promise<TransactionFullDetails | null> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
+  if (id < 0) {
+    return null;
+  }
+
+  const tx = await db.query.transactions.findFirst({
+    where: and(eq(transactions.id, id), eq(transactions.userId, userId)),
+    with: {
+      account: true,
+      creditCard: true,
+      category: true,
+      subcategory: true,
+      fixedTransaction: true,
+      loan: true,
+    },
+  });
+
+  if (!tx) return null;
+
+  let originAccount: { id: number; name: string; type: string } | null = null;
+  let destinationAccount: { id: number; name: string; type: string } | null = null;
+
+  if (tx.type === "transfer") {
+    const otherTx = tx.parentTransactionId
+      ? await db.query.transactions.findFirst({
+          where: and(eq(transactions.id, tx.parentTransactionId), eq(transactions.userId, userId)),
+          with: { account: true },
+        })
+      : await db.query.transactions.findFirst({
+          where: and(eq(transactions.parentTransactionId, tx.id), eq(transactions.userId, userId)),
+          with: { account: true },
+        });
+
+    if (tx.parentTransactionId) {
+      originAccount = otherTx?.account
+        ? { id: otherTx.account.id, name: otherTx.account.name, type: otherTx.account.type }
+        : null;
+      destinationAccount = tx.account
+        ? { id: tx.account.id, name: tx.account.name, type: tx.account.type }
+        : null;
+    } else {
+      originAccount = tx.account ? { id: tx.account.id, name: tx.account.name, type: tx.account.type } : null;
+      destinationAccount = otherTx?.account
+        ? { id: otherTx.account.id, name: otherTx.account.name, type: otherTx.account.type }
+        : null;
+    }
+  }
+
+  const descMatch = tx.description.match(/\((\d+)\/(\d+)\)/);
+  const inferredCurrent = tx.installmentCurrent ?? (descMatch ? parseInt(descMatch[1], 10) : null);
+  const inferredTotal = tx.installmentTotal ?? (descMatch ? parseInt(descMatch[2], 10) : null);
+
+  const isParcelada = Boolean((inferredTotal && inferredTotal > 1) || tx.installmentParentId);
+  const installmentsList: TransactionInstallmentItem[] = [];
+
+  if (isParcelada) {
+    const rootId =
+      tx.installmentParentId || (tx.type !== "transfer" && tx.parentTransactionId ? tx.parentTransactionId : tx.id);
+
+    const linkedConditions = [eq(transactions.id, rootId), eq(transactions.installmentParentId, rootId)];
+    if (tx.type !== "transfer") {
+      linkedConditions.push(eq(transactions.parentTransactionId, rootId));
+    }
+
+    let rawInstallments = await db.query.transactions.findMany({
+      where: and(eq(transactions.userId, userId), ne(transactions.status, "ignored"), or(...linkedConditions)),
+    });
+
+    if (rawInstallments.length <= 1) {
+      const targetBaseDesc = cleanBaseInstallmentDescription(tx.description);
+      const fallbackCandidates = await db.query.transactions.findMany({
+        where: and(
+          eq(transactions.userId, userId),
+          ne(transactions.status, "ignored"),
+          eq(transactions.type, tx.type),
+          tx.creditCardId ? eq(transactions.creditCardId, tx.creditCardId) : isNull(transactions.creditCardId),
+          tx.accountId ? eq(transactions.accountId, tx.accountId) : isNull(transactions.accountId),
+        ),
+      });
+
+      const matchedByDesc = fallbackCandidates.filter((cand) => {
+        const candMatch = cand.description.match(/\((\d+)\/(\d+)\)/);
+        const candTotal = cand.installmentTotal ?? (candMatch ? parseInt(candMatch[2], 10) : null);
+        if (inferredTotal && candTotal !== inferredTotal) return false;
+        return cleanBaseDescCompare(cand.description, targetBaseDesc);
+      });
+
+      if (matchedByDesc.length > rawInstallments.length) {
+        rawInstallments = matchedByDesc;
+      }
+    }
+
+    rawInstallments.sort((a, b) => {
+      const aMatch = a.description.match(/\((\d+)\/(\d+)\)/);
+      const bMatch = b.description.match(/\((\d+)\/(\d+)\)/);
+      const aNum = a.installmentCurrent ?? (aMatch ? parseInt(aMatch[1], 10) : 0);
+      const bNum = b.installmentCurrent ?? (bMatch ? parseInt(bMatch[1], 10) : 0);
+      if (aNum !== bNum && aNum > 0 && bNum > 0) return aNum - bNum;
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    });
+
+    const maxFromDb = rawInstallments.reduce((max, item) => {
+      const m = item.description.match(/\((\d+)\/(\d+)\)/);
+      const tot = item.installmentTotal ?? (m ? parseInt(m[2], 10) : 0);
+      return Math.max(max, tot);
+    }, 0);
+
+    const totalInstallments = Math.max(inferredTotal ?? 0, maxFromDb, rawInstallments.length);
+    const byNumber = new Map<number, (typeof rawInstallments)[0]>();
+
+    rawInstallments.forEach((item, index) => {
+      const m = item.description.match(/\((\d+)\/(\d+)\)/);
+      const num = item.installmentCurrent ?? (m ? parseInt(m[1], 10) : index + 1);
+      if (!byNumber.has(num) || item.id === tx.id) {
+        byNumber.set(num, item);
+      }
+    });
+
+    const currentParcelNumber =
+      inferredCurrent ??
+      Array.from(byNumber.entries()).find(([, val]) => val.id === tx.id)?.[0] ??
+      1;
+
+    const cleanTitle = tx.description.replace(/\s*\(\d+\/\d+\)/g, "").trim();
+    const refDueDate = parseISO(tx.dueDate);
+    const refLaunchDate = parseISO(tx.launchDate || tx.dueDate);
+    const refCompetencyDate = tx.competencyMonth ? parseISO(`${tx.competencyMonth}-01`) : refDueDate;
+
+    for (let i = 1; i <= totalInstallments; i++) {
+      const existing = byNumber.get(i);
+      if (existing) {
+        installmentsList.push({
+          id: existing.id,
+          installmentCurrent: i,
+          installmentTotal: totalInstallments,
+          description: existing.description,
+          amount: existing.amount,
+          dueDate: existing.dueDate,
+          launchDate: existing.launchDate,
+          competencyMonth: existing.competencyMonth,
+          invoiceMonth: existing.invoiceMonth,
+          status: existing.status,
+          paidAt: existing.paidAt,
+          isVirtual: false,
+        });
+      } else {
+        const diffMonths = i - currentParcelNumber;
+        const synthDueDate = format(addMonths(refDueDate, diffMonths), "yyyy-MM-dd");
+        const synthLaunchDate = format(addMonths(refLaunchDate, diffMonths), "yyyy-MM-dd");
+        const synthCompMonth = format(addMonths(refCompetencyDate, diffMonths), "yyyy-MM");
+        const isPastParcel = i < currentParcelNumber;
+
+        installmentsList.push({
+          id: -i,
+          installmentCurrent: i,
+          installmentTotal: totalInstallments,
+          description: `${cleanTitle} (${i}/${totalInstallments})`,
+          amount: tx.amount,
+          dueDate: synthDueDate,
+          launchDate: synthLaunchDate,
+          competencyMonth: synthCompMonth,
+          invoiceMonth: tx.type === "credit_card_expense" ? synthCompMonth : null,
+          status: isPastParcel ? "paid" : "pending",
+          paidAt: null,
+          isVirtual: true,
+        });
+      }
+    }
+  }
+
+  return {
+    id: tx.id,
+    type: tx.type,
+    description: tx.description,
+    amount: tx.amount,
+    dueDate: tx.dueDate,
+    launchDate: tx.launchDate,
+    competencyMonth: tx.competencyMonth,
+    invoiceMonth: tx.invoiceMonth,
+    status: tx.status,
+    paidAt: tx.paidAt,
+    observations: tx.observations,
+    isFixed: tx.isFixed || Boolean(tx.fixedTransactionId),
+    fixedTransactionId: tx.fixedTransactionId,
+    installmentCurrent: inferredCurrent,
+    installmentTotal: inferredTotal,
+    parentTransactionId: tx.parentTransactionId,
+    installmentParentId: tx.installmentParentId,
+    accountId: tx.accountId,
+    creditCardId: tx.creditCardId,
+    categoryId: tx.categoryId,
+    subcategoryId: tx.subcategoryId,
+    account: tx.account ? { id: tx.account.id, name: tx.account.name, type: tx.account.type } : null,
+    destinationAccount,
+    originAccount,
+    creditCard: tx.creditCard
+      ? {
+          id: tx.creditCard.id,
+          name: tx.creditCard.name,
+          closingDay: tx.creditCard.closingDay,
+          dueDay: tx.creditCard.dueDay,
+          creditLimit: tx.creditCard.creditLimit,
+        }
+      : null,
+    category: tx.category
+      ? { id: tx.category.id, name: tx.category.name, icon: tx.category.icon, type: tx.category.type }
+      : null,
+    subcategory: tx.subcategory ? { id: tx.subcategory.id, name: tx.subcategory.name } : null,
+    fixedTransaction: tx.fixedTransaction
+      ? {
+          id: tx.fixedTransaction.id,
+          startDate: tx.fixedTransaction.startDate,
+          active: tx.fixedTransaction.active,
+        }
+      : null,
+    loan: tx.loan
+      ? {
+          id: tx.loan.id,
+          name: tx.loan.name,
+          type: tx.loan.type,
+          installments: tx.loan.installments,
+        }
+      : null,
+    installments: installmentsList,
+  };
+}
+
+function cleanBaseDescCompare(candidateDesc: string, targetBaseDesc: string): boolean {
+  if (!targetBaseDesc) return false;
+  return cleanBaseInstallmentDescription(candidateDesc) === targetBaseDesc;
 }

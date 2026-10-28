@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 
 import { EditTransactionDialog } from "@/components/edit-transaction-dialog";
+import { TransactionDetailsDialog } from "@/components/transaction-details-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,6 +67,7 @@ export type TransactionWithRelations = {
 export function TransactionList({ transactions }: { transactions: TransactionWithRelations[] }) {
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [groupCreditCards, setGroupCreditCards] = useState(true);
+  const [viewingTransaction, setViewingTransaction] = useState<TransactionWithRelations | null>(null);
   const [transactionToEdit, setTransactionToEdit] = useState<TransactionWithRelations | null>(null);
   const [transactionToDelete, setTransactionToDelete] = useState<TransactionWithRelations | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -434,13 +436,21 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                 {group.transactions.map((tx) => (
                   <div
                     key={tx.id}
-                    className="group relative flex items-center justify-between p-3 sm:p-4 rounded-2xl bg-card hover:bg-muted/50 border border-border/50 shadow-sm transition-colors gap-3 sm:gap-4"
+                    onClick={() => {
+                      if (!tx.isGroup) {
+                        setViewingTransaction(tx);
+                      }
+                    }}
+                    className={`group relative flex items-center justify-between p-3 sm:p-4 rounded-2xl bg-card hover:bg-muted/50 border border-border/50 shadow-sm transition-colors gap-3 sm:gap-4 ${!tx.isGroup ? "cursor-pointer" : ""}`}
                   >
                     {/* Esquerda (Ícone e Textos) */}
                     <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
                       <button
                         type="button"
-                        onClick={() => handleToggleStatus(tx)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleStatus(tx);
+                        }}
                         disabled={isPending && loadingId === tx.id}
                         className="shrink-0 transition-colors"
                         title={tx.status === "paid" ? "Desfazer pagamento" : "Marcar como pago"}
@@ -491,7 +501,10 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                         </span>
 
                         <button
-                          onClick={() => handleMarkAsPaid(tx)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMarkAsPaid(tx);
+                          }}
                           disabled={loadingId === tx.id}
                           className="transition-opacity hover:opacity-80"
                         >
@@ -521,7 +534,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
 
                       {/* Ações (Edit/Delete) */}
                       {!tx.isGroup && (
-                        <div className="flex items-center gap-0.5 sm:gap-1">
+                        <div className="flex items-center gap-0.5 sm:gap-1" onClick={(e) => e.stopPropagation()}>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -548,6 +561,19 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
           ))}
         </div>
       )}
+
+      {/* Details Dialog */}
+      <TransactionDetailsDialog
+        transaction={viewingTransaction}
+        open={!!viewingTransaction}
+        onOpenChange={(open) => !open && setViewingTransaction(null)}
+        onEdit={() => {
+          if (viewingTransaction) setTransactionToEdit(viewingTransaction);
+        }}
+        onDelete={() => {
+          if (viewingTransaction) setTransactionToDelete(viewingTransaction);
+        }}
+      />
 
       {/* Edit Dialog */}
       <EditTransactionDialog

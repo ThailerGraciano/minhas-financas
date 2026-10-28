@@ -16,6 +16,7 @@ export type CreateLoanInput = {
   interestRate: number; // default 0
   installments: number;
   date: string; // Data inicial, YYYY-MM-DD
+  firstInstallmentDate?: string; // Data da 1ª cobrança, YYYY-MM-DD
   alreadyReceived?: boolean;
 
   // Se bank
@@ -115,6 +116,10 @@ export async function createLoan(input: CreateLoanInput) {
 
     const principal = input.totalAmount;
     const rate = input.interestRate / 100;
+    const parsedDate = parseISO(input.date);
+    const parsedFirstInstallmentDate = input.firstInstallmentDate
+      ? parseISO(input.firstInstallmentDate)
+      : addMonths(parsedDate, 1);
 
     if (input.type === "bank") {
       if (!input.categoryId) {
@@ -124,7 +129,6 @@ export async function createLoan(input: CreateLoanInput) {
         throw new Error("Missing bankIncomeAccountId for bank loan");
       }
 
-      const parsedDate = parseISO(input.date);
       const competencyMonth = getCompetencyMonth(parsedDate, closingDay);
 
       // Entrada na conta destino (apenas se não foi recebido previamente)
@@ -158,7 +162,7 @@ export async function createLoan(input: CreateLoanInput) {
       let parentId: number | null = null;
 
       for (let i = 1; i <= input.installments; i++) {
-        const currentDate = addMonths(parsedDate, i - 1);
+        const currentDate = addMonths(parsedFirstInstallmentDate, i - 1);
         const dateStr = format(currentDate, "yyyy-MM-dd");
         const currentCompetency = getCompetencyMonth(currentDate, closingDay);
 
@@ -200,7 +204,6 @@ export async function createLoan(input: CreateLoanInput) {
         throw new Error("Missing required fields for personal loan");
       }
 
-      const parsedDate = parseISO(input.date);
       const competencyMonth = getCompetencyMonth(parsedDate, closingDay);
       const transferCategoryId = await getTransferCategoryId(tx, userId);
 
@@ -257,8 +260,8 @@ export async function createLoan(input: CreateLoanInput) {
       let devInParentId: number | null = null;
 
       for (let i = 1; i <= input.installments; i++) {
-        // Devoluções começam no mês seguinte (addMonths(..., i))
-        const currentDate = addMonths(parsedDate, i);
+        // Devoluções começam a partir da data da 1ª cobrança
+        const currentDate = addMonths(parsedFirstInstallmentDate, i - 1);
         const dateStr = format(currentDate, "yyyy-MM-dd");
         const currentCompetency = getCompetencyMonth(currentDate, closingDay);
 

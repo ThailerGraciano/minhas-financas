@@ -5,9 +5,9 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "sonner";
-import { format, addMonths } from "date-fns";
+import { format, addMonths, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 
 import { createLoan } from "@/app/actions/loans";
 import { getTransactionFormData } from "@/app/actions/form-data";
@@ -23,10 +23,18 @@ import { Switch } from "@/components/ui/switch";
 
 type FormData = NonNullable<Awaited<ReturnType<typeof getTransactionFormData>>>;
 
+function getSuggestedFirstInstallmentDate(concessionDateStr: string): string {
+  if (!concessionDateStr) return "";
+  const parsed = parseISO(concessionDateStr);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return format(addMonths(parsed, 1), "yyyy-MM-dd");
+}
+
 const loanSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
   type: z.enum(['bank', 'personal']),
   date: z.string().min(1, "Data é obrigatória"),
+  firstInstallmentDate: z.string().min(1, "Data da 1ª cobrança é obrigatória"),
   totalAmount: z.number().min(0.01, "Valor deve ser maior que zero"),
   installments: z.number().min(1, "Mínimo 1 parcela"),
   interestRate: z.number().min(0, "Taxa não pode ser negativa"),
@@ -73,6 +81,7 @@ export function LoanFormDialog({ trigger }: { trigger?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [formDataCache, setFormDataCache] = useState<FormData | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const [isFirstInstallmentCustom, setIsFirstInstallmentCustom] = useState(false);
 
   useEffect(() => {
     if (open && !formDataCache) {
@@ -80,11 +89,14 @@ export function LoanFormDialog({ trigger }: { trigger?: React.ReactNode }) {
     }
   }, [open, formDataCache]);
 
+  const initialConcessionDate = format(new Date(), 'yyyy-MM-dd');
+
   const { register, handleSubmit, watch, setValue, getValues, control, reset, formState: { errors } } = useForm<LoanFormValues>({
     resolver: zodResolver(loanSchema),
     defaultValues: {
       type: 'bank',
-      date: format(new Date(), 'yyyy-MM-dd'),
+      date: initialConcessionDate,
+      firstInstallmentDate: getSuggestedFirstInstallmentDate(initialConcessionDate),
       totalAmount: 0,
       interestRate: 0,
       installments: 1,
@@ -126,6 +138,23 @@ export function LoanFormDialog({ trigger }: { trigger?: React.ReactNode }) {
     }
   }, [watchedAlreadyReceived, categories, getValues, setValue]);
 
+  const handleResetForm = () => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    reset({
+      name: '',
+      type: 'bank',
+      date: today,
+      firstInstallmentDate: getSuggestedFirstInstallmentDate(today),
+      totalAmount: 0,
+      interestRate: 0,
+      installments: 1,
+      installmentAmount: 0,
+      alreadyReceived: false,
+      bankPaymentMethod: 'account',
+    });
+    setIsFirstInstallmentCustom(false);
+  };
+
   const onSubmit = async (data: LoanFormValues) => {
     setIsPending(true);
     try {
@@ -133,6 +162,7 @@ export function LoanFormDialog({ trigger }: { trigger?: React.ReactNode }) {
         name: data.name,
         type: data.type,
         date: data.date,
+        firstInstallmentDate: data.firstInstallmentDate,
         totalAmount: data.totalAmount,
         installments: data.installments,
         interestRate: data.interestRate,
@@ -146,7 +176,7 @@ export function LoanFormDialog({ trigger }: { trigger?: React.ReactNode }) {
         checkingAccountId: data.checkingAccountId ? Number(data.checkingAccountId) : undefined,
       });
       toast.success("Empréstimo criado com sucesso!");
-      reset();
+      handleResetForm();
       setOpen(false);
     } catch (error) {
       toast.error("Erro ao criar empréstimo");
@@ -168,9 +198,22 @@ export function LoanFormDialog({ trigger }: { trigger?: React.ReactNode }) {
   const creditCards = formDataCache?.creditCards || [];
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) {
+          handleResetForm();
+        }
+      }}
+    >
       <DialogTrigger asChild>
-        {trigger || <Button variant="outline">Novo Empréstimo</Button>}
+        {trigger || (
+          <Button className="bg-primary hover:bg-primary/90 text-white rounded-xl px-4 py-2 h-10 text-sm font-semibold shadow-sm transition-all cursor-pointer gap-2">
+            <Plus className="w-4 h-4" />
+            Novo Empréstimo
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[440px] overflow-y-auto max-h-[90vh]">
         <DialogHeader>
@@ -195,10 +238,40 @@ export function LoanFormDialog({ trigger }: { trigger?: React.ReactNode }) {
             {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
           </div>
 
-          <div className="space-y-2">
-            <Label>Data (Concessão)</Label>
-            <Input type="date" {...register("date")} />
-            {errors.date && <p className="text-sm text-destructive">{errors.date.message}</p>}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Data (Concessão)</Label>
+              <Input
+                type="date"
+                {...register("date", {
+                  onChange: (e) => {
+                    const newDate = e.target.value;
+                    if (!isFirstInstallmentCustom && newDate) {
+                      const suggested = getSuggestedFirstInstallmentDate(newDate);
+                      if (suggested) {
+                        setValue("firstInstallmentDate", suggested, { shouldValidate: true });
+                      }
+                    }
+                  },
+                })}
+              />
+              {errors.date && <p className="text-sm text-destructive">{errors.date.message}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Data da 1ª Cobrança</Label>
+              <Input
+                type="date"
+                {...register("firstInstallmentDate", {
+                  onChange: () => {
+                    setIsFirstInstallmentCustom(true);
+                  },
+                })}
+              />
+              {errors.firstInstallmentDate && (
+                <p className="text-sm text-destructive">{errors.firstInstallmentDate.message}</p>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

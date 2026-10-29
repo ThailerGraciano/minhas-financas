@@ -18,9 +18,10 @@ interface DatePickerProps {
   onChange?: (date: string) => void;
   onKeyDown?: (e: React.KeyboardEvent) => void;
   required?: boolean;
+  disabled?: boolean;
 }
 
-export function DatePicker({ id, name, defaultValue, value, onChange, onKeyDown, required }: DatePickerProps) {
+export function DatePicker({ id, name, defaultValue, value, onChange, onKeyDown, required, disabled }: DatePickerProps) {
   const isControlled = value !== undefined;
 
   const [internalDate, setInternalDate] = React.useState<Date | undefined>(
@@ -53,6 +54,7 @@ export function DatePicker({ id, name, defaultValue, value, onChange, onKeyDown,
             id={id}
             type="button"
             onKeyDown={onKeyDown}
+            disabled={disabled}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {date ? format(date, "dd/MM/yyyy") : <span>DD/MM/AAAA</span>}

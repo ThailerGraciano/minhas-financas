@@ -13,6 +13,7 @@ import {
   Receipt,
   Settings,
   ShoppingCart,
+  Smartphone,
   TableProperties,
   Target,
   TrendingUp,
@@ -30,6 +31,7 @@ const mainTabs = [
 
 const moreItems = [
   { name: "Orçamentos", href: "/budgets", icon: Target },
+  { name: "Widget Android", href: "/widget", icon: Smartphone },
   { name: "Power Grid", href: "/power-grid", icon: TableProperties },
   { name: "Planejamento", href: "/planning", icon: TrendingUp },
   { name: "Empréstimos", href: "/loans", icon: HandCoins },

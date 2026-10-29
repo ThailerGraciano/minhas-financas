@@ -20,5 +20,59 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nova Despesa",
+      "short_name": "Despesa",
+      "description": "Registrar uma nova despesa rapidamente",
+      "url": "/widget?action=new-expense",
+      "icons": [
+        {
+          "src": "/icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Nova Receita",
+      "short_name": "Receita",
+      "description": "Registrar uma nova receita rapidamente",
+      "url": "/widget?action=new-income",
+      "icons": [
+        {
+          "src": "/icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Widget Orçamentos",
+      "short_name": "Orçamentos",
+      "description": "Abrir painel compacto de orçamentos por categoria",
+      "url": "/widget?view=budgets",
+      "icons": [
+        {
+          "src": "/icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Widget Saúde do Mês",
+      "short_name": "Saúde Mês",
+      "description": "Abrir painel compacto de saúde financeira",
+      "url": "/widget?view=health",
+      "icons": [
+        {
+          "src": "/icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
   ]
 }

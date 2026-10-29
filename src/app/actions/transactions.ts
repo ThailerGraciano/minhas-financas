@@ -11,7 +11,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 type NewTransaction = typeof transactions.$inferInsert;
-type CreateTransactionInput = Omit<NewTransaction, "userId" | "dueDate" | "launchDate"> & {
+type CreateTransactionInput = Omit<NewTransaction, "userId" | "dueDate" | "launchDate" | "categoryId"> & {
+  categoryId?: number;
   dueDate?: string;
   launchDate?: string;
   date?: string;
@@ -327,6 +328,7 @@ export async function createTransaction(
     const { isFixed, destinationAccountId, isTotalAmount, current_installment, date: _date, ...restTxData } = data;
     const txData = {
       ...restTxData,
+      categoryId: restTxData.categoryId ?? 0,
       dueDate: finalDueDate,
       launchDate: finalLaunchDate,
     };

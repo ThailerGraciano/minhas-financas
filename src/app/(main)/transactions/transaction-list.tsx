@@ -2,20 +2,16 @@
 
 import { getAccounts } from "@/app/actions/accounts";
 import { payFullInvoice, revertInvoicePayment } from "@/app/actions/credit-cards";
-import { deleteTransaction, payVirtualTransaction, toggleTransactionStatus } from "@/app/actions/transactions";
+import { deleteTransaction, toggleTransactionStatus } from "@/app/actions/transactions";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
-  ArrowDownCircle,
-  ArrowRightLeft,
-  ArrowUpCircle,
   CheckCircle2,
   Circle,
-  CreditCard,
   Loader2,
   MinusCircle,
 } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -63,6 +59,159 @@ export type TransactionWithRelations = {
   category?: { id: number; name: string; icon?: string | null } | null;
   subcategory?: { id: number; name: string } | null;
 };
+
+interface DynamicFitTextProps {
+  text: string;
+  maxFontSizePx: number;
+  minFontSizePx: number;
+  maxWidthPx?: number;
+  className?: string;
+  allowWrapAtMin?: boolean;
+}
+
+function DynamicFitText({
+  text,
+  maxFontSizePx,
+  minFontSizePx,
+  maxWidthPx,
+  className = "",
+  allowWrapAtMin = false,
+}: DynamicFitTextProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+
+  const adjustFontSize = useCallback(() => {
+    const container = containerRef.current;
+    const textEl = textRef.current;
+    if (!container || !textEl) return;
+
+    const availableWidth = maxWidthPx ?? container.clientWidth;
+    if (availableWidth <= 0) return;
+
+    textEl.style.whiteSpace = "nowrap";
+    textEl.style.fontSize = `${maxFontSizePx}px`;
+
+    const naturalWidth = textEl.scrollWidth;
+    if (naturalWidth <= availableWidth) {
+      return;
+    }
+
+    const ratio = availableWidth / naturalWidth;
+    const calculatedSize = Math.max(minFontSizePx, Math.floor(maxFontSizePx * ratio * 10) / 10);
+    textEl.style.fontSize = `${calculatedSize}px`;
+
+    if (allowWrapAtMin && calculatedSize <= minFontSizePx && textEl.scrollWidth > availableWidth) {
+      textEl.style.whiteSpace = "normal";
+    }
+  }, [maxFontSizePx, minFontSizePx, maxWidthPx, allowWrapAtMin]);
+
+  useEffect(() => {
+    adjustFontSize();
+    const container = containerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(() => {
+      adjustFontSize();
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [adjustFontSize, text]);
+
+  return (
+    <div
+      ref={containerRef}
+      className={`${maxWidthPx ? "shrink-0" : "w-full min-w-0"} overflow-hidden tx-fluid-container`}
+    >
+      <span
+        ref={textRef}
+        style={{ fontSize: `${maxFontSizePx}px` }}
+        className={`block leading-tight whitespace-nowrap break-words ${className}`}
+      >
+        {text}
+      </span>
+    </div>
+  );
+}
+
+interface UnifiedTransactionStatusButtonProps {
+  tx: TransactionWithRelations;
+  isLoading: boolean;
+  onToggle: (tx: TransactionWithRelations) => void;
+}
+
+function UnifiedTransactionStatusButton({ tx, isLoading, onToggle }: UnifiedTransactionStatusButtonProps) {
+  const isIncome = tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)"));
+  const isPaid = tx.status === "paid";
+  const isPartial = tx.status === "partial";
+
+  const getTypeColorClasses = () => {
+    if (isIncome) {
+      return isPaid
+        ? "bg-emerald-500/20 text-emerald-500 border-emerald-500/50 shadow-xs shadow-emerald-500/10"
+        : "bg-emerald-500/10 text-emerald-500/80 border-emerald-500/25";
+    }
+    if (tx.type === "transfer") {
+      return isPaid
+        ? "bg-blue-500/20 text-blue-500 border-blue-500/50 shadow-xs shadow-blue-500/10"
+        : "bg-blue-500/10 text-blue-500/80 border-blue-500/25";
+    }
+    if (tx.type === "credit_card_expense") {
+      return isPaid
+        ? "bg-orange-500/20 text-orange-500 border-orange-500/50 shadow-xs shadow-orange-500/10"
+        : "bg-orange-500/10 text-orange-500/80 border-orange-500/25";
+    }
+    return isPaid
+      ? "bg-rose-500/20 text-rose-500 border-rose-500/50 shadow-xs shadow-rose-500/10"
+      : "bg-rose-500/10 text-rose-500/80 border-rose-500/25";
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle(tx);
+      }}
+      disabled={isLoading}
+      title={isPaid ? "Desfazer pagamento" : "Marcar como pago"}
+      className="group/status w-[54px] sm:w-[62px] flex flex-col items-center justify-center gap-1 shrink-0 focus:outline-none transition-transform active:scale-95 cursor-pointer"
+    >
+      <div
+        className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full border flex items-center justify-center transition-all ${getTypeColorClasses()} group-hover/status:brightness-110`}
+      >
+        {isLoading ? (
+          <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+        ) : isPaid ? (
+          <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.25]" />
+        ) : isPartial ? (
+          <MinusCircle className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.25]" />
+        ) : (
+          <Circle className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2] opacity-80" />
+        )}
+      </div>
+
+      {isPaid ? (
+        <Badge className="w-full justify-center bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25 border border-emerald-500/30 uppercase font-bold text-[8px] sm:text-[9px] leading-none h-4 px-1 rounded-full">
+          {isIncome ? "Recebido" : "Pago"}
+        </Badge>
+      ) : isPartial ? (
+        <Badge
+          variant="outline"
+          className="w-full justify-center text-[8px] sm:text-[9px] text-amber-500 border-amber-500/40 bg-amber-500/10 uppercase font-bold leading-none px-1 h-4 rounded-full"
+        >
+          Parcial
+        </Badge>
+      ) : (
+        <Badge
+          variant="outline"
+          className="w-full justify-center text-[8px] sm:text-[9px] text-amber-500 border-amber-500/40 bg-amber-500/5 uppercase font-bold leading-none px-1 h-4 rounded-full"
+        >
+          Pendente
+        </Badge>
+      )}
+    </button>
+  );
+}
 
 export function TransactionList({ transactions }: { transactions: TransactionWithRelations[] }) {
   const [loadingId, setLoadingId] = useState<number | null>(null);
@@ -168,35 +317,6 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
 
   const formatCurrency = (value: string | number) => {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value));
-  };
-
-  const getIcon = (type: string) => {
-    switch (type) {
-      case "income":
-        return (
-          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center bg-green-500/10 shrink-0">
-            <ArrowUpCircle className="w-4 h-4 sm:w-6 sm:h-6 text-green-500" />
-          </div>
-        );
-      case "transfer":
-        return (
-          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center bg-blue-500/10 shrink-0">
-            <ArrowRightLeft className="w-4 h-4 sm:w-6 sm:h-6 text-blue-500" />
-          </div>
-        );
-      case "credit_card_expense":
-        return (
-          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center bg-orange-500/10 shrink-0">
-            <CreditCard className="w-4 h-4 sm:w-6 sm:h-6 text-orange-500" />
-          </div>
-        );
-      default:
-        return (
-          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center bg-destructive/10 shrink-0">
-            <ArrowDownCircle className="w-4 h-4 sm:w-6 sm:h-6 text-destructive" />
-          </div>
-        );
-    }
   };
 
   const getSource = (tx: TransactionWithRelations) => {
@@ -342,11 +462,12 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
   return (
     <div className="space-y-6">
       {/* 1. Chips de Categoria */}
-      <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide">
+      <div className="flex overflow-x-auto gap-2 pb-1 scrollbar-hide">
         <Button
           variant={selectedCategory === "Todas" ? "default" : "outline"}
-          className={`rounded-full shrink-0 ${
-            selectedCategory === "Todas" ? "bg-orange-500 hover:bg-orange-600 text-white" : ""
+          size="sm"
+          className={`rounded-full shrink-0 h-8 sm:h-9 px-3.5 text-xs sm:text-sm ${
+            selectedCategory === "Todas" ? "bg-orange-500 hover:bg-orange-600 text-white border-transparent" : ""
           }`}
           onClick={() => setSelectedCategory("Todas")}
         >
@@ -356,8 +477,9 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
           <Button
             key={catName}
             variant={selectedCategory === catName ? "default" : "outline"}
-            className={`rounded-full shrink-0 ${
-              selectedCategory === catName ? "bg-orange-500 hover:bg-orange-600 text-white" : ""
+            size="sm"
+            className={`rounded-full shrink-0 h-8 sm:h-9 px-3.5 text-xs sm:text-sm ${
+              selectedCategory === catName ? "bg-orange-500 hover:bg-orange-600 text-white border-transparent" : ""
             }`}
             onClick={() => setSelectedCategory(catName)}
           >
@@ -367,41 +489,44 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
       </div>
 
       {/* 2. Controles (Toggles, Ordenação e Filtro) */}
-      <div className="flex flex-col gap-4 py-3 px-4 md:px-6 rounded-2xl md:rounded-xl border border-transparent bg-card shadow-sm mb-6">
-        <div className="flex items-center justify-between gap-4 w-full flex-wrap sm:flex-nowrap">
-          <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 p-3 sm:p-4 rounded-2xl border border-border/50 bg-card shadow-sm mb-6">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-between sm:gap-4 w-full">
+          <Label
+            htmlFor="show-only-pending"
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-2 rounded-xl bg-background/60 border border-border/40 text-xs sm:text-sm font-medium cursor-pointer select-none transition-colors hover:bg-background min-w-0"
+          >
             <Switch
               id="show-only-pending"
               checked={showOnlyPending}
               onCheckedChange={setShowOnlyPending}
-              className="scale-75 origin-left"
+              className="scale-75 origin-left shrink-0 -mr-2"
             />
-            <Label htmlFor="show-only-pending" className="text-sm font-medium cursor-pointer">
-              Apenas pendentes
-            </Label>
-          </div>
-          <div className="flex items-center gap-2">
+            <span className="truncate leading-tight">Apenas pendentes</span>
+          </Label>
+
+          <Label
+            htmlFor="group-cc"
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-2 rounded-xl bg-background/60 border border-border/40 text-xs sm:text-sm font-medium cursor-pointer select-none transition-colors hover:bg-background min-w-0"
+          >
             <Switch
               id="group-cc"
               checked={groupCreditCards}
               onCheckedChange={setGroupCreditCards}
-              className="scale-75 origin-right"
+              className="scale-75 origin-left shrink-0 -mr-2"
             />
-            <Label htmlFor="group-cc" className="text-sm font-medium cursor-pointer">
-              Agrupar faturas
-            </Label>
-          </div>
+            <span className="truncate leading-tight">Agrupar faturas</span>
+          </Label>
         </div>
 
-        <div className="flex items-center justify-between w-full pt-3 border-t border-border/50 gap-4 flex-wrap sm:flex-nowrap">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="sort-by" className="text-sm font-medium text-muted-foreground whitespace-nowrap">
-              Ordenar por:
+        <div className="flex items-center justify-between w-full pt-2.5 border-t border-border/50 gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <Label htmlFor="sort-by" className="text-xs sm:text-sm font-medium text-muted-foreground whitespace-nowrap shrink-0">
+              Ordenar<span className="hidden sm:inline"> por</span>:
             </Label>
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger
                 id="sort-by"
-                className="w-[140px] sm:w-[180px] h-9 bg-background rounded-full border-transparent"
+                className="flex-1 sm:w-[190px] sm:flex-none h-9 bg-background rounded-xl border-border/40 text-xs sm:text-sm px-3 whitespace-nowrap *:data-[slot=select-value]:truncate"
               >
                 <SelectValue placeholder="Ordenar por" />
               </SelectTrigger>
@@ -414,8 +539,12 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
             </Select>
           </div>
 
-          <Button variant="outline" size="sm" className="gap-2 rounded-full whitespace-nowrap">
-            <Filter className="w-4 h-4" />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 px-3 gap-1.5 rounded-xl whitespace-nowrap text-xs sm:text-sm shrink-0 bg-background border-border/40 hover:bg-muted"
+          >
+            <Filter className="w-3.5 h-3.5" />
             Filtros
           </Button>
         </div>
@@ -433,129 +562,90 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                 {format(parseISO(group.date), "dd 'de' MMMM", { locale: ptBR })}
               </h3>
               <div className="flex flex-col gap-2">
-                {group.transactions.map((tx) => (
-                  <div
-                    key={tx.id}
-                    onClick={() => {
-                      if (!tx.isGroup) {
-                        setViewingTransaction(tx);
-                      }
-                    }}
-                    className={`group relative flex items-center justify-between p-3 sm:p-4 rounded-2xl bg-card hover:bg-muted/50 border border-border/50 shadow-sm transition-colors gap-3 sm:gap-4 ${!tx.isGroup ? "cursor-pointer" : ""}`}
-                  >
-                    {/* Esquerda (Ícone e Textos) */}
-                    <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleStatus(tx);
-                        }}
-                        disabled={isPending && loadingId === tx.id}
-                        className="shrink-0 transition-colors"
-                        title={tx.status === "paid" ? "Desfazer pagamento" : "Marcar como pago"}
-                      >
-                        {isPending && loadingId === tx.id ? (
-                          <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-muted-foreground" />
-                        ) : tx.status === "paid" ? (
-                          <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
-                        ) : tx.status === "partial" ? (
-                          <MinusCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
-                        ) : (
-                          <Circle className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground hover:text-foreground" />
-                        )}
-                      </button>
-                      {getIcon(tx.type)}
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-medium text-sm sm:text-base truncate leading-tight">
-                          {tx.description}
-                        </span>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground truncate mt-0.5">
-                          <span>
-                            {getSource(tx)} • {tx.category?.name || "Geral"}
-                          </span>
-                          {tx.launchDate && !tx.isGroup && (
-                            <>
-                              <span>•</span>
-                              <span>Lançado em {format(parseISO(tx.launchDate.split("T")[0]), "dd/MM/yyyy")}</span>
-                            </>
-                          )}
+                {group.transactions.map((tx) => {
+                  const isIncome =
+                    tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)"));
+                  const formattedAmount = `${isIncome ? "+" : "-"}${formatCurrency(tx.amount)}`;
+                  const subtitleParts = [
+                    getSource(tx),
+                    tx.category?.name || "Geral",
+                    tx.launchDate && !tx.isGroup
+                      ? `Lançado em ${format(parseISO(tx.launchDate.split("T")[0]), "dd/MM/yyyy")}`
+                      : null,
+                  ].filter((part): part is string => Boolean(part));
+
+                  return (
+                    <div
+                      key={tx.id}
+                      onClick={() => {
+                        if (!tx.isGroup) {
+                          setViewingTransaction(tx);
+                        }
+                      }}
+                      className={`group relative flex items-center justify-between p-2.5 sm:p-4 rounded-2xl bg-card hover:bg-muted/50 border border-border/50 shadow-sm transition-colors gap-2.5 sm:gap-4 ${!tx.isGroup ? "cursor-pointer" : ""}`}
+                    >
+                      {/* Esquerda (Componente Unificado de Status/Tipo com Tag + Descrição expandida) */}
+                      <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
+                        <UnifiedTransactionStatusButton
+                          tx={tx}
+                          isLoading={isPending && loadingId === tx.id}
+                          onToggle={handleMarkAsPaid}
+                        />
+                        <div className="flex flex-col min-w-0 flex-1 gap-0.5">
+                          <DynamicFitText
+                            text={tx.description}
+                            maxFontSizePx={15}
+                            minFontSizePx={8.5}
+                            allowWrapAtMin={true}
+                            className="font-semibold text-foreground tx-fluid-description"
+                          />
+                          <DynamicFitText
+                            text={subtitleParts.join(" • ")}
+                            maxFontSizePx={11.5}
+                            minFontSizePx={8}
+                            allowWrapAtMin={true}
+                            className="text-muted-foreground"
+                          />
                         </div>
                       </div>
-                    </div>
 
-                    {/* Direita (Valores, Badge e Ações) */}
-                    <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-                      <div className="flex flex-col items-end gap-1.5">
-                        <span
-                          className={`font-semibold text-sm sm:text-base ${
-                            tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)"))
-                              ? "text-emerald-500"
-                              : "text-rose-500"
+                      {/* Direita (Valor dinâmico e Ações) */}
+                      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+                        <DynamicFitText
+                          text={formattedAmount}
+                          maxFontSizePx={15}
+                          minFontSizePx={10.5}
+                          maxWidthPx={96}
+                          className={`font-semibold text-right tracking-tight tx-fluid-amount ${
+                            isIncome ? "text-emerald-500" : "text-rose-500"
                           }`}
-                        >
-                          {tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)"))
-                            ? "+"
-                            : "-"}
-                          {formatCurrency(tx.amount)}
-                        </span>
+                        />
 
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMarkAsPaid(tx);
-                          }}
-                          disabled={loadingId === tx.id}
-                          className="transition-opacity hover:opacity-80"
-                        >
-                          {tx.status === "paid" ? (
-                            <Badge className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 uppercase font-bold text-[10px] border-0 h-5 px-1.5 cursor-pointer">
-                              {tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)"))
-                                ? "Recebido"
-                                : "Pago"}
-                            </Badge>
-                          ) : tx.status === "partial" ? (
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] text-amber-500 border-amber-500/30 uppercase font-bold px-1.5 h-5 bg-transparent cursor-pointer"
+                        {/* Ações (Edit/Delete) */}
+                        {!tx.isGroup && (
+                          <div className="flex items-center gap-0.5 sm:gap-1" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setTransactionToEdit(tx)}
+                              className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-foreground"
                             >
-                              Parcial
-                            </Badge>
-                          ) : (
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] text-amber-500 border-amber-500/30 uppercase font-bold px-1.5 h-5 bg-transparent cursor-pointer"
+                              <Pencil className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setTransactionToDelete(tx)}
+                              className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                             >
-                              Pendente
-                            </Badge>
-                          )}
-                        </button>
+                              <Trash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
-
-                      {/* Ações (Edit/Delete) */}
-                      {!tx.isGroup && (
-                        <div className="flex items-center gap-0.5 sm:gap-1" onClick={(e) => e.stopPropagation()}>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setTransactionToEdit(tx)}
-                            className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-foreground"
-                          >
-                            <Pencil className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setTransactionToDelete(tx)}
-                            className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          </Button>
-                        </div>
-                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}

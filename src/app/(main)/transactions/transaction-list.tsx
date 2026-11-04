@@ -5,12 +5,7 @@ import { payFullInvoice, revertInvoicePayment } from "@/app/actions/credit-cards
 import { deleteTransaction, toggleTransactionStatus } from "@/app/actions/transactions";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import {
-  CheckCircle2,
-  Circle,
-  Loader2,
-  MinusCircle,
-} from "lucide-react";
+import { CheckCircle2, Circle, Loader2, MinusCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -120,7 +115,7 @@ function DynamicFitText({
   return (
     <div
       ref={containerRef}
-      className={`${maxWidthPx ? "shrink-0" : "w-full min-w-0"} overflow-hidden tx-fluid-container`}
+      className={maxWidthPx ? "shrink-0 flex justify-end" : "w-full min-w-0 overflow-hidden tx-fluid-container"}
     >
       <span
         ref={textRef}
@@ -493,34 +488,37 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
         <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-between sm:gap-4 w-full">
           <Label
             htmlFor="show-only-pending"
-            className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-2 rounded-xl bg-background/60 border border-border/40 text-xs sm:text-sm font-medium cursor-pointer select-none transition-colors hover:bg-background min-w-0"
+            className="flex items-center gap-1 sm:gap-2 px-2 py-2 rounded-xl bg-background/60 border border-border/40 text-[11px] sm:text-sm font-medium cursor-pointer select-none transition-colors hover:bg-background min-w-0"
           >
             <Switch
               id="show-only-pending"
               checked={showOnlyPending}
               onCheckedChange={setShowOnlyPending}
-              className="scale-75 origin-left shrink-0 -mr-2"
+              className="scale-75 origin-left shrink-0 -mr-2.5"
             />
-            <span className="truncate leading-tight">Apenas pendentes</span>
+            <span className="whitespace-nowrap leading-tight">Apenas pendentes</span>
           </Label>
 
           <Label
             htmlFor="group-cc"
-            className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-2 rounded-xl bg-background/60 border border-border/40 text-xs sm:text-sm font-medium cursor-pointer select-none transition-colors hover:bg-background min-w-0"
+            className="flex items-center gap-1 sm:gap-2 px-2 py-2 rounded-xl bg-background/60 border border-border/40 text-[11px] sm:text-sm font-medium cursor-pointer select-none transition-colors hover:bg-background min-w-0"
           >
             <Switch
               id="group-cc"
               checked={groupCreditCards}
               onCheckedChange={setGroupCreditCards}
-              className="scale-75 origin-left shrink-0 -mr-2"
+              className="scale-75 origin-left shrink-0 -mr-2.5"
             />
-            <span className="truncate leading-tight">Agrupar faturas</span>
+            <span className="whitespace-nowrap leading-tight">Agrupar faturas</span>
           </Label>
         </div>
 
         <div className="flex items-center justify-between w-full pt-2.5 border-t border-border/50 gap-2 sm:gap-4">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Label htmlFor="sort-by" className="text-xs sm:text-sm font-medium text-muted-foreground whitespace-nowrap shrink-0">
+            <Label
+              htmlFor="sort-by"
+              className="text-xs sm:text-sm font-medium text-muted-foreground whitespace-nowrap shrink-0"
+            >
               Ordenar<span className="hidden sm:inline"> por</span>:
             </Label>
             <Select value={sortBy} onValueChange={setSortBy}>
@@ -616,7 +614,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                           maxFontSizePx={15}
                           minFontSizePx={10.5}
                           maxWidthPx={96}
-                          className={`font-semibold text-right tracking-tight tx-fluid-amount ${
+                          className={`font-semibold text-right tracking-tight ${
                             isIncome ? "text-emerald-500" : "text-rose-500"
                           }`}
                         />

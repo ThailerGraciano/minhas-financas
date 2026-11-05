@@ -1,7 +1,31 @@
 import { transactions } from "@/db/schema";
-import { addMonths, endOfMonth, format, parseISO, subMonths } from "date-fns";
+import { addMonths, endOfMonth, format, getDate, parseISO, setDate, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { SQL, and, eq, gte, isNull, lte, ne, or } from "drizzle-orm";
+
+/**
+ * Retorna o mês de competência no formato 'yyyy-MM' baseado no dia de fechamento.
+ * Se o dia for maior que o dia de fechamento, pertence à competência do mês seguinte.
+ */
+export function getCompetencyMonth(date: Date, closingDay: number): string {
+  const day = getDate(date);
+  if (day > closingDay) {
+    return format(addMonths(date, 1), "yyyy-MM");
+  }
+  return format(date, "yyyy-MM");
+}
+
+/**
+ * Calcula a data de vencimento da fatura com base na data de compra e nas datas de fechamento e vencimento do cartão.
+ * Se a compra for feita no dia de fechamento ou após, vai para o mês seguinte.
+ */
+export function calculateCreditCardDueDate(purchaseDate: Date, closingDay: number, dueDay: number): Date {
+  let targetDate = new Date(purchaseDate);
+  if (purchaseDate.getDate() >= closingDay) {
+    targetDate = addMonths(targetDate, 1);
+  }
+  return setDate(targetDate, dueDay);
+}
 
 /**
  * Retorna o "Mês de Fatura" alvo dado o "Mês de Competência Global" (e.g. Agosto),

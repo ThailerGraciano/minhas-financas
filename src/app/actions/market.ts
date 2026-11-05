@@ -265,21 +265,7 @@ export async function getMarketReceiptDetails(receiptId: string) {
   return await db.select().from(marketItems).where(eq(marketItems.receiptId, receiptId));
 }
 
-export async function getMarketDashboardData(competencyMonth: string) {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-  const userId = session.user.id;
-
-  const closingDay = await getClosingDay(userId);
-  const { startDate, endDate } = getCompetencyDateRange(competencyMonth, closingDay);
-
-  const receipts = await db
-    .select()
-    .from(marketReceipts)
-    .where(
-      and(eq(marketReceipts.userId, userId), gte(marketReceipts.date, startDate), lte(marketReceipts.date, endDate)),
-    );
-
+export async function getMarketDashboardDataFromReceipts(receipts: (typeof marketReceipts.$inferSelect)[]) {
   const totalSpent = receipts.reduce((acc, curr) => acc + Number(curr.totalAmount), 0);
 
   if (receipts.length === 0) {
@@ -295,7 +281,6 @@ export async function getMarketDashboardData(competencyMonth: string) {
   }
 
   const receiptIds = receipts.map((r) => r.id);
-
   const items = await db.select().from(marketItems).where(inArray(marketItems.receiptId, receiptIds));
 
   const totalDiscount = items.reduce((acc, curr) => acc + Number(curr.discountAmount), 0);
@@ -345,7 +330,6 @@ export async function getMarketDashboardData(competencyMonth: string) {
   });
 
   const allItems = Array.from(itemMap.values()).sort((a, b) => b.netPrice - a.netPrice);
-
   const topExpensiveItems = allItems.slice(0, 5);
 
   const categoryItemsMap = new Map<
@@ -394,6 +378,24 @@ export async function getMarketDashboardData(competencyMonth: string) {
     itemsByCategory,
     topItemsByCategory,
   };
+}
+
+export async function getMarketDashboardData(competencyMonth: string) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
+  const closingDay = await getClosingDay(userId);
+  const { startDate, endDate } = getCompetencyDateRange(competencyMonth, closingDay);
+
+  const receipts = await db
+    .select()
+    .from(marketReceipts)
+    .where(
+      and(eq(marketReceipts.userId, userId), gte(marketReceipts.date, startDate), lte(marketReceipts.date, endDate)),
+    );
+
+  return await getMarketDashboardDataFromReceipts(receipts);
 }
 
 export async function getMarketCategoryHistory(competencyMonth: string, monthsCount: number = 3) {

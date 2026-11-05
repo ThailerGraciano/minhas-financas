@@ -3,9 +3,14 @@
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { accounts, creditCards, fixedTransactions, settings, transactions } from "@/db/schema";
-import { buildGlobalCompetencyCondition, getTargetInvoiceMonth } from "@/lib/competency-utils";
-import { calculateCreditCardDueDate } from "@/lib/utils/competency";
-import { addMonths, endOfMonth, format, getDate, parseISO, subMonths } from "date-fns";
+import { applyBalanceDelta } from "@/lib/balance-utils";
+import {
+  buildGlobalCompetencyCondition,
+  calculateCreditCardDueDate,
+  getCompetencyMonth,
+  getTargetInvoiceMonth,
+} from "@/lib/competency-utils";
+import { addMonths, endOfMonth, format, parseISO, subMonths } from "date-fns";
 import { and, eq, gte, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -23,49 +28,6 @@ type CreateTransactionInput = Omit<NewTransaction, "userId" | "dueDate" | "launc
 };
 
 type DBTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-function getCompetencyMonth(date: Date, closingDay: number): string {
-  const day = getDate(date);
-  if (day > closingDay) {
-    return format(addMonths(date, 1), "yyyy-MM");
-  }
-  return format(date, "yyyy-MM");
-}
-
-async function applyBalanceDelta(
-  tx: DBTx,
-  accountId: number | null | undefined,
-  amount: number | string,
-  type: string,
-  status: string,
-  parentTransactionId?: number | null,
-  isRevert = false,
-) {
-  if (!accountId || status !== "paid") return;
-
-  let delta = 0;
-  const numAmount = Number(amount);
-
-  if (type === "income") {
-    delta = numAmount;
-  } else if (type === "expense" || type === "credit_card_expense") {
-    delta = -numAmount;
-  } else if (type === "transfer") {
-    if (!parentTransactionId) {
-      delta = -numAmount; // Saída
-    } else {
-      delta = numAmount; // Entrada
-    }
-  }
-
-  if (delta === 0) return;
-  if (isRevert) delta = -delta;
-
-  await tx
-    .update(accounts)
-    .set({ currentBalance: sql`${accounts.currentBalance} + ${delta}` })
-    .where(eq(accounts.id, accountId));
-}
 
 const transactionSchema = z
   .object({
@@ -646,7 +608,8 @@ export async function createTransaction(
     }
   } catch (error) {
     console.error("Error creating transaction:", error);
-    return { success: false, error: "Failed to create transaction" };
+    const errorMessage = error instanceof Error ? error.message : "Falha ao criar transação";
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -743,7 +706,8 @@ export async function markTransactionAsPaid(id: string | number) {
     return result;
   } catch (error) {
     console.error("Error marking transaction as paid:", error);
-    return { success: false, error: "Failed to update transaction" };
+    const errorMessage = error instanceof Error ? error.message : "Falha ao atualizar status da transação";
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -788,7 +752,8 @@ export async function toggleTransactionStatus(
     return { ...result, newStatus };
   } catch (error) {
     console.error("Error toggling transaction status:", error);
-    return { success: false, error: "Failed to toggle transaction status" };
+    const errorMessage = error instanceof Error ? error.message : "Falha ao alternar status da transação";
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -884,7 +849,8 @@ export async function payVirtualTransaction(txData: VirtualTransactionInput) {
     return { success: true };
   } catch (error) {
     console.error("Error paying virtual transaction:", error);
-    return { success: false, error: "Failed to pay virtual transaction" };
+    const errorMessage = error instanceof Error ? error.message : "Falha ao efetivar transação fixa projetada";
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -1204,7 +1170,8 @@ export async function deleteTransaction(
     return result;
   } catch (error) {
     console.error("Error deleting transaction:", error);
-    return { success: false, error: "Failed to delete transaction" };
+    const errorMessage = error instanceof Error ? error.message : "Falha ao excluir transação";
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -1555,29 +1522,32 @@ export async function fixAllCompetencies() {
   const cards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
   const cardMap = new Map(cards.map((c) => [c.id, c]));
 
-  const { calculateCreditCardDueDate } = await import("@/lib/utils/competency");
-
   let updatedCount = 0;
 
-  for (const tx of allTxs) {
-    const purchaseDate = parseISO(tx.launchDate || tx.dueDate);
-    const dueDateParsed = parseISO(tx.dueDate);
-    let correctCompetency: string;
+  await db.transaction(async (tx) => {
+    for (const item of allTxs) {
+      const purchaseDate = parseISO(item.launchDate || item.dueDate);
+      const dueDateParsed = parseISO(item.dueDate);
+      let correctCompetency: string;
 
-    if (tx.type === "credit_card_expense" && tx.creditCardId) {
-      const card = cardMap.get(tx.creditCardId);
-      if (!card) continue;
-      const dueDate = calculateCreditCardDueDate(purchaseDate, card.closingDay, card.dueDay);
-      correctCompetency = format(dueDate, "yyyy-MM");
-    } else {
-      correctCompetency = getCompetencyMonth(dueDateParsed, closingDay);
-    }
+      if (item.type === "credit_card_expense" && item.creditCardId) {
+        const card = cardMap.get(item.creditCardId);
+        if (!card) continue;
+        const dueDate = calculateCreditCardDueDate(purchaseDate, card.closingDay, card.dueDay);
+        correctCompetency = format(dueDate, "yyyy-MM");
+      } else {
+        correctCompetency = getCompetencyMonth(dueDateParsed, closingDay);
+      }
 
-    if (tx.competencyMonth !== correctCompetency) {
-      await db.update(transactions).set({ competencyMonth: correctCompetency }).where(eq(transactions.id, tx.id));
-      updatedCount++;
+      if (item.competencyMonth !== correctCompetency) {
+        await tx
+          .update(transactions)
+          .set({ competencyMonth: correctCompetency })
+          .where(and(eq(transactions.id, item.id), eq(transactions.userId, userId)));
+        updatedCount++;
+      }
     }
-  }
+  });
 
   return { success: true, count: updatedCount };
 }
@@ -1601,26 +1571,30 @@ export async function backfillInvoiceMonths() {
 
   const cards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
   const cardMap = new Map(cards.map((c) => [c.id, c]));
-  const { calculateCreditCardDueDate } = await import("@/lib/utils/competency");
 
   let updatedCount = 0;
 
-  for (const tx of txsToUpdate) {
-    let newInvoiceMonth = tx.competencyMonth;
+  await db.transaction(async (tx) => {
+    for (const item of txsToUpdate) {
+      let newInvoiceMonth = item.competencyMonth;
 
-    if (!newInvoiceMonth && tx.creditCardId) {
-      const card = cardMap.get(tx.creditCardId);
-      if (card) {
-        const dueDate = calculateCreditCardDueDate(parseISO(tx.launchDate || tx.dueDate), card.closingDay, card.dueDay);
-        newInvoiceMonth = format(dueDate, "yyyy-MM");
+      if (!newInvoiceMonth && item.creditCardId) {
+        const card = cardMap.get(item.creditCardId);
+        if (card) {
+          const dueDate = calculateCreditCardDueDate(parseISO(item.launchDate || item.dueDate), card.closingDay, card.dueDay);
+          newInvoiceMonth = format(dueDate, "yyyy-MM");
+        }
+      }
+
+      if (newInvoiceMonth) {
+        await tx
+          .update(transactions)
+          .set({ invoiceMonth: newInvoiceMonth })
+          .where(and(eq(transactions.id, item.id), eq(transactions.userId, userId)));
+        updatedCount++;
       }
     }
-
-    if (newInvoiceMonth) {
-      await db.update(transactions).set({ invoiceMonth: newInvoiceMonth }).where(eq(transactions.id, tx.id));
-      updatedCount++;
-    }
-  }
+  });
 
   return { success: true, count: updatedCount };
 }

@@ -3,6 +3,8 @@
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { accounts, categories, fixedTransactions, loans, settings, transactions } from "@/db/schema";
+import { applyBalanceDelta } from "@/lib/balance-utils";
+import { getCompetencyMonth } from "@/lib/competency-utils";
 import { addMonths, format, getDate, parseISO } from "date-fns";
 import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -32,48 +34,7 @@ export type CreateLoanInput = {
   checkingAccountId?: number; // Para onde vai
 };
 
-function getCompetencyMonth(date: Date, closingDay: number): string {
-  const day = getDate(date);
-  if (day > closingDay) {
-    return format(addMonths(date, 1), "yyyy-MM");
-  }
-  return format(date, "yyyy-MM");
-}
-
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-async function applyBalanceDelta(
-  tx: DbTransaction,
-  accountId: number | null | undefined,
-  amount: number | string,
-  type: string,
-  status: string,
-  parentTransactionId?: number | null,
-) {
-  if (!accountId || status !== "paid") return;
-
-  let delta = 0;
-  const numAmount = Number(amount);
-
-  if (type === "income") {
-    delta = numAmount;
-  } else if (type === "expense" || type === "credit_card_expense") {
-    delta = -numAmount;
-  } else if (type === "transfer") {
-    if (!parentTransactionId) {
-      delta = -numAmount; // Saída
-    } else {
-      delta = numAmount; // Entrada
-    }
-  }
-
-  if (delta === 0) return;
-
-  await tx
-    .update(accounts)
-    .set({ currentBalance: sql`${accounts.currentBalance} + ${delta}` })
-    .where(eq(accounts.id, accountId));
-}
 
 async function getTransferCategoryId(tx: DbTransaction, userId: string) {
   const [cat] = await tx

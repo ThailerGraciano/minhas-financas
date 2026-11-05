@@ -2,11 +2,62 @@
 
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { accounts, categories, creditCards, settings, subcategories, transactions } from "@/db/schema";
+import { categories, creditCards, settings, subcategories, transactions } from "@/db/schema";
+import { applyBalanceDelta } from "@/lib/balance-utils";
 import { buildCreditCardCompetencyCondition, getInvoiceCondition } from "@/lib/competency-utils";
 import { format } from "date-fns";
 import { and, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+
+type DBTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function getAuthorizedCard(cardId: number, userId: string) {
+  const card = await db.query.creditCards.findFirst({
+    where: (c, { eq, and }) => and(eq(c.id, cardId), eq(c.userId, userId)),
+  });
+  if (!card) throw new Error("Cartão não encontrado");
+  return card;
+}
+
+async function getOrCreateCategoryWithDefaultSub(
+  tx: DBTx,
+  userId: string,
+  categoryName: string,
+  icon: string,
+): Promise<{ categoryId: number; subcategoryId: number | null }> {
+  const category = await tx.query.categories.findFirst({
+    where: (c, { eq, and }) => and(eq(c.name, categoryName), eq(c.userId, userId)),
+  });
+
+  if (!category) {
+    const [newCategory] = await tx
+      .insert(categories)
+      .values({ userId, name: categoryName, type: "expense", icon })
+      .returning();
+
+    const [newSubcategory] = await tx
+      .insert(subcategories)
+      .values({ userId, name: "Geral", categoryId: newCategory.id })
+      .returning();
+
+    return { categoryId: newCategory.id, subcategoryId: newSubcategory.id };
+  }
+
+  const existingSub = await tx.query.subcategories.findFirst({
+    where: (s, { eq, and }) => and(eq(s.categoryId, category!.id), eq(s.userId, userId)),
+  });
+
+  if (existingSub) {
+    return { categoryId: category.id, subcategoryId: existingSub.id };
+  }
+
+  const [newSubcategory] = await tx
+    .insert(subcategories)
+    .values({ userId, name: "Geral", categoryId: category.id })
+    .returning();
+
+  return { categoryId: category.id, subcategoryId: newSubcategory.id };
+}
 
 export async function getCreditCards() {
   const session = await auth();
@@ -85,8 +136,7 @@ export async function getInvoiceSummary(creditCardId: string | number, competenc
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
   const parsedId = Number(creditCardId);
-  const card = await db.query.creditCards.findFirst({ where: (c, { eq }) => eq(c.id, parsedId) });
-  if (!card) throw new Error("Cartão não encontrado");
+  const card = await getAuthorizedCard(parsedId, userId);
   const cardTransactions = await db.query.transactions.findMany({
     where: (t, { eq, ne, and, or, isNull }) =>
       and(
@@ -136,8 +186,7 @@ export async function payFullInvoice(
   const userId = session.user.id;
   const parsedCardId = Number(creditCardId);
   const parsedAccountId = Number(accountId);
-  const card = await db.query.creditCards.findFirst({ where: (c, { eq }) => eq(c.id, parsedCardId) });
-  if (!card) throw new Error("Cartão não encontrado");
+  const card = await getAuthorizedCard(parsedCardId, userId);
 
   try {
     const result = await db.transaction(async (tx) => {
@@ -188,40 +237,12 @@ export async function payFullInvoice(
         );
 
       // 3. Find or create Category for "Pagamento de Fatura"
-      let category = await tx.query.categories.findFirst({
-        where: (categories, { eq, and }) =>
-          and(eq(categories.name, "Pagamento de Fatura"), eq(categories.userId, userId)),
-      });
-      let subcategoryId = null;
-
-      if (!category) {
-        const [newCategory] = await tx
-          .insert(categories)
-          .values({ userId, name: "Pagamento de Fatura", type: "expense", icon: "CreditCard" })
-          .returning();
-
-        const [newSubcategory] = await tx
-          .insert(subcategories)
-          .values({ userId, name: "Geral", categoryId: newCategory.id })
-          .returning();
-
-        category = newCategory;
-        subcategoryId = newSubcategory.id;
-      } else {
-        const subcategory = await tx.query.subcategories.findFirst({
-          where: (subcategories, { eq, and }) =>
-            and(eq(subcategories.categoryId, category!.id), eq(subcategories.userId, userId)),
-        });
-        subcategoryId = subcategory?.id || null;
-
-        if (!subcategoryId) {
-          const [newSubcategory] = await tx
-            .insert(subcategories)
-            .values({ userId, name: "Geral", categoryId: category.id })
-            .returning();
-          subcategoryId = newSubcategory.id;
-        }
-      }
+      const { categoryId, subcategoryId } = await getOrCreateCategoryWithDefaultSub(
+        tx,
+        userId,
+        "Pagamento de Fatura",
+        "CreditCard",
+      );
 
       // 4. Create the transfer transaction for the payment (avoids double counting in expenses)
       await tx.insert(transactions).values({
@@ -229,8 +250,8 @@ export async function payFullInvoice(
         type: "transfer",
         accountId: parsedAccountId,
         creditCardId: parsedCardId,
-        categoryId: category.id,
-        subcategoryId: subcategoryId,
+        categoryId,
+        subcategoryId,
         amount: pendingAmount.toString(),
         description: `Pagamento de Fatura - ${competencyMonth}`,
         dueDate: format(new Date(), "yyyy-MM-dd"),
@@ -239,18 +260,8 @@ export async function payFullInvoice(
         status: "paid",
       });
 
-      // 5. Deduct from account balance
-      const [account] = await tx
-        .select()
-        .from(accounts)
-        .where(and(eq(accounts.id, parsedAccountId), eq(accounts.userId, userId)));
-      if (account) {
-        const newBalance = Number(account.currentBalance) - pendingAmount;
-        await tx
-          .update(accounts)
-          .set({ currentBalance: newBalance.toString() })
-          .where(and(eq(accounts.id, parsedAccountId), eq(accounts.userId, userId)));
-      }
+      // 5. Deduct from account balance atomically
+      await applyBalanceDelta(tx, parsedAccountId, pendingAmount, "expense", "paid", null, false, userId);
 
       return { success: true };
     });
@@ -279,8 +290,7 @@ export async function prepayInvoice(
   const parsedCardId = Number(creditCardId);
   const parsedAccountId = Number(accountId);
 
-  const card = await db.query.creditCards.findFirst({ where: (c, { eq }) => eq(c.id, parsedCardId) });
-  if (!card) throw new Error("Cartão não encontrado");
+  const card = await getAuthorizedCard(parsedCardId, userId);
   try {
     const result = await db.transaction(async (tx) => {
       // 1. Get pending amount to ensure they don't prepay more than owed
@@ -316,40 +326,12 @@ export async function prepayInvoice(
       }
 
       // 2. Find or create Category for "Pagamento de Fatura"
-      let category = await tx.query.categories.findFirst({
-        where: (categories, { eq, and }) =>
-          and(eq(categories.name, "Pagamento de Fatura"), eq(categories.userId, userId)),
-      });
-      let subcategoryId = null;
-
-      if (!category) {
-        const [newCategory] = await tx
-          .insert(categories)
-          .values({ userId, name: "Pagamento de Fatura", type: "expense", icon: "CreditCard" })
-          .returning();
-
-        const [newSubcategory] = await tx
-          .insert(subcategories)
-          .values({ userId, name: "Geral", categoryId: newCategory.id })
-          .returning();
-
-        category = newCategory;
-        subcategoryId = newSubcategory.id;
-      } else {
-        const subcategory = await tx.query.subcategories.findFirst({
-          where: (subcategories, { eq, and }) =>
-            and(eq(subcategories.categoryId, category!.id), eq(subcategories.userId, userId)),
-        });
-        subcategoryId = subcategory?.id || null;
-
-        if (!subcategoryId) {
-          const [newSubcategory] = await tx
-            .insert(subcategories)
-            .values({ userId, name: "Geral", categoryId: category.id })
-            .returning();
-          subcategoryId = newSubcategory.id;
-        }
-      }
+      const { categoryId, subcategoryId } = await getOrCreateCategoryWithDefaultSub(
+        tx,
+        userId,
+        "Pagamento de Fatura",
+        "CreditCard",
+      );
 
       // 3. Create the transfer transaction (money leaving the checking account)
       await tx.insert(transactions).values({
@@ -357,8 +339,8 @@ export async function prepayInvoice(
         type: "transfer",
         accountId: parsedAccountId,
         creditCardId: parsedCardId,
-        categoryId: category.id,
-        subcategoryId: subcategoryId,
+        categoryId,
+        subcategoryId,
         amount: amount.toString(),
         description: `Adiantamento de Fatura - ${competencyMonth}`,
         dueDate: date,
@@ -372,8 +354,8 @@ export async function prepayInvoice(
         userId,
         type: "credit_card_expense",
         creditCardId: parsedCardId,
-        categoryId: category.id,
-        subcategoryId: subcategoryId,
+        categoryId,
+        subcategoryId,
         amount: (-amount).toString(), // Negative amount
         description: `Adiantamento de Fatura`,
         dueDate: date,
@@ -383,18 +365,8 @@ export async function prepayInvoice(
         status: "pending", // Keeps it pending so it reduces the pending sum, and gets marked as paid later
       });
 
-      // 5. Deduct from checking account balance
-      const [account] = await tx
-        .select()
-        .from(accounts)
-        .where(and(eq(accounts.id, parsedAccountId), eq(accounts.userId, userId)));
-      if (account) {
-        const newBalance = Number(account.currentBalance) - amount;
-        await tx
-          .update(accounts)
-          .set({ currentBalance: newBalance.toString() })
-          .where(and(eq(accounts.id, parsedAccountId), eq(accounts.userId, userId)));
-      }
+      // 5. Deduct from checking account balance atomically
+      await applyBalanceDelta(tx, parsedAccountId, amount, "expense", "paid", null, false, userId);
 
       return { success: true };
     });
@@ -415,9 +387,6 @@ export async function getCreditCardsWithSummary(competencyMonth: string) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
-
-  const [appSettings] = await db.select().from(settings).where(eq(settings.userId, userId)).limit(1);
-  const closingDay = appSettings?.closingDay || 25;
 
   const cards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
 
@@ -484,8 +453,7 @@ export async function adjustInvoice(
   const userId = session.user.id;
   const parsedCardId = Number(creditCardId);
 
-  const card = await db.query.creditCards.findFirst({ where: (c, { eq }) => eq(c.id, parsedCardId) });
-  if (!card) throw new Error("Cartão não encontrado");
+  const card = await getAuthorizedCard(parsedCardId, userId);
   try {
     const result = await db.transaction(async (tx) => {
       // 1. Calculate current invoice total (same logic as getInvoiceSummary)
@@ -523,47 +491,19 @@ export async function adjustInvoice(
       // 2. Find or create appropriate category
       if (diff > 0) {
         // Real > Calculated: missing expense, create adjustment
-        let category = await tx.query.categories.findFirst({
-          where: (categories, { eq, and }) =>
-            and(eq(categories.name, "Ajuste de Fatura"), eq(categories.userId, userId)),
-        });
-        let subcategoryId = null;
-
-        if (!category) {
-          const [newCategory] = await tx
-            .insert(categories)
-            .values({ userId, name: "Ajuste de Fatura", type: "expense", icon: "Settings" })
-            .returning();
-
-          const [newSubcategory] = await tx
-            .insert(subcategories)
-            .values({ userId, name: "Geral", categoryId: newCategory.id })
-            .returning();
-
-          category = newCategory;
-          subcategoryId = newSubcategory.id;
-        } else {
-          const subcategory = await tx.query.subcategories.findFirst({
-            where: (subcategories, { eq, and }) =>
-              and(eq(subcategories.categoryId, category!.id), eq(subcategories.userId, userId)),
-          });
-          subcategoryId = subcategory?.id || null;
-
-          if (!subcategoryId) {
-            const [newSubcategory] = await tx
-              .insert(subcategories)
-              .values({ userId, name: "Geral", categoryId: category.id })
-              .returning();
-            subcategoryId = newSubcategory.id;
-          }
-        }
+        const { categoryId, subcategoryId } = await getOrCreateCategoryWithDefaultSub(
+          tx,
+          userId,
+          "Ajuste de Fatura",
+          "Settings",
+        );
 
         await tx.insert(transactions).values({
           userId,
           type: "credit_card_expense",
           creditCardId: parsedCardId,
-          categoryId: category.id,
-          subcategoryId: subcategoryId,
+          categoryId,
+          subcategoryId,
           amount: diff.toFixed(2),
           description: `Ajuste de Fatura - ${competencyMonth}`,
           dueDate: format(new Date(), "yyyy-MM-dd"),
@@ -576,47 +516,19 @@ export async function adjustInvoice(
         return { success: true, adjustmentType: "increase" as const, difference: diff };
       } else {
         // Real < Calculated: overstated, create negative credit
-        let category = await tx.query.categories.findFirst({
-          where: (categories, { eq, and }) =>
-            and(eq(categories.name, "Pagamento de Fatura"), eq(categories.userId, userId)),
-        });
-        let subcategoryId = null;
-
-        if (!category) {
-          const [newCategory] = await tx
-            .insert(categories)
-            .values({ userId, name: "Pagamento de Fatura", type: "expense", icon: "CreditCard" })
-            .returning();
-
-          const [newSubcategory] = await tx
-            .insert(subcategories)
-            .values({ userId, name: "Geral", categoryId: newCategory.id })
-            .returning();
-
-          category = newCategory;
-          subcategoryId = newSubcategory.id;
-        } else {
-          const subcategory = await tx.query.subcategories.findFirst({
-            where: (subcategories, { eq, and }) =>
-              and(eq(subcategories.categoryId, category!.id), eq(subcategories.userId, userId)),
-          });
-          subcategoryId = subcategory?.id || null;
-
-          if (!subcategoryId) {
-            const [newSubcategory] = await tx
-              .insert(subcategories)
-              .values({ userId, name: "Geral", categoryId: category.id })
-              .returning();
-            subcategoryId = newSubcategory.id;
-          }
-        }
+        const { categoryId, subcategoryId } = await getOrCreateCategoryWithDefaultSub(
+          tx,
+          userId,
+          "Pagamento de Fatura",
+          "CreditCard",
+        );
 
         await tx.insert(transactions).values({
           userId,
           type: "credit_card_expense",
           creditCardId: parsedCardId,
-          categoryId: category.id,
-          subcategoryId: subcategoryId,
+          categoryId,
+          subcategoryId,
           amount: diff.toFixed(2), // negative value
           description: `Adiantamento de Fatura - ${competencyMonth}`,
           dueDate: format(new Date(), "yyyy-MM-dd"),
@@ -704,8 +616,7 @@ export async function revertInvoicePayment(
   const userId = session.user.id;
   const parsedCardId = Number(creditCardId);
 
-  const card = await db.query.creditCards.findFirst({ where: (c, { eq }) => eq(c.id, parsedCardId) });
-  if (!card) throw new Error("Cartão não encontrado");
+  const card = await getAuthorizedCard(parsedCardId, userId);
   try {
     const result = await db.transaction(async (tx) => {
       // 1. Mark expenses as pending
@@ -748,22 +659,12 @@ export async function revertInvoicePayment(
           ),
         );
 
-      // 3. Delete transfers and refund accounts
+      // 3. Delete transfers and refund accounts atomically
       for (const t of paymentTransfers) {
         if (t.accountId) {
-          const [account] = await tx
-            .select()
-            .from(accounts)
-            .where(and(eq(accounts.id, t.accountId), eq(accounts.userId, userId)));
-          if (account) {
-            const newBalance = Number(account.currentBalance) + Number(t.amount);
-            await tx
-              .update(accounts)
-              .set({ currentBalance: newBalance.toString() })
-              .where(and(eq(accounts.id, t.accountId), eq(accounts.userId, userId)));
-          }
+          await applyBalanceDelta(tx, t.accountId, t.amount, "income", "paid", null, false, userId);
         }
-        await tx.delete(transactions).where(eq(transactions.id, t.id));
+        await tx.delete(transactions).where(and(eq(transactions.id, t.id), eq(transactions.userId, userId)));
       }
 
       // 4. Delete negative credit card expenses that were created for prepayment
@@ -781,7 +682,7 @@ export async function revertInvoicePayment(
           ),
         );
       for (const t of prepaymentExpenses) {
-        await tx.delete(transactions).where(eq(transactions.id, t.id));
+        await tx.delete(transactions).where(and(eq(transactions.id, t.id), eq(transactions.userId, userId)));
       }
 
       return { success: true };

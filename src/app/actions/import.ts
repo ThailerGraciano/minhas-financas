@@ -3,8 +3,9 @@
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { accounts, categories, creditCards, importLogs, settings, subcategories, transactions } from "@/db/schema";
+import { calculateCreditCardDueDate, getCompetencyMonth } from "@/lib/competency-utils";
 import crypto from "crypto";
-import { addMonths, format, getDate, isValid, parse } from "date-fns";
+import { format, isValid, parse } from "date-fns";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import Papa from "papaparse";
@@ -33,14 +34,6 @@ function parseInstallments(description: string) {
 }
 
 type ImportType = "expense" | "income" | "transfer";
-
-function getCompetencyMonth(date: Date, closingDay: number): string {
-  const day = getDate(date);
-  if (day > closingDay) {
-    return format(addMonths(date, 1), "yyyy-MM");
-  }
-  return format(date, "yyyy-MM");
-}
 
 function parseDate(dateStr: string): Date | null {
   if (!dateStr) return null;
@@ -217,7 +210,6 @@ async function processExpenses(
       if (cartaoName) {
         const card = await getOrCreateCard(cartaoName, closingDay, dbState, userId);
         creditCardId = card.id;
-        const { calculateCreditCardDueDate } = await import("@/lib/utils/competency");
         finalDueDate = calculateCreditCardDueDate(dataVencimento, card.closingDay, card.dueDay);
         competencyMonth = getCompetencyMonth(finalDueDate, closingDay);
       } else {

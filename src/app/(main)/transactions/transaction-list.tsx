@@ -5,7 +5,7 @@ import { payFullInvoice, revertInvoicePayment } from "@/app/actions/credit-cards
 import { deleteTransaction, toggleTransactionStatus } from "@/app/actions/transactions";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CheckCircle2, Circle, Loader2, MinusCircle } from "lucide-react";
+import { Check, Loader2, Minus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -141,23 +141,39 @@ function UnifiedTransactionStatusButton({ tx, isLoading, onToggle }: UnifiedTran
 
   const getTypeColorClasses = () => {
     if (isIncome) {
-      return isPaid
-        ? "bg-emerald-500/20 text-emerald-500 border-emerald-500/50 shadow-xs shadow-emerald-500/10"
-        : "bg-emerald-500/10 text-emerald-500/80 border-emerald-500/25";
+      if (isPaid) {
+        return "bg-emerald-500 border-emerald-500 text-white shadow-sm shadow-emerald-500/30";
+      }
+      if (isPartial) {
+        return "bg-emerald-500/15 border-emerald-500 text-emerald-500";
+      }
+      return "bg-transparent border-emerald-500 text-emerald-500 group-hover/status:bg-emerald-500/10";
     }
     if (tx.type === "transfer") {
-      return isPaid
-        ? "bg-blue-500/20 text-blue-500 border-blue-500/50 shadow-xs shadow-blue-500/10"
-        : "bg-blue-500/10 text-blue-500/80 border-blue-500/25";
+      if (isPaid) {
+        return "bg-blue-500 border-blue-500 text-white shadow-sm shadow-blue-500/30";
+      }
+      if (isPartial) {
+        return "bg-blue-500/15 border-blue-500 text-blue-500";
+      }
+      return "bg-transparent border-blue-500 text-blue-500 group-hover/status:bg-blue-500/10";
     }
     if (tx.type === "credit_card_expense") {
-      return isPaid
-        ? "bg-orange-500/20 text-orange-500 border-orange-500/50 shadow-xs shadow-orange-500/10"
-        : "bg-orange-500/10 text-orange-500/80 border-orange-500/25";
+      if (isPaid) {
+        return "bg-orange-500 border-orange-500 text-white shadow-sm shadow-orange-500/30";
+      }
+      if (isPartial) {
+        return "bg-orange-500/15 border-orange-500 text-orange-500";
+      }
+      return "bg-transparent border-orange-500 text-orange-500 group-hover/status:bg-orange-500/10";
     }
-    return isPaid
-      ? "bg-rose-500/20 text-rose-500 border-rose-500/50 shadow-xs shadow-rose-500/10"
-      : "bg-rose-500/10 text-rose-500/80 border-rose-500/25";
+    if (isPaid) {
+      return "bg-rose-500 border-rose-500 text-white shadow-sm shadow-rose-500/30";
+    }
+    if (isPartial) {
+      return "bg-rose-500/15 border-rose-500 text-rose-500";
+    }
+    return "bg-transparent border-rose-500 text-rose-500 group-hover/status:bg-rose-500/10";
   };
 
   return (
@@ -168,21 +184,27 @@ function UnifiedTransactionStatusButton({ tx, isLoading, onToggle }: UnifiedTran
         onToggle(tx);
       }}
       disabled={isLoading}
-      title={isPaid ? "Desfazer pagamento" : "Marcar como pago"}
-      className="group/status w-[54px] sm:w-[62px] flex flex-col items-center justify-center gap-1 shrink-0 focus:outline-none transition-transform active:scale-95 cursor-pointer"
+      title={
+        isPaid
+          ? isIncome
+            ? "Desfazer recebimento"
+            : "Desfazer pagamento"
+          : isIncome
+            ? "Marcar como recebido"
+            : "Marcar como pago"
+      }
+      className="group/status w-[54px] sm:w-[62px] flex flex-col items-center justify-center gap-1.5 shrink-0 focus:outline-none transition-transform active:scale-95 cursor-pointer"
     >
       <div
-        className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full border flex items-center justify-center transition-all ${getTypeColorClasses()} group-hover/status:brightness-110`}
+        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 flex items-center justify-center transition-all ${getTypeColorClasses()} group-hover/status:brightness-110`}
       >
         {isLoading ? (
-          <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+          <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
         ) : isPaid ? (
-          <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.25]" />
+          <Check className="w-4 h-4 sm:w-[18px] sm:h-[18px] stroke-[3]" />
         ) : isPartial ? (
-          <MinusCircle className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.25]" />
-        ) : (
-          <Circle className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2] opacity-80" />
-        )}
+          <Minus className="w-4 h-4 sm:w-[18px] sm:h-[18px] stroke-[2.75]" />
+        ) : null}
       </div>
 
       {isPaid ? (

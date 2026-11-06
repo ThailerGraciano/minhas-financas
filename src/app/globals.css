@@ -192,3 +192,26 @@
     font-size: clamp(0.6875rem, 4.2cqi, 0.9375rem);
   }
 }
+
+.drag-handle {
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.drag-handle:active,
+.drag-handle.dragging {
+  cursor: grabbing;
+}
+
+.dashboard-widget-cell {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px auto 360px;
+}
+
+@supports not (content-visibility: auto) {
+  .dashboard-widget-cell {
+    contain: layout style paint;
+  }
+}

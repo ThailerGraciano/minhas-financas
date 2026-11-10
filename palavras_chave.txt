@@ -1,7 +1,5 @@
-8bitdo
-gamesir
-rtx 3050
 rtx 3060
+rtx 4060
 rtx 5050
 rx 5700
 rx 6600

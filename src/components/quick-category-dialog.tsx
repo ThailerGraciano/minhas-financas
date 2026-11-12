@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createCategory, createSubcategory } from "@/app/actions/categories";
 import { CATEGORY_ICONS_LIST } from "@/components/category-icon";
+import { cn } from "@/lib/utils";
 
 interface QuickCategoryDialogProps {
   type: "income" | "expense";
@@ -23,9 +24,17 @@ interface QuickCategoryDialogProps {
   isSubcategoryMode?: boolean;
   parentCategoryId?: string;
   parentCategoryName?: string;
+  triggerClassName?: string;
 }
 
-export function QuickCategoryDialog({ type, onSuccess, isSubcategoryMode, parentCategoryId, parentCategoryName }: QuickCategoryDialogProps) {
+export function QuickCategoryDialog({
+  type,
+  onSuccess,
+  isSubcategoryMode,
+  parentCategoryId,
+  parentCategoryName,
+  triggerClassName,
+}: QuickCategoryDialogProps) {
   const [open, setOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState("");
@@ -94,7 +103,7 @@ export function QuickCategoryDialog({ type, onSuccess, isSubcategoryMode, parent
           type="button"
           variant="outline"
           size="icon"
-          className="h-12 w-12 shrink-0 rounded-xl border-dashed"
+          className={cn("h-12 w-12 shrink-0 rounded-xl border-dashed", triggerClassName)}
           title={isSubcategoryMode ? "Nova subcategoria" : "Nova categoria"}
         >
           <Plus className="h-5 w-5 text-muted-foreground" />

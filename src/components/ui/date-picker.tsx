@@ -19,9 +19,22 @@ interface DatePickerProps {
   onKeyDown?: (e: React.KeyboardEvent) => void;
   required?: boolean;
   disabled?: boolean;
+  className?: string;
+  popoverContentClassName?: string;
 }
 
-export function DatePicker({ id, name, defaultValue, value, onChange, onKeyDown, required, disabled }: DatePickerProps) {
+export function DatePicker({
+  id,
+  name,
+  defaultValue,
+  value,
+  onChange,
+  onKeyDown,
+  required,
+  disabled,
+  className,
+  popoverContentClassName,
+}: DatePickerProps) {
   const isControlled = value !== undefined;
 
   const [internalDate, setInternalDate] = React.useState<Date | undefined>(
@@ -50,6 +63,7 @@ export function DatePicker({ id, name, defaultValue, value, onChange, onKeyDown,
             className={cn(
               "w-full justify-start text-left font-normal bg-background h-10 px-3 py-2 text-sm",
               !date && "text-muted-foreground",
+              className
             )}
             id={id}
             type="button"
@@ -60,7 +74,7 @@ export function DatePicker({ id, name, defaultValue, value, onChange, onKeyDown,
             {date ? format(date, "dd/MM/yyyy") : <span>DD/MM/AAAA</span>}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+        <PopoverContent className={cn("w-auto p-0", popoverContentClassName)} align="start">
           <Calendar mode="single" selected={date} onSelect={handleSelect} initialFocus locale={ptBR} />
         </PopoverContent>
       </Popover>

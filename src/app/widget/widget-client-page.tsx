@@ -75,6 +75,8 @@ export function WidgetClientPage({ initialData }: { initialData: WidgetFullData 
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Record<number, boolean>>({});
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
 
+  const isEmbed = searchParams.get("embed") === "true" || searchParams.get("compact") === "true";
+
   const paramView = searchParams.get("view");
   const activeView: WidgetView = isValidView(paramView) ? paramView : selectedView;
 
@@ -179,7 +181,12 @@ export function WidgetClientPage({ initialData }: { initialData: WidgetFullData 
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0B10] text-foreground p-2.5 sm:p-4 flex flex-col gap-3 max-w-xl mx-auto select-none">
+    <div
+      className={cn(
+        "min-h-screen bg-[#0B0B10] text-foreground flex flex-col gap-3 max-w-xl mx-auto select-none",
+        isEmbed ? "p-1.5 sm:p-2" : "p-2.5 sm:p-4"
+      )}
+    >
       {/* =========================================================
           1. HEADER COMPACTO + ACESSO RÁPIDO A TRANSAÇÃO (1 TOQUE)
          ========================================================= */}
@@ -223,94 +230,98 @@ export function WidgetClientPage({ initialData }: { initialData: WidgetFullData 
             </button>
 
             {/* Guia de Configuração no Android */}
-            <Dialog>
-              <DialogTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="Como adicionar widget no Android"
-                  className="p-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary transition-colors cursor-pointer"
-                >
-                  <Smartphone className="w-4 h-4" />
-                </button>
-              </DialogTrigger>
-              <DialogContent className="bg-[#1A1A22] border-white/10 text-white max-w-md rounded-3xl">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2 text-base font-bold">
-                    <Smartphone className="w-5 h-5 text-primary" />
-                    Usar como Widget no Android
-                  </DialogTitle>
-                  <DialogDescription className="text-xs text-white/60">
-                    Configure atalhos de 1 toque e gráficos interativos na tela inicial do seu celular.
-                  </DialogDescription>
-                </DialogHeader>
+            {!isEmbed && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Como adicionar widget no Android"
+                    className="p-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary transition-colors cursor-pointer"
+                  >
+                    <Smartphone className="w-4 h-4" />
+                  </button>
+                </DialogTrigger>
+                <DialogContent className="bg-[#1A1A22] border-white/10 text-white max-w-md rounded-3xl">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-base font-bold">
+                      <Smartphone className="w-5 h-5 text-primary" />
+                      Usar como Widget no Android
+                    </DialogTitle>
+                    <DialogDescription className="text-xs text-white/60">
+                      Configure atalhos de 1 toque e gráficos interativos na tela inicial do seu celular.
+                    </DialogDescription>
+                  </DialogHeader>
 
-                <div className="space-y-4 text-xs leading-relaxed">
-                  <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-2">
-                    <p className="font-bold text-white">1. Widget com Gráfico na Tela Inicial</p>
-                    <p className="text-white/70">
-                      Instale um app gratuito de Web Widget na Play Store (ex:{" "}
-                      <span className="text-white font-medium">Web Widget</span> ou{" "}
-                      <span className="text-white font-medium">Website Shortcut</span>) e cole um dos links abaixo:
-                    </p>
-                    <div className="space-y-1.5 pt-1">
-                      {(
-                        [
-                          { id: "budgets", label: "Orçamentos por Categoria" },
-                          { id: "health", label: "Saúde Financeira do Mês" },
-                          { id: "evolution", label: "Evolução de Saldo" },
-                        ] as const
-                      ).map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex items-center justify-between gap-2 p-2 rounded-xl bg-[#121217] border border-white/5"
-                        >
-                          <div className="truncate">
-                            <span className="font-semibold text-white block">{item.label}</span>
-                            <span className="text-[10px] text-white/45 font-mono">/widget?view={item.id}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => copyWidgetLink(item.id)}
-                            className="shrink-0 px-2.5 py-1.5 rounded-lg bg-primary/15 hover:bg-primary/25 text-primary font-semibold flex items-center gap-1 cursor-pointer"
+                  <div className="space-y-4 text-xs leading-relaxed">
+                    <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                      <p className="font-bold text-white">1. Widget com Gráfico na Tela Inicial</p>
+                      <p className="text-white/70">
+                        Instale um app gratuito de Web Widget na Play Store (ex:{" "}
+                        <span className="text-white font-medium">Web Widget</span> ou{" "}
+                        <span className="text-white font-medium">Website Shortcut</span>) e cole um dos links abaixo:
+                      </p>
+                      <div className="space-y-1.5 pt-1">
+                        {(
+                          [
+                            { id: "budgets", label: "Orçamentos por Categoria" },
+                            { id: "health", label: "Saúde Financeira do Mês" },
+                            { id: "evolution", label: "Evolução de Saldo" },
+                          ] as const
+                        ).map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between gap-2 p-2 rounded-xl bg-[#121217] border border-white/5"
                           >
-                            {copiedUrl === item.id ? (
-                              <>
-                                <Check className="w-3.5 h-3.5" />
-                                Copiado
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3.5 h-3.5" />
-                                Copiar
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      ))}
+                            <div className="truncate">
+                              <span className="font-semibold text-white block">{item.label}</span>
+                              <span className="text-[10px] text-white/45 font-mono">/widget?view={item.id}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => copyWidgetLink(item.id)}
+                              className="shrink-0 px-2.5 py-1.5 rounded-lg bg-primary/15 hover:bg-primary/25 text-primary font-semibold flex items-center gap-1 cursor-pointer"
+                            >
+                              {copiedUrl === item.id ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5" />
+                                  Copiado
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3.5 h-3.5" />
+                                  Copiar
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1.5">
+                      <p className="font-bold text-white">2. Botões Diretos de Nova Transação (PWA)</p>
+                      <p className="text-white/70">
+                        Com o site instalado no Android (<span className="text-white">Adicionar à tela inicial</span> no
+                        Chrome), <strong>segure o dedo sobre o ícone do app</strong> e arraste os atalhos{" "}
+                        <span className="text-rose-400 font-semibold">Nova Despesa</span> ou{" "}
+                        <span className="text-emerald-400 font-semibold">Nova Receita</span> direto para a sua tela
+                        inicial!
+                      </p>
                     </div>
                   </div>
+                </DialogContent>
+              </Dialog>
+            )}
 
-                  <div className="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-1.5">
-                    <p className="font-bold text-white">2. Botões Diretos de Nova Transação (PWA)</p>
-                    <p className="text-white/70">
-                      Com o site instalado no Android (<span className="text-white">Adicionar à tela inicial</span> no
-                      Chrome), <strong>segure o dedo sobre o ícone do app</strong> e arraste os atalhos{" "}
-                      <span className="text-rose-400 font-semibold">Nova Despesa</span> ou{" "}
-                      <span className="text-emerald-400 font-semibold">Nova Receita</span> direto para a sua tela
-                      inicial!
-                    </p>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            <Link
-              href="/"
-              aria-label="Abrir Dashboard Completo"
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ExternalLink className="w-4 h-4" />
-            </Link>
+            {!isEmbed && (
+              <Link
+                href="/"
+                aria-label="Abrir Dashboard Completo"
+                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </Link>
+            )}
           </div>
         </div>
 

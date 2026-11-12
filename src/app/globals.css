@@ -55,15 +55,28 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ==========================================================================
+   PALETA DE CORES GLOBAL DO SISTEMA (TAILWIND CSS v4 + SHADCN/UI)
+   Para trocar o tema global, altere as variáveis principais abaixo:
+   - --primary: Cor de destaque da marca (botões, logotipo, links)
+   - --background: Cor de fundo da aplicação
+   - --card: Superfície dos cartões
+   ========================================================================== */
+
 :root {
+  /* Superfícies & Fundo */
   --background: hsl(240 10% 6%);
   --foreground: hsl(0 0% 98%);
   --card: hsl(240 8% 11%);
   --card-foreground: hsl(0 0% 98%);
   --popover: hsl(240 8% 11%);
   --popover-foreground: hsl(0 0% 98%);
+
+  /* Destaque Principal da Marca */
   --primary: hsl(24 100% 50%);
   --primary-foreground: hsl(0 0% 100%);
+
+  /* Cores Semânticas Auxiliares */
   --secondary: hsl(240 5% 15%);
   --secondary-foreground: hsl(0 0% 98%);
   --muted: hsl(240 5% 15%);
@@ -77,6 +90,8 @@
   --border: hsl(240 5% 15%);
   --input: hsl(240 5% 10%);
   --ring: hsl(24 100% 50%);
+
+  /* Gráficos Financeiros */
   --chart-1: oklch(0.64 0.19 25.1);
   --chart-2: oklch(0.68 0.16 260);
   --chart-3: oklch(0.75 0.18 150);
@@ -87,7 +102,10 @@
   --chart-8: oklch(0.85 0.15 100);
   --chart-9: oklch(0.6 0.15 280);
   --chart-10: oklch(0.7 0.15 45);
+
   --radius: 1rem;
+
+  /* Barra Lateral (Sidebar) */
   --sidebar: hsl(240 10% 6%);
   --sidebar-foreground: hsl(0 0% 98%);
   --sidebar-primary: hsl(24 100% 50%);

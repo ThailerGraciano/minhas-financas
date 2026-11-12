@@ -8,13 +8,7 @@ import {
 import { CategoryIcon } from "@/components/category-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
@@ -204,14 +198,10 @@ export function TransactionDetailsDialog({
     const descMatch = desc.match(/\((\d+)\/(\d+)\)/);
 
     const installmentCurrent =
-      details?.installmentCurrent ??
-      transaction.installmentCurrent ??
-      (descMatch ? parseInt(descMatch[1], 10) : null);
+      details?.installmentCurrent ?? transaction.installmentCurrent ?? (descMatch ? parseInt(descMatch[1], 10) : null);
 
     const installmentTotal =
-      details?.installmentTotal ??
-      transaction.installmentTotal ??
-      (descMatch ? parseInt(descMatch[2], 10) : null);
+      details?.installmentTotal ?? transaction.installmentTotal ?? (descMatch ? parseInt(descMatch[2], 10) : null);
 
     const dueDate = details?.dueDate ?? transaction.dueDate ?? transaction.date ?? "";
     const launchDate = details?.launchDate ?? transaction.launchDate ?? dueDate;
@@ -220,9 +210,7 @@ export function TransactionDetailsDialog({
     const type = details?.type ?? transaction.type;
     const status = details?.status ?? transaction.status ?? "pending";
     const amount = details?.amount ?? transaction.amount;
-    const isFixed =
-      details?.isFixed ??
-      Boolean(transaction.isFixed || transaction.fixedTransactionId);
+    const isFixed = details?.isFixed ?? Boolean(transaction.isFixed || transaction.fixedTransactionId);
 
     const category = details?.category ?? transaction.category ?? null;
     const subcategory = details?.subcategory ?? transaction.subcategory ?? null;
@@ -239,9 +227,8 @@ export function TransactionDetailsDialog({
       const cleanTitle = desc.replace(/\s*\(\d+\/\d+\)/g, "").trim();
       const refDue = dueDate ? parseISO(dueDate.split("T")[0]) : new Date();
       const refLaunch = launchDate ? parseISO(launchDate.split("T")[0]) : refDue;
-      const refComp = competencyMonth && /^\d{4}-\d{2}$/.test(competencyMonth)
-        ? parseISO(`${competencyMonth}-01`)
-        : refDue;
+      const refComp =
+        competencyMonth && /^\d{4}-\d{2}$/.test(competencyMonth) ? parseISO(`${competencyMonth}-01`) : refDue;
 
       installments = Array.from({ length: installmentTotal }, (_, idx) => {
         const num = idx + 1;
@@ -428,7 +415,7 @@ export function TransactionDetailsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className={cn(
-          "w-[95vw] max-h-[90dvh] overflow-y-auto p-4 sm:p-6 bg-background border-border",
+          "w-[95vw] max-h-[90dvh] overflow-y-auto p-4 sm:p-6 bg-card/90 backdrop-blur-2xl border-white/[0.12] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),0_20px_60px_rgba(0,0,0,0.65)] rounded-3xl",
           isParcelada ? "sm:max-w-3xl" : "sm:max-w-xl",
         )}
       >
@@ -480,9 +467,7 @@ export function TransactionDetailsDialog({
         <div className="rounded-2xl border border-border/60 bg-muted/20 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-0.5">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              {isParcelada
-                ? `Valor da Parcela (${currentParcelNum}/${merged.installmentTotal})`
-                : "Valor da Transação"}
+              {isParcelada ? `Valor da Parcela (${currentParcelNum}/${merged.installmentTotal})` : "Valor da Transação"}
             </span>
             <div
               className={cn(
@@ -517,7 +502,7 @@ export function TransactionDetailsDialog({
         {/* Grade de Informações Detalhadas */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           {/* Lançamento */}
-          <div className="rounded-xl border border-border/50 bg-card/50 p-3 flex items-start gap-3">
+          <div className="rounded-2xl border border-white/[0.08] bg-card/85 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] p-3 flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 text-muted-foreground mt-0.5">
               <Calendar className="w-4 h-4" />
             </div>
@@ -528,7 +513,7 @@ export function TransactionDetailsDialog({
           </div>
 
           {/* Vencimento */}
-          <div className="rounded-xl border border-border/50 bg-card/50 p-3 flex items-start gap-3">
+          <div className="rounded-2xl border border-white/[0.08] bg-card/85 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] p-3 flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 text-muted-foreground mt-0.5">
               <CalendarClock className="w-4 h-4" />
             </div>
@@ -541,7 +526,7 @@ export function TransactionDetailsDialog({
           </div>
 
           {/* Competência / Fatura */}
-          <div className="rounded-xl border border-border/50 bg-card/50 p-3 flex items-start gap-3">
+          <div className="rounded-2xl border border-white/[0.08] bg-card/85 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] p-3 flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 text-muted-foreground mt-0.5">
               <CalendarCheck2 className="w-4 h-4" />
             </div>
@@ -556,7 +541,7 @@ export function TransactionDetailsDialog({
           </div>
 
           {/* Categoria e Subcategoria */}
-          <div className="rounded-xl border border-border/50 bg-card/50 p-3 flex items-start gap-3">
+          <div className="rounded-2xl border border-white/[0.08] bg-card/85 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] p-3 flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 text-muted-foreground mt-0.5">
               {merged.category?.icon ? (
                 <CategoryIcon name={merged.category.icon} className="w-4 h-4" />
@@ -580,7 +565,7 @@ export function TransactionDetailsDialog({
 
           {/* Conta / Cartão / Transferência */}
           {merged.type === "transfer" ? (
-            <div className="sm:col-span-2 rounded-xl border border-border/50 bg-card/50 p-3 flex items-start gap-3">
+            <div className="sm:col-span-2 rounded-2xl border border-white/[0.08] bg-card/85 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] p-3 flex items-start gap-3">
               <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
                 <ArrowRightLeft className="w-4 h-4" />
               </div>
@@ -594,7 +579,7 @@ export function TransactionDetailsDialog({
               </div>
             </div>
           ) : merged.type === "credit_card_expense" || merged.creditCard ? (
-            <div className="rounded-xl border border-border/50 bg-card/50 p-3 flex items-start gap-3">
+            <div className="rounded-2xl border border-white/[0.08] bg-card/85 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] p-3 flex items-start gap-3">
               <div className="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-400 flex items-center justify-center shrink-0 mt-0.5">
                 <CreditCard className="w-4 h-4" />
               </div>
@@ -611,7 +596,7 @@ export function TransactionDetailsDialog({
               </div>
             </div>
           ) : (
-            <div className="rounded-xl border border-border/50 bg-card/50 p-3 flex items-start gap-3">
+            <div className="rounded-2xl border border-white/[0.08] bg-card/85 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] p-3 flex items-start gap-3">
               <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 text-muted-foreground mt-0.5">
                 <Landmark className="w-4 h-4" />
               </div>
@@ -630,7 +615,7 @@ export function TransactionDetailsDialog({
           )}
 
           {/* Data de Pagamento / ID / Empréstimo */}
-          <div className="rounded-xl border border-border/50 bg-card/50 p-3 flex items-start gap-3">
+          <div className="rounded-2xl border border-white/[0.08] bg-card/85 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] p-3 flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 text-muted-foreground mt-0.5">
               {merged.loan ? <PiggyBank className="w-4 h-4" /> : <Hash className="w-4 h-4" />}
             </div>
@@ -668,7 +653,7 @@ export function TransactionDetailsDialog({
 
           {/* Observações (se houver) */}
           {merged.observations && (
-            <div className="sm:col-span-2 rounded-xl border border-border/50 bg-card/50 p-3 flex items-start gap-3">
+            <div className="sm:col-span-2 rounded-2xl border border-white/[0.08] bg-card/85 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] p-3 flex items-start gap-3">
               <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 text-muted-foreground mt-0.5">
                 <FileText className="w-4 h-4" />
               </div>
@@ -742,14 +727,11 @@ export function TransactionDetailsDialog({
                 <TableBody>
                   {merged.installments.map((inst) => {
                     const isCurrent =
-                      (inst.id > 0 && inst.id === Number(merged.id)) ||
-                      inst.installmentCurrent === currentParcelNum;
+                      (inst.id > 0 && inst.id === Number(merged.id)) || inst.installmentCurrent === currentParcelNum;
                     const isPrevious = inst.installmentCurrent < currentParcelNum;
                     const isFuture = inst.installmentCurrent > currentParcelNum;
                     const isPaid = inst.status === "paid" || isPrevious;
-                    const paymentDateLabel = isPaid
-                      ? formatFullDate(inst.paidAt ?? inst.dueDate)
-                      : "-";
+                    const paymentDateLabel = isPaid ? formatFullDate(inst.paidAt ?? inst.dueDate) : "-";
 
                     return (
                       <TableRow
@@ -875,7 +857,13 @@ export function TransactionDetailsDialog({
             )}
           </div>
 
-          <Button type="button" variant="secondary" size="sm" onClick={() => onOpenChange(false)} className="cursor-pointer">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+            className="cursor-pointer"
+          >
             Fechar
           </Button>
         </div>
@@ -883,4 +871,3 @@ export function TransactionDetailsDialog({
     </Dialog>
   );
 }
-

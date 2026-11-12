@@ -22,7 +22,8 @@ export function MonthlyBalanceGrid({ totalIncome, totalExpense, showBalance = tr
   return (
     <div className="grid grid-cols-2 gap-3">
       {/* Card Receitas */}
-      <div className="bg-card rounded-2xl sm:rounded-[2rem] border border-white/5 shadow-sm flex flex-col pt-5 pb-0 overflow-hidden relative">
+      <div className="bg-card/70 backdrop-blur-xl rounded-2xl sm:rounded-[2rem] border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] flex flex-col pt-5 pb-0 overflow-hidden relative">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
         <div className="px-4 sm:px-6 mb-3 sm:mb-4 flex flex-col space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -42,7 +43,8 @@ export function MonthlyBalanceGrid({ totalIncome, totalExpense, showBalance = tr
       </div>
 
       {/* Card Despesas */}
-      <div className="bg-card rounded-2xl sm:rounded-[2rem] border border-white/5 shadow-sm flex flex-col pt-5 pb-0 overflow-hidden relative">
+      <div className="bg-card/70 backdrop-blur-xl rounded-2xl sm:rounded-[2rem] border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] flex flex-col pt-5 pb-0 overflow-hidden relative">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-rose-500/30 to-transparent" />
         <div className="px-4 sm:px-6 mb-3 sm:mb-4 flex flex-col space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

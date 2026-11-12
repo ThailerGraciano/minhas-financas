@@ -65,7 +65,7 @@ export function PlanningChart({ data }: PlanningChartProps) {
   const hasFutureData = formattedData.some((d) => d.balanceProjected !== null);
 
   return (
-    <Card className="rounded-[1.5rem] sm:rounded-[2rem] border-white/10 shadow-sm bg-card overflow-hidden">
+    <Card className="rounded-[1.5rem] sm:rounded-[2rem] border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between pb-2 pt-5 px-5 sm:px-6">
         <CardTitle className="text-lg font-bold flex items-center gap-2 text-foreground">
           <TrendingUp className="w-5 h-5 text-primary" />

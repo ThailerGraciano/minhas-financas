@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   DASHBOARD_WIDGETS_META,
-  DEFAULT_ADVANCED_CHARTS_ORDER,
   getDefaultDashboardLayout,
   isDefaultDashboardLayout,
   moveArrayItem,
@@ -37,17 +36,12 @@ describe("dashboard-layout utils", () => {
         { id: "open-invoices", colSpan: 3, visible: true },
         { id: "balance-evolution", colSpan: 3, visible: false },
       ],
-      advancedChartsOrder: ["purchasing-power", "global-income-expense"],
-      advancedAnalyticsOpen: true,
     });
 
     const parsed = parseDashboardLayout(partialJson);
     expect(parsed.widgets[0]).toEqual({ id: "open-invoices", colSpan: 3, visible: true });
     expect(parsed.widgets[1]).toEqual({ id: "balance-evolution", colSpan: 3, visible: false });
     expect(parsed.widgets.length).toBe(DASHBOARD_WIDGETS_META.length);
-    expect(parsed.advancedChartsOrder.slice(0, 2)).toEqual(["purchasing-power", "global-income-expense"]);
-    expect(parsed.advancedChartsOrder.length).toBe(DEFAULT_ADVANCED_CHARTS_ORDER.length);
-    expect(parsed.advancedAnalyticsOpen).toBe(true);
   });
 
   it("moves array items safely", () => {
@@ -56,4 +50,3 @@ describe("dashboard-layout utils", () => {
     expect(moveArrayItem(["a", "b", "c"], -1, 1)).toEqual(["a", "b", "c"]);
   });
 });
-

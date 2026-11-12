@@ -83,7 +83,7 @@ export function ClientDataLoader<T>({
             headerActions ? "justify-between md:justify-end" : "justify-center md:justify-end",
           )}
         >
-          <div className="rounded-full bg-secondary px-3 py-1 sm:py-1.5 flex items-center gap-1.5 shadow-sm border border-white/5 justify-center shrink-0">
+          <div className="rounded-full bg-white/[0.04] backdrop-blur-xl px-3 py-1 sm:py-1.5 flex items-center gap-1.5 border border-white/[0.10] shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.22),0_4px_16px_rgba(0,0,0,0.4)] justify-center shrink-0">
             <CompetencyFilter closingDay={closingDay} value={selectedMonth} onChange={handleMonthChange} />
             {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground shrink-0" />}
           </div>

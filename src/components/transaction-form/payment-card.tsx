@@ -57,7 +57,7 @@ export const PaymentCard = React.memo(function PaymentCard({
       {tab === "expense" && (
         <>
           <div>
-            <Label className="text-xs font-medium text-[#A7B3C5]">
+            <Label className="text-xs font-medium text-muted-foreground">
               Forma de liquidação
             </Label>
             <div className="mt-2 grid grid-cols-2 gap-3">
@@ -95,7 +95,7 @@ export const PaymentCard = React.memo(function PaymentCard({
                   <span className="flex items-center justify-between w-full">
                     <span>Cartão de crédito</span>
                     {card && (
-                      <span className="font-medium text-[#42D6A0]">
+                      <span className="font-medium text-success">
                         Limite: {money(Number(card.creditLimit))}
                       </span>
                     )}
@@ -104,23 +104,23 @@ export const PaymentCard = React.memo(function PaymentCard({
               >
                 <Select value={cardId} onValueChange={onCardChange}>
                   <SelectTrigger
-                    className="w-full !h-11 rounded-xl px-3.5 bg-[#101A2A]/90 hover:bg-[#151F31]/90 border-[#29384E] hover:border-white/20 text-[#F2F5FA] transition-all duration-200"
+                    className="w-full !h-11 rounded-xl px-3.5 bg-input/90 hover:bg-input border-border hover:border-white/20 text-foreground transition-all duration-200"
                     style={{
                       boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.04)",
                     }}
                   >
                     <SelectValue placeholder="Selecionar cartão" />
                   </SelectTrigger>
-                  <SelectContent className="z-[120] rounded-xl border border-white/10 bg-[#111A2A]/95 p-1 text-[#F2F5FA] shadow-[0_16px_36px_rgba(0,0,0,0.6)] backdrop-blur-2xl">
+                  <SelectContent className="z-[120] rounded-xl border border-border bg-popover/95 p-1 text-popover-foreground shadow-[0_16px_36px_rgba(0,0,0,0.6)] backdrop-blur-2xl">
                     {creditCards.map((item: Card) => (
                       <SelectItem
                         key={item.id}
                         value={String(item.id)}
-                        className="hover:bg-white/[0.08] focus:bg-white/[0.10] text-[#F2F5FA] rounded-lg cursor-pointer"
+                        className="hover:bg-white/[0.08] focus:bg-white/[0.10] text-popover-foreground rounded-lg cursor-pointer"
                       >
                         <div className="flex items-center justify-between w-full gap-2">
                           <span>{item.name}</span>
-                          <span className="text-xs text-[#718096]">
+                          <span className="text-xs text-muted-foreground">
                             Fecha dia {item.closingDay} • Vence dia {item.dueDay}
                           </span>
                         </div>
@@ -132,9 +132,9 @@ export const PaymentCard = React.memo(function PaymentCard({
 
               {card && (
                 <div>
-                  <div className="flex justify-between text-xs text-[#A7B3C5] mb-2 font-medium">
+                  <div className="flex justify-between text-xs text-muted-foreground mb-2 font-medium">
                     <span>Fatura de lançamento</span>
-                    <span className="text-[#718096]">Fecha dia {card.closingDay}</span>
+                    <span className="text-muted-foreground/80">Fecha dia {card.closingDay}</span>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                     {invoiceOptions.map((month) => {
@@ -145,27 +145,27 @@ export const PaymentCard = React.memo(function PaymentCard({
                           key={value}
                           type="button"
                           onClick={() => onInvoiceMonthChange(value)}
-                          className="flex flex-col items-center justify-center rounded-xl border p-2.5 text-sm font-semibold capitalize transition-all duration-200 cursor-pointer"
+                          className="relative flex flex-col items-center justify-center rounded-2xl border p-2.5 text-sm font-semibold capitalize transition-all duration-300 cursor-pointer overflow-hidden backdrop-blur-xl"
                           style={
                             isSelected
                               ? {
                                   borderColor: accent.border,
-                                  backgroundColor: accent.elevatedBg,
-                                  color: "#F2F5FA",
-                                  boxShadow: `inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 14px ${accent.subtleGlow}`,
+                                  background: `linear-gradient(145deg, ${accent.elevatedBg} 0%, rgba(14, 14, 20, 0.90) 100%)`,
+                                  color: "var(--foreground)",
+                                  boxShadow: `inset 0 1px 1px 0 rgba(255, 255, 255, 0.28), 0 6px 20px -2px ${accent.subtleGlow}`,
                                 }
                               : {
                                   borderColor: "rgba(255, 255, 255, 0.08)",
-                                  backgroundColor: "rgba(16, 26, 42, 0.8)",
-                                  color: "#A7B3C5",
-                                  boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.04)",
+                                  background: "linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%), var(--card)",
+                                  color: "var(--muted-foreground)",
+                                  boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.08)",
                                 }
                           }
                         >
                           <span className="font-semibold text-sm">
                             {format(month, "MMM/yy", { locale: ptBR })}
                           </span>
-                          <span className="mt-1 block text-xs font-normal normal-case text-[#718096]">
+                          <span className="mt-1 block text-xs font-normal normal-case text-muted-foreground">
                             Vence dia {card.dueDay}
                           </span>
                         </button>

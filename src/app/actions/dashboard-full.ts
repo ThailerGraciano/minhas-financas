@@ -8,7 +8,6 @@ import {
   getExpenseTreemapData,
   getExpensesForecastData,
   getIncomeTreemapData,
-  getIncomeVsExpenseData,
   getInstallmentsChartData,
 } from "./dashboard";
 
@@ -24,9 +23,8 @@ export async function getDashboardFullData(month: string, dateMode: "due_date" |
   ]);
 
   // Lote 2: Gráficos e agrupamentos
-  const [installmentsData, incomeVsExpenseData, treemapData, incomeTreemapData] = await Promise.all([
+  const [installmentsData, treemapData, incomeTreemapData] = await Promise.all([
     getInstallmentsChartData(),
-    getIncomeVsExpenseData(month, false, dateMode),
     getExpenseTreemapData(month, dateMode),
     getIncomeTreemapData(month, dateMode),
   ]);
@@ -42,7 +40,6 @@ export async function getDashboardFullData(month: string, dateMode: "due_date" |
     balancesData,
     evolutionData,
     installmentsData,
-    incomeVsExpenseData,
     treemapData,
     incomeTreemapData,
     forecastData,

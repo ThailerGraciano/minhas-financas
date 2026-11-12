@@ -133,7 +133,7 @@ export function UpcomingTransactionsManager({
 
   return (
     <>
-      <Card className="rounded-[1.5rem] sm:rounded-[2rem] border-white/10 shadow-sm bg-card overflow-hidden flex flex-col">
+      <Card className="rounded-[1.5rem] sm:rounded-[2rem] border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden flex flex-col">
         <CardHeader className="flex flex-row items-center justify-between pb-3 pt-5 px-5 sm:px-6">
           <CardTitle className="text-lg font-bold flex items-center gap-2 text-foreground">
             <WalletCards className="w-5 h-5 text-primary" />
@@ -194,7 +194,7 @@ export function UpcomingTransactionsManager({
                   <div
                     key={tx.id}
                     onClick={() => setViewingTransaction(tx)}
-                    className="p-2.5 sm:p-3.5 rounded-2xl bg-muted/20 hover:bg-muted/40 border border-white/5 transition-all flex items-center justify-between gap-2.5 sm:gap-3 text-sm cursor-pointer"
+                    className="p-2.5 sm:p-3.5 rounded-2xl bg-card/85 backdrop-blur-md hover:bg-card/95 hover:border-white/15 border border-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_16px_rgba(0,0,0,0.35)] transition-all flex items-center justify-between gap-2.5 sm:gap-3 text-sm cursor-pointer"
                   >
                     {/* Esquerda: Data empilhada (Data em cima, dia da semana abreviado embaixo) + Ícone + Descrição */}
                     <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
@@ -301,7 +301,10 @@ export function UpcomingTransactionsManager({
                       {getThematicIcon(tx)}
                     </div>
                     <div className="flex flex-col min-w-0 flex-1">
-                      <span className="font-semibold text-xs sm:text-sm text-foreground truncate" title={tx.description}>
+                      <span
+                        className="font-semibold text-xs sm:text-sm text-foreground truncate"
+                        title={tx.description}
+                      >
                         {tx.description}
                       </span>
                       <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-muted-foreground truncate mt-0.5">
@@ -327,9 +330,7 @@ export function UpcomingTransactionsManager({
                       {isIncome ? "+" : "-"}
                       {formatCurrency(Number(tx.amount))}
                     </span>
-                    <span className="text-[9px] sm:text-[10px] text-amber-500/90 font-medium">
-                      Pendente
-                    </span>
+                    <span className="text-[9px] sm:text-[10px] text-amber-500/90 font-medium">Pendente</span>
                   </div>
                 </div>
               );

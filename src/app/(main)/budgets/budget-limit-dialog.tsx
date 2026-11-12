@@ -3,21 +3,9 @@
 import { deleteBudgetLimit, saveBudgetLimit, type BudgetPillar } from "@/app/actions/budgets";
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   roundCurrency,
   validateAllocationToIncome,
@@ -25,9 +13,10 @@ import {
   type BudgetPlanItem,
 } from "@/lib/budget-planner-utils";
 import { cn } from "@/lib/utils";
+import { orderByMostUsedCategory } from "@/lib/category-utils";
 import { AlertCircle, Heart, Sparkles, Target, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 export interface BudgetEditTarget {
@@ -85,8 +74,13 @@ function BudgetLimitForm({
   const router = useRouter();
   const [isPending, setIsPending] = useState(false);
 
+  const orderedCategories = useMemo(
+    () => orderByMostUsedCategory(categories, allItems.map((item) => ({ categoryId: item.categoryId }))),
+    [categories, allItems],
+  );
+
   const [categoryId, setCategoryId] = useState<string>(
-    editTarget ? String(editTarget.categoryId) : categories[0] ? String(categories[0].id) : "",
+    editTarget ? String(editTarget.categoryId) : orderedCategories[0] ? String(orderedCategories[0].id) : "",
   );
   const [subcategoryId, setSubcategoryId] = useState<string>(
     editTarget?.subcategoryId ? String(editTarget.subcategoryId) : "all",
@@ -95,9 +89,7 @@ function BudgetLimitForm({
     editTarget?.amount && editTarget.amount > 0 ? editTarget.amount : undefined,
   );
   const [pillar, setPillar] = useState<BudgetPillar>(editTarget?.pillar || "needs");
-  const [incomeSourceId, setIncomeSourceId] = useState<string>(
-    editTarget?.incomeSourceId ?? "__none__",
-  );
+  const [incomeSourceId, setIncomeSourceId] = useState<string>(editTarget?.incomeSourceId ?? "__none__");
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
@@ -105,8 +97,7 @@ function BudgetLimitForm({
   const selectedCategory = categories.find((c) => String(c.id) === categoryId);
   const availableSubcategories = selectedCategory?.subcategories || [];
 
-  const currentItemKey =
-    subcategoryId === "all" ? `cat:${categoryId}` : `sub:${subcategoryId}`;
+  const currentItemKey = subcategoryId === "all" ? `cat:${categoryId}` : `sub:${subcategoryId}`;
   const targetIncomeId = incomeSourceId === "__none__" ? null : incomeSourceId;
   const candidateAmount = amount && amount > 0 ? roundCurrency(amount) : 0;
 
@@ -188,16 +179,12 @@ function BudgetLimitForm({
       {/* Categoria Principal */}
       <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">Categoria Principal</Label>
-        <Select
-          value={categoryId}
-          onValueChange={handleCategoryChange}
-          disabled={Boolean(editTarget?.id)}
-        >
+        <Select value={categoryId} onValueChange={handleCategoryChange} disabled={Boolean(editTarget?.id)}>
           <SelectTrigger className="h-11 w-full rounded-xl bg-muted/40 border-input focus:ring-2 focus:ring-primary">
             <SelectValue placeholder="Selecione a categoria..." />
           </SelectTrigger>
           <SelectContent>
-            {categories.map((c) => (
+            {orderedCategories.map((c) => (
               <SelectItem key={c.id} value={String(c.id)}>
                 {c.name}
               </SelectItem>
@@ -209,11 +196,7 @@ function BudgetLimitForm({
       {/* Subcategoria */}
       <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">Subcategoria</Label>
-        <Select
-          value={subcategoryId}
-          onValueChange={setSubcategoryId}
-          disabled={Boolean(editTarget?.id)}
-        >
+        <Select value={subcategoryId} onValueChange={setSubcategoryId} disabled={Boolean(editTarget?.id)}>
           <SelectTrigger className="h-11 w-full rounded-xl bg-muted/40 border-input focus:ring-2 focus:ring-primary">
             <SelectValue placeholder="Selecione..." />
           </SelectTrigger>
@@ -231,9 +214,7 @@ function BudgetLimitForm({
       {/* Receita de Origem (Opcional) */}
       {selectedIncomes.length > 0 && (
         <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">
-            Vincular a uma Receita Fixa (Opcional)
-          </Label>
+          <Label className="text-xs text-muted-foreground">Vincular a uma Receita Fixa (Opcional)</Label>
           <Select value={incomeSourceId} onValueChange={setIncomeSourceId}>
             <SelectTrigger className="h-11 w-full rounded-xl bg-muted/40 border-input focus:ring-2 focus:ring-primary">
               <SelectValue placeholder="Sem receita vinculada..." />
@@ -269,11 +250,7 @@ function BudgetLimitForm({
           <Label className="text-xs text-muted-foreground">Teto de Gasto Mensal (R$)</Label>
           <span className="text-[11px] text-muted-foreground tabular-nums">
             Saldo previsto:{" "}
-            <strong
-              className={
-                freeBalance >= 0 ? "text-emerald-500 font-bold" : "text-rose-500 font-bold"
-              }
-            >
+            <strong className={freeBalance >= 0 ? "text-emerald-500 font-bold" : "text-rose-500 font-bold"}>
               {formatCurrency(freeBalance)}
             </strong>
           </span>
@@ -378,7 +355,7 @@ export function BudgetLimitDialog({
 }: BudgetLimitDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px] bg-card border-white/10 p-5 sm:p-6 shadow-2xl">
+      <DialogContent className="sm:max-w-[480px] bg-card/90 backdrop-blur-2xl border-white/[0.12] p-5 sm:p-6 shadow-2xl rounded-3xl">
         <DialogHeader className="mb-2">
           <DialogTitle className="text-xl font-bold text-foreground">
             {editTarget?.id ? "Editar Limite Orçamentário" : "Novo Limite Orçamentário"}

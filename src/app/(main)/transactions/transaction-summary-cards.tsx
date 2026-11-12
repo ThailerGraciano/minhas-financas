@@ -68,17 +68,20 @@ export function TransactionSummaryCards({ transactions, accountId }: Transaction
   }, [transactions, accountId]);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-4 mb-6">
-      {/* 1. Receitas */}
-      <div className="rounded-xl border border-border/50 bg-card p-4 shadow-sm flex flex-col justify-between">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 md:gap-4 mb-6">
+      {/* 1. Receitas - Apple Liquid Glass */}
+      <div className="relative rounded-2xl border border-white/[0.08] bg-white/[0.025] backdrop-blur-xl p-4 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),0_8px_24px_rgba(0,0,0,0.4)] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:border-white/20 hover:bg-white/[0.04]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/40 to-transparent" />
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-medium text-muted-foreground">
             Receitas
           </span>
-          <ArrowUp className="w-4 h-4 text-emerald-500" />
+          <div className="size-7 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+            <ArrowUp className="w-3.5 h-3.5 text-emerald-400" />
+          </div>
         </div>
         <div>
-          <div className="text-xl md:text-2xl font-bold tracking-tight text-emerald-500">
+          <div className="text-xl md:text-2xl font-bold tracking-tight text-emerald-400 tabular-nums">
             {formatCurrency(totalIncome)}
           </div>
           <div className="text-xs text-muted-foreground mt-1">
@@ -87,16 +90,19 @@ export function TransactionSummaryCards({ transactions, accountId }: Transaction
         </div>
       </div>
 
-      {/* 2. Despesas */}
-      <div className="rounded-xl border border-border/50 bg-card p-4 shadow-sm flex flex-col justify-between">
+      {/* 2. Despesas - Apple Liquid Glass */}
+      <div className="relative rounded-2xl border border-white/[0.08] bg-white/[0.025] backdrop-blur-xl p-4 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),0_8px_24px_rgba(0,0,0,0.4)] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:border-white/20 hover:bg-white/[0.04]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-rose-500/40 to-transparent" />
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-medium text-muted-foreground">
             Despesas
           </span>
-          <ArrowDown className="w-4 h-4 text-rose-500" />
+          <div className="size-7 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+            <ArrowDown className="w-3.5 h-3.5 text-rose-400" />
+          </div>
         </div>
         <div>
-          <div className="text-xl md:text-2xl font-bold tracking-tight text-rose-500">
+          <div className="text-xl md:text-2xl font-bold tracking-tight text-rose-400 tabular-nums">
             {formatCurrency(totalExpense)}
           </div>
           <div className="text-xs text-muted-foreground mt-1">
@@ -105,16 +111,19 @@ export function TransactionSummaryCards({ transactions, accountId }: Transaction
         </div>
       </div>
 
-      {/* 3. Saldo Líquido */}
-      <div className="rounded-xl border border-border/50 bg-card p-4 shadow-sm flex flex-col justify-between">
+      {/* 3. Saldo Líquido - Apple Liquid Glass */}
+      <div className="relative rounded-2xl border border-white/[0.08] bg-white/[0.025] backdrop-blur-xl p-4 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),0_8px_24px_rgba(0,0,0,0.4)] flex flex-col justify-between overflow-hidden transition-all duration-300 hover:border-white/20 hover:bg-white/[0.04]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-medium text-muted-foreground">
             Saldo Líquido
           </span>
-          <Scale className="w-4 h-4 text-muted-foreground" />
+          <div className="size-7 rounded-xl bg-white/[0.05] border border-white/[0.08] flex items-center justify-center">
+            <Scale className="w-3.5 h-3.5 text-muted-foreground" />
+          </div>
         </div>
         <div>
-          <div className="text-xl md:text-2xl font-bold tracking-tight text-foreground">
+          <div className="text-xl md:text-2xl font-bold tracking-tight text-foreground tabular-nums">
             {formatCurrency(netBalance)}
           </div>
           <div className="text-xs text-muted-foreground mt-1">

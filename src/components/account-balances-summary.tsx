@@ -68,7 +68,9 @@ export function AccountBalancesSummary({
   };
 
   return (
-    <div className="bg-card rounded-[2rem] border border-white/5 shadow-sm flex flex-col justify-between p-5 sm:p-6 relative overflow-hidden h-full">
+    <div className="bg-card/70 backdrop-blur-xl rounded-[2rem] border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),0_8px_32px_rgba(0,0,0,0.4)] flex flex-col justify-between p-5 sm:p-6 relative overflow-hidden h-full">
+      {/* Specular top highlight */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/25 to-transparent" />
       {/* Background Glow */}
       <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -117,7 +119,7 @@ export function AccountBalancesSummary({
             {balancesByType.slice(0, 4).map((b) => (
               <div
                 key={b.type}
-                className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 flex flex-col justify-center min-w-0"
+                className="p-2.5 rounded-xl bg-card/85 backdrop-blur-md border border-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] flex flex-col justify-center min-w-0"
               >
                 <div className="flex items-center gap-1.5 min-w-0">
                   {getAccountTypeIcon(b.type)}

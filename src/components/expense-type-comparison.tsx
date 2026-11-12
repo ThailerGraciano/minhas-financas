@@ -75,14 +75,16 @@ export function ExpenseTypeComparison({ data, selectedMonth, showBalance = true 
 
   if (!data || data.length === 0) {
     return (
-      <div className="bg-card rounded-[2rem] border border-white/5 shadow-sm p-6 text-center text-sm text-muted-foreground">
+      <div className="bg-card/70 backdrop-blur-xl rounded-[2rem] border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] p-6 text-center text-sm text-muted-foreground">
         Nenhum dado de composição de despesas disponível.
       </div>
     );
   }
 
   return (
-    <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] p-5 sm:p-6 border border-white/5 shadow-sm space-y-6 w-full min-w-0">
+    <div className="bg-card/70 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] p-5 sm:p-6 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] space-y-6 w-full min-w-0 relative overflow-hidden">
+      {/* Specular top highlight */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
       {/* Header com Tabs de período */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
@@ -186,8 +188,8 @@ export function ExpenseTypeComparison({ data, selectedMonth, showBalance = true 
       )}
 
       {/* Gráfico de Barras Empilhadas */}
-      <div className="h-[280px] sm:h-[320px] w-full pt-2">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-[280px] sm:h-[320px] w-full min-w-0 pt-2">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 320, height: 280 }}>
           <BarChart data={filteredData} margin={{ top: 12, right: 8, left: -20, bottom: 0 }}>
             <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
             <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} className="text-xs" />

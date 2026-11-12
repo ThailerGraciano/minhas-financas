@@ -120,7 +120,7 @@ export function LoansClientPage({ data }: { data: LoansPageData }) {
             {loans.map((loan) => (
               <Card
                 key={loan.id}
-                className="cursor-pointer hover:bg-muted/50 transition-colors"
+                className="cursor-pointer bg-card/85 backdrop-blur-md border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_16px_rgba(0,0,0,0.35)] transition-all hover:bg-card/95 hover:border-white/20"
                 onClick={() => setSelectedLoanId(loan.id)}
               >
                 <CardHeader className="pb-3">
@@ -201,7 +201,7 @@ export function LoansClientPage({ data }: { data: LoansPageData }) {
 
       {/* Amortization Chart */}
       {amortizationData.length > 0 && (
-        <div className="bg-card rounded-3xl sm:rounded-[2rem] px-4 py-6 sm:p-6 border-transparent shadow-sm w-full min-w-0">
+        <div className="bg-card/70 backdrop-blur-xl rounded-3xl sm:rounded-[2rem] px-4 py-6 sm:p-6 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] w-full min-w-0 relative overflow-hidden">
           <div className="flex flex-row items-center gap-2 mb-4">
             <TrendingDown className="h-5 w-5 text-primary" />
             <div>

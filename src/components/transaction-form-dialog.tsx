@@ -21,7 +21,8 @@ import {
   type AccentColorConfig,
   type TransactionTab,
 } from "@/components/transaction-theme";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { orderByMostUsedCategory } from "@/lib/category-utils";
 import { addMonths, format, parseISO } from "date-fns";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -76,7 +77,10 @@ export function TransactionFormDialog({
   const accent: AccentColorConfig = useMemo(() => getTransactionAccent(tab), [tab]);
 
   const categories = useMemo(
-    () => data?.categories.filter((item: Category) => item.type === (tab === "income" ? "income" : "expense")) ?? [],
+    () =>
+      orderByMostUsedCategory(
+        data?.categories.filter((item: Category) => item.type === (tab === "income" ? "income" : "expense")) ?? [],
+      ),
     [data, tab],
   );
 
@@ -310,13 +314,10 @@ export function TransactionFormDialog({
 
         <DialogContent
           showCloseButton={false}
-          overlayClassName="fixed inset-0 z-50 bg-[#0B1220]/75 backdrop-blur-md transition-colors duration-500 overflow-hidden flex items-end sm:items-center justify-center p-0 sm:p-4"
+          overlayClassName="fixed inset-0 z-50 bg-background/80 backdrop-blur-md transition-colors duration-500 overflow-hidden flex items-end sm:items-center justify-center p-0 sm:p-4"
           overlayChildren={<AmbientGlow accent={accent} />}
-          className="fixed z-50 flex flex-col overflow-hidden gap-0 p-0 text-[#F2F5FA] border-0 outline-none top-auto bottom-0 left-0 right-0 translate-x-0 translate-y-0 w-full max-w-full rounded-t-3xl rounded-b-none max-h-[92vh] sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-w-xl sm:rounded-[28px] sm:max-h-[88vh]"
+          className="fixed z-50 flex flex-col overflow-hidden gap-0 p-0 text-foreground border-0 outline-none top-auto bottom-0 left-0 right-0 translate-x-0 translate-y-0 w-full max-w-full rounded-t-3xl rounded-b-none max-h-[92vh] sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-w-xl sm:rounded-[28px] sm:max-h-[88vh] bg-[var(--card-elevated)]/75 backdrop-blur-2xl"
           style={{
-            background: "rgba(21, 31, 49, 0.68)",
-            backdropFilter: "blur(28px)",
-            WebkitBackdropFilter: "blur(28px)",
             border: "1px solid rgba(255, 255, 255, 0.10)",
             boxShadow: `
               inset 0 1px 0 rgba(255, 255, 255, 0.12),
@@ -327,6 +328,11 @@ export function TransactionFormDialog({
             `,
           }}
         >
+          <DialogTitle className="sr-only">Cadastrar Transação</DialogTitle>
+          <DialogDescription className="sr-only">
+            Formulário para adicionar nova despesa, receita ou transferência
+          </DialogDescription>
+
           {/* Header */}
           <FormHeader tab={tab} accent={accent} onTabChange={changeTab} />
 

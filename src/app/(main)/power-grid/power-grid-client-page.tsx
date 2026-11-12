@@ -32,7 +32,8 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { orderByMostUsedCategory } from "@/lib/category-utils";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type FilterOptions = Awaited<ReturnType<typeof getGridFilterOptions>>;
 
@@ -113,6 +114,11 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
     setIsMounted(true);
   }, []);
   const invoiceOptions = isMounted ? generateInvoiceOptions() : [];
+
+  const orderedCategories = useMemo(
+    () => orderByMostUsedCategory(filterOptions.categories, data),
+    [filterOptions.categories, data],
+  );
 
   const activeFilterCount = [
     dateStart,
@@ -359,7 +365,7 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas</SelectItem>
-                    {filterOptions.categories.map((cat) => (
+                    {orderedCategories.map((cat) => (
                       <SelectItem key={cat.id} value={String(cat.id)}>
                         {cat.name}
                       </SelectItem>
@@ -587,7 +593,7 @@ export function PowerGridClientPage({ filterOptions }: PowerGridClientPageProps)
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {filterOptions.categories.map((cat) => (
+                        {orderedCategories.map((cat) => (
                           <SelectItem key={cat.id} value={String(cat.id)}>
                             {cat.name}
                           </SelectItem>

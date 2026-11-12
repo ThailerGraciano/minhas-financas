@@ -89,7 +89,7 @@ export function DayByDayForecast({ projection }: { projection: DayProjection[] }
   const dayNetVariation = (activeDay.total_incomes || 0) - (activeDay.total_expenses || 0);
 
   return (
-    <Card className="rounded-[1.5rem] sm:rounded-[2rem] border-white/10 shadow-sm bg-card overflow-hidden flex flex-col">
+    <Card className="rounded-[1.5rem] sm:rounded-[2rem] border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between pb-3 pt-5 px-5 sm:px-6">
         <CardTitle className="text-lg font-bold flex items-center gap-2 text-foreground">
           <CalendarDays className="w-5 h-5 text-primary" />
@@ -241,7 +241,7 @@ export function DayByDayForecast({ projection }: { projection: DayProjection[] }
                     <div
                       key={tx.id}
                       onClick={() => setViewingTransaction(tx)}
-                      className="p-3 rounded-xl bg-card/70 border border-white/5 hover:border-white/15 transition-all flex items-center justify-between gap-3 text-xs cursor-pointer"
+                      className="p-3 rounded-xl bg-card/85 backdrop-blur-md border border-white/[0.07] hover:border-white/20 hover:bg-card/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all flex items-center justify-between gap-3 text-xs cursor-pointer"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div

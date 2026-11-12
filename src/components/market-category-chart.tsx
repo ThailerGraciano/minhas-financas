@@ -4,13 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Cell, Pie, PieChart } from "recharts";
 
-import React, { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import React, { useState } from "react";
 
 interface MarketCategoryChartProps {
-  data: { 
-    category: string; 
-    value: number; 
+  data: {
+    category: string;
+    value: number;
     subcategories?: { name: string; value: number }[];
   }[];
 }
@@ -44,9 +44,9 @@ export function MarketCategoryChart({ data }: MarketCategoryChartProps) {
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
   const toggleCategory = (category: string) => {
-    setExpandedCategories(prev => ({
+    setExpandedCategories((prev) => ({
       ...prev,
-      [category]: !prev[category]
+      [category]: !prev[category],
     }));
   };
 
@@ -69,7 +69,7 @@ export function MarketCategoryChart({ data }: MarketCategoryChartProps) {
 
   if (data.length === 0) {
     return (
-      <Card className="rounded-3xl sm:rounded-[2rem] border-transparent shadow-sm flex flex-col h-full w-full overflow-hidden">
+      <Card className="rounded-3xl sm:rounded-[2rem] border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] flex flex-col h-full w-full overflow-hidden">
         <CardHeader className="pb-2">
           <CardTitle className="text-xl font-bold">Gastos por Categoria</CardTitle>
         </CardHeader>
@@ -81,7 +81,7 @@ export function MarketCategoryChart({ data }: MarketCategoryChartProps) {
   }
 
   return (
-    <Card className="rounded-3xl sm:rounded-[2rem] border-transparent shadow-sm flex flex-col h-full w-full min-w-0 overflow-hidden">
+    <Card className="rounded-3xl sm:rounded-[2rem] border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] flex flex-col h-full w-full min-w-0 overflow-hidden">
       <CardHeader className="pb-2">
         <CardTitle className="text-xl font-bold">Gastos por Categoria</CardTitle>
       </CardHeader>
@@ -101,7 +101,7 @@ export function MarketCategoryChart({ data }: MarketCategoryChartProps) {
         </ChartContainer>
 
         <div className="mt-6 pb-20 md:pb-0">
-          <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="rounded-2xl border border-white/[0.08] bg-card/85 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_16px_rgba(0,0,0,0.35)] overflow-hidden">
             <table className="w-full text-sm table-fixed">
               <thead>
                 <tr className="border-b bg-muted/50 text-left text-muted-foreground">
@@ -116,8 +116,8 @@ export function MarketCategoryChart({ data }: MarketCategoryChartProps) {
 
                   return (
                     <React.Fragment key={index}>
-                      <tr 
-                        className={`border-b last:border-0 hover:bg-muted/50 transition-colors ${hasSubcategories ? 'cursor-pointer' : ''}`}
+                      <tr
+                        className={`border-b last:border-0 hover:bg-muted/50 transition-colors ${hasSubcategories ? "cursor-pointer" : ""}`}
                         onClick={() => hasSubcategories && toggleCategory(item.category)}
                       >
                         <td className="px-3 md:px-4 py-3 flex items-center gap-2 overflow-hidden">
@@ -136,9 +136,12 @@ export function MarketCategoryChart({ data }: MarketCategoryChartProps) {
                           />
                           <span className="font-medium truncate block">{item.category}</span>
                         </td>
-                        <td className="px-3 md:px-4 py-3 text-right font-medium truncate">{formatCurrency(item.value)}</td>
+                        <td className="px-3 md:px-4 py-3 text-right font-medium truncate">
+                          {formatCurrency(item.value)}
+                        </td>
                       </tr>
-                      {isExpanded && item.subcategories && (
+                      {isExpanded &&
+                        item.subcategories &&
                         item.subcategories.map((sub, subIndex) => (
                           <tr key={`sub-${index}-${subIndex}`} className="border-b last:border-0 bg-muted/20">
                             <td className="px-3 md:px-4 py-2 pl-10 md:pl-12 flex items-center gap-2 text-muted-foreground overflow-hidden">
@@ -148,8 +151,7 @@ export function MarketCategoryChart({ data }: MarketCategoryChartProps) {
                               {formatCurrency(sub.value)}
                             </td>
                           </tr>
-                        ))
-                      )}
+                        ))}
                     </React.Fragment>
                   );
                 })}

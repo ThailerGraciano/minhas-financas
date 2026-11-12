@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { categories, creditCards, transactions } from "@/db/schema";
+import { buildCategoryUsageOrderBy } from "@/lib/category-utils";
 import { and, eq, gte, lte, ne, SQL } from "drizzle-orm";
 
 export interface GridFilters {
@@ -79,7 +80,7 @@ export async function getGridFilterOptions() {
           orderBy: (s, { asc }) => [asc(s.name)],
         },
       },
-      orderBy: (c, { asc }) => [asc(c.name)],
+      orderBy: buildCategoryUsageOrderBy({ userId }),
     }),
     db.select({ id: creditCards.id, name: creditCards.name }).from(creditCards).where(eq(creditCards.userId, userId)),
   ]);

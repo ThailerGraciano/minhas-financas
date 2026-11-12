@@ -12,6 +12,9 @@ Bem-vindo à documentação do Minhas Finanças AI. Esta documentação foi gera
 - [[Tela Configurações]]
 - [[Tela Autenticação (Login e Register)]]
 
+## 🎨 Design System e Customização
+- [[Sistema de Temas e Cores]]
+
 ## ⚙️ Processos Core e Regras de Negócio
 - [[Processo - Período de Competência]]
 - [[Processo - Transações Parceladas e Fixas]]

@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { accounts, creditCards, categories } from '@/db/schema';
 import { eq, asc } from 'drizzle-orm';
 import { auth } from '@/auth';
+import { buildCategoryUsageOrderBy } from '@/lib/category-utils';
 
 export async function getTransactionFormData() {
   const session = await auth();
@@ -15,7 +16,7 @@ export async function getTransactionFormData() {
   
   let cats = await db.query.categories.findMany({
     where: eq(categories.userId, userId),
-    orderBy: (cats, { asc }) => [asc(cats.name)],
+    orderBy: buildCategoryUsageOrderBy({ userId }),
     with: { 
       subcategories: {
         orderBy: (subcats, { asc }) => [asc(subcats.name)]

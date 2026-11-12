@@ -1,14 +1,6 @@
-'use client';
+"use client";
 
-import { CreditCard, Edit, FileText, Trash } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { CreditCardFormDialog } from './credit-card-form-dialog';
-import Link from 'next/link';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { Progress } from '@/components/ui/progress';
-import { useState } from 'react';
-import { deleteCreditCard } from '@/app/actions/credit-cards';
+import { deleteCreditCard } from "@/app/actions/credit-cards";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +11,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { CreditCard, Edit, FileText, Trash } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
+import { CreditCardFormDialog } from "./credit-card-form-dialog";
 
 export type CreditCardType = {
   id: number;
@@ -32,7 +32,7 @@ export type CreditCardType = {
   targetInvoiceMonth?: string;
 };
 
-export function CreditCardList({ cards, selectedMonth }: { cards: CreditCardType[], selectedMonth?: string }) {
+export function CreditCardList({ cards, selectedMonth }: { cards: CreditCardType[]; selectedMonth?: string }) {
   const [cardToDelete, setCardToDelete] = useState<CreditCardType | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
@@ -52,28 +52,34 @@ export function CreditCardList({ cards, selectedMonth }: { cards: CreditCardType
 
   if (cards.length === 0) {
     return (
-      <div className="text-center p-8 text-muted-foreground border rounded-lg border-dashed">
+      <div className="text-center p-8 text-muted-foreground border rounded-2xl border-dashed border-white/10 bg-card/60 backdrop-blur-md">
         Nenhum cartão cadastrado ainda.
       </div>
     );
   }
 
   const formatCurrency = (value: string) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value));
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value));
   };
 
   return (
     <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mt-4">
       {cards.map((card) => (
-        <div key={card.id} className="bg-card rounded-3xl sm:rounded-[2rem] border-transparent shadow-sm transition-all hover:shadow-md flex flex-col p-5 md:px-4 py-6 sm:px-4 py-6 sm:p-6 min-w-0">
+        <div
+          key={card.id}
+          className="bg-card/85 backdrop-blur-md rounded-3xl sm:rounded-[2rem] border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_20px_rgba(0,0,0,0.35)] transition-all hover:bg-card/95 hover:border-white/20 flex flex-col p-5 md:px-4 py-6 sm:px-4 py-6 sm:p-6 min-w-0 overflow-hidden"
+        >
           <div className="flex flex-row items-center justify-between pb-4">
             <h3 className="text-lg font-bold truncate mr-2">{card.name}</h3>
             <div className="flex items-center gap-2">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full" 
-                onClick={() => { setCardToDelete(card); setDeleteError(""); }}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
+                onClick={() => {
+                  setCardToDelete(card);
+                  setDeleteError("");
+                }}
               >
                 <Trash className="w-4 h-4" />
               </Button>
@@ -88,10 +94,9 @@ export function CreditCardList({ cards, selectedMonth }: { cards: CreditCardType
               <>
                 <div className="text-3xl md:text-4xl font-bold">{formatCurrency(card.invoice_total.toString())}</div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {card.targetInvoiceMonth 
-                    ? `Fatura de ${format(new Date(`${card.targetInvoiceMonth}-01T00:00:00`), 'MMMM', { locale: ptBR }).replace(/^\w/, c => c.toUpperCase())}`
-                    : 'Fatura Atual'
-                  }
+                  {card.targetInvoiceMonth
+                    ? `Fatura de ${format(new Date(`${card.targetInvoiceMonth}-01T00:00:00`), "MMMM", { locale: ptBR }).replace(/^\w/, (c) => c.toUpperCase())}`
+                    : "Fatura Atual"}
                 </p>
               </>
             ) : (
@@ -103,18 +108,22 @@ export function CreditCardList({ cards, selectedMonth }: { cards: CreditCardType
 
             {card.invoice_total !== undefined && (
               <div className="mt-4 space-y-3">
-                <Progress 
-                  value={Math.min((card.invoice_total / Number(card.creditLimit)) * 100, 100)} 
+                <Progress
+                  value={Math.min((card.invoice_total / Number(card.creditLimit)) * 100, 100)}
                   className="h-2"
                 />
 
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Valor Pago:</span>
-                  <span className="text-green-500 font-medium">{formatCurrency((card.invoice_paid || 0).toString())}</span>
+                  <span className="text-green-500 font-medium">
+                    {formatCurrency((card.invoice_paid || 0).toString())}
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Restante a Pagar:</span>
-                  <span className="text-red-500 font-medium">{formatCurrency((card.invoice_pending || 0).toString())}</span>
+                  <span className="text-red-500 font-medium">
+                    {formatCurrency((card.invoice_pending || 0).toString())}
+                  </span>
                 </div>
               </div>
             )}
@@ -139,7 +148,9 @@ export function CreditCardList({ cards, selectedMonth }: { cards: CreditCardType
               </Button>
             </CreditCardFormDialog>
             <Button variant="default" className="w-full flex-1 rounded-full shadow-md" size="sm" asChild>
-              <Link href={`/credit-cards/${card.id}${card.targetInvoiceMonth ? `?month=${card.targetInvoiceMonth}` : (selectedMonth ? `?month=${selectedMonth}` : '')}`}>
+              <Link
+                href={`/credit-cards/${card.id}${card.targetInvoiceMonth ? `?month=${card.targetInvoiceMonth}` : selectedMonth ? `?month=${selectedMonth}` : ""}`}
+              >
                 <FileText className="w-4 h-4 mr-2" />
                 Faturas
               </Link>
@@ -155,9 +166,7 @@ export function CreditCardList({ cards, selectedMonth }: { cards: CreditCardType
             <AlertDialogDescription>
               Tem certeza que deseja excluir o cartão <strong>{cardToDelete?.name}</strong>?
             </AlertDialogDescription>
-            {deleteError && (
-              <p className="text-sm font-medium text-destructive mt-2">{deleteError}</p>
-            )}
+            {deleteError && <p className="text-sm font-medium text-destructive mt-2">{deleteError}</p>}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>

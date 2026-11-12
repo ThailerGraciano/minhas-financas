@@ -5,14 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import type { BudgetIncomeSource, BudgetPlanItem } from "@/lib/budget-planner-utils";
 import { roundCurrency } from "@/lib/budget-planner-utils";
 import { cn } from "@/lib/utils";
-import {
-  Banknote,
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Sparkles,
-  Wallet,
-} from "lucide-react";
+import { Banknote, Check, ChevronDown, ChevronUp, Sparkles, Wallet } from "lucide-react";
 import { useState } from "react";
 
 interface BudgetIncomeSelectorProps {
@@ -37,14 +30,12 @@ export function BudgetIncomeSelector({
 
   const selectedSet = new Set(selectedIncomeIds);
   const selectedTotal = roundCurrency(
-    availableIncomes
-      .filter((inc) => selectedSet.has(inc.id))
-      .reduce((acc, inc) => acc + inc.amount, 0),
+    availableIncomes.filter((inc) => selectedSet.has(inc.id)).reduce((acc, inc) => acc + inc.amount, 0),
   );
 
   if (availableIncomes.length === 0) {
     return (
-      <div className="bg-[#1A1A22] rounded-2xl sm:rounded-3xl p-5 border border-white/5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="bg-card/70 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-5 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
             <Banknote className="w-5 h-5" />
@@ -54,8 +45,8 @@ export function BudgetIncomeSelector({
               Nenhuma receita fixa ou prevista cadastrada neste mês
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Cadastre uma receita fixa (ex: Salário, Adiantamento) pelo botão global de Nova
-              Transação para distribuir suas despesas nos contêineres de receita.
+              Cadastre uma receita fixa (ex: Salário, Adiantamento) pelo botão global de Nova Transação para distribuir
+              suas despesas nos contêineres de receita.
             </p>
           </div>
         </div>
@@ -64,7 +55,7 @@ export function BudgetIncomeSelector({
   }
 
   return (
-    <div className="bg-[#1A1A22] rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-white/5 shadow-sm space-y-4">
+    <div className="bg-card/70 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
@@ -72,9 +63,7 @@ export function BudgetIncomeSelector({
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-sm sm:text-base font-bold text-foreground">
-                Receitas do Mês Selecionadas
-              </h3>
+              <h3 className="text-sm sm:text-base font-bold text-foreground">Receitas do Mês Selecionadas</h3>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 {selectedIncomeIds.length} de {availableIncomes.length} ativas
               </span>
@@ -116,12 +105,9 @@ export function BudgetIncomeSelector({
           {availableIncomes.map((inc) => {
             const isSelected = selectedSet.has(inc.id);
             const allocatedAmount = roundCurrency(
-              items
-                .filter((item) => item.incomeSourceId === inc.id)
-                .reduce((acc, item) => acc + item.amount, 0),
+              items.filter((item) => item.incomeSourceId === inc.id).reduce((acc, item) => acc + item.amount, 0),
             );
-            const committedPercent =
-              inc.amount > 0 ? Math.min(100, (allocatedAmount / inc.amount) * 100) : 0;
+            const committedPercent = inc.amount > 0 ? Math.min(100, (allocatedAmount / inc.amount) * 100) : 0;
             const remaining = roundCurrency(Math.max(0, inc.amount - allocatedAmount));
 
             return (
@@ -149,9 +135,7 @@ export function BudgetIncomeSelector({
                       <Check className="w-3.5 h-3.5 stroke-[3]" />
                     </div>
                     <div className="min-w-0">
-                      <span className="font-bold text-xs sm:text-sm text-foreground block truncate">
-                        {inc.name}
-                      </span>
+                      <span className="font-bold text-xs sm:text-sm text-foreground block truncate">{inc.name}</span>
                       <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground truncate">
                         <span>{inc.categoryName}</span>
                         {inc.accountName && (
@@ -180,16 +164,14 @@ export function BudgetIncomeSelector({
                   <div className="space-y-1 w-full pt-1 border-t border-white/5">
                     <div className="flex items-center justify-between text-[10px] text-muted-foreground tabular-nums">
                       <span>
-                        Alocado: <strong className="text-foreground">{formatCurrency(allocatedAmount)}</strong> ({committedPercent.toFixed(0)}%)
+                        Alocado: <strong className="text-foreground">{formatCurrency(allocatedAmount)}</strong> (
+                        {committedPercent.toFixed(0)}%)
                       </span>
                       <span>
                         Livre: <strong className="text-emerald-400">{formatCurrency(remaining)}</strong>
                       </span>
                     </div>
-                    <Progress
-                      value={committedPercent}
-                      className="h-1 bg-white/5 [&>div]:bg-emerald-500"
-                    />
+                    <Progress value={committedPercent} className="h-1 bg-white/5 [&>div]:bg-emerald-500" />
                   </div>
                 )}
               </button>
@@ -200,4 +182,3 @@ export function BudgetIncomeSelector({
     </div>
   );
 }
-

@@ -115,7 +115,7 @@ export function CreditCardInvoicesList({ invoices, showBalance = true }: CreditC
           return (
             <div
               key={card.id}
-              className="bg-card rounded-2xl sm:rounded-[1.5rem] p-4 sm:p-5 shadow-sm border border-white/5 flex flex-col gap-3 relative overflow-hidden hover:border-white/10 transition-all"
+              className="bg-card/85 backdrop-blur-md rounded-2xl sm:rounded-[1.5rem] p-4 sm:p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_16px_rgba(0,0,0,0.35)] border border-white/[0.08] flex flex-col gap-3 relative overflow-hidden hover:border-white/20 hover:bg-card/95 transition-all"
             >
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-3">

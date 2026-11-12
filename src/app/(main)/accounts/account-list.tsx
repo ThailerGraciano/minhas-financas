@@ -195,7 +195,7 @@ function AccountCard({ account, showBalance = true }: { account: Account; showBa
   };
 
   return (
-    <Card className="bg-card border border-white/5 rounded-2xl p-4 flex flex-col gap-3 relative transition-all hover:border-white/10 group shadow-sm">
+    <Card className="bg-card/85 backdrop-blur-md border border-white/[0.08] rounded-2xl p-4 flex flex-col gap-3 relative transition-all duration-200 hover:bg-card/95 hover:border-white/20 group shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_16px_rgba(0,0,0,0.35)]">
       {/* Background link to make the whole card clickable except the actions */}
       <Link
         href={`/transactions?accountId=${account.id}`}
@@ -316,7 +316,7 @@ function AccountCard({ account, showBalance = true }: { account: Account; showBa
 export function AccountList({ accounts, showBalance = true }: { accounts: Account[]; showBalance?: boolean }) {
   if (accounts.length === 0) {
     return (
-      <div className="text-center p-8 text-muted-foreground border rounded-2xl border-dashed border-white/10 mt-2">
+      <div className="text-center p-8 text-muted-foreground border rounded-2xl border-dashed border-white/10 mt-2 bg-card/60 backdrop-blur-md">
         Nenhuma conta encontrada nesta categoria.
       </div>
     );

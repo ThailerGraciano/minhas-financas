@@ -12,14 +12,7 @@ export type DashboardWidgetId =
   | "open-invoices"
   | "installments-projection"
   | "goals-stash"
-  | "category-forecast"
-  | "advanced-analytics";
-
-export type AdvancedChartId =
-  | "global-income-expense"
-  | "account-income-expense"
-  | "purchasing-power"
-  | "account-vs-global";
+  | "category-forecast";
 
 export type WidgetColSpan = 2 | 3 | 4 | 6;
 
@@ -39,8 +32,6 @@ export interface DashboardWidgetConfig {
 export interface DashboardLayoutState {
   version: 1;
   widgets: DashboardWidgetConfig[];
-  advancedChartsOrder: AdvancedChartId[];
-  advancedAnalyticsOpen: boolean;
 }
 
 export const DASHBOARD_LAYOUT_STORAGE_KEY = "minhas-financas:dashboard-layout:v1";
@@ -130,39 +121,7 @@ export const DASHBOARD_WIDGETS_META: readonly DashboardWidgetMeta[] = [
     description: "Projeção de despesas categorizadas para os próximos 6 meses",
     defaultColSpan: 6,
   },
-  {
-    id: "advanced-analytics",
-    title: "Análises Avançadas",
-    description: "Comparativos por conta, poder de compra e despesa global",
-    defaultColSpan: 6,
-  },
 ] as const;
-
-export const DEFAULT_ADVANCED_CHARTS_ORDER: readonly AdvancedChartId[] = [
-  "global-income-expense",
-  "account-income-expense",
-  "purchasing-power",
-  "account-vs-global",
-] as const;
-
-export const ADVANCED_CHARTS_META: Record<AdvancedChartId, { title: string; description: string }> = {
-  "global-income-expense": {
-    title: "Receita vs Despesa Global",
-    description: "Comparativo consolidado do mês",
-  },
-  "account-income-expense": {
-    title: "Receita vs Despesa por Conta",
-    description: "Entradas e saídas em cada conta",
-  },
-  "purchasing-power": {
-    title: "Poder de Compra por Conta",
-    description: "Capacidade disponível em cada conta",
-  },
-  "account-vs-global": {
-    title: "Despesa da Conta vs Global",
-    description: "Participação de cada conta nas saídas totais",
-  },
-};
 
 export function getDefaultDashboardLayout(): DashboardLayoutState {
   return {
@@ -172,21 +131,14 @@ export function getDefaultDashboardLayout(): DashboardLayoutState {
       colSpan: meta.defaultColSpan,
       visible: true,
     })),
-    advancedChartsOrder: [...DEFAULT_ADVANCED_CHARTS_ORDER],
-    advancedAnalyticsOpen: false,
   };
 }
 
 const VALID_WIDGET_IDS = new Set<DashboardWidgetId>(DASHBOARD_WIDGETS_META.map((m) => m.id));
-const VALID_ADVANCED_IDS = new Set<AdvancedChartId>(DEFAULT_ADVANCED_CHARTS_ORDER);
 const VALID_COL_SPANS = new Set<WidgetColSpan>([2, 3, 4, 6]);
 
 function isWidgetId(value: unknown): value is DashboardWidgetId {
   return typeof value === "string" && VALID_WIDGET_IDS.has(value as DashboardWidgetId);
-}
-
-function isAdvancedChartId(value: unknown): value is AdvancedChartId {
-  return typeof value === "string" && VALID_ADVANCED_IDS.has(value as AdvancedChartId);
 }
 
 function isWidgetColSpan(value: unknown): value is WidgetColSpan {
@@ -214,9 +166,7 @@ export function parseDashboardLayout(rawJson: string | null): DashboardLayoutSta
           continue;
         }
         const meta = DASHBOARD_WIDGETS_META.find((m) => m.id === item.id);
-        const colSpan = isWidgetColSpan(item.colSpan)
-          ? item.colSpan
-          : (meta?.defaultColSpan ?? 6);
+        const colSpan = isWidgetColSpan(item.colSpan) ? item.colSpan : (meta?.defaultColSpan ?? 6);
         const visible = typeof item.visible === "boolean" ? item.visible : true;
 
         seenWidgets.add(item.id);
@@ -235,32 +185,9 @@ export function parseDashboardLayout(rawJson: string | null): DashboardLayoutSta
       }
     }
 
-    const seenAdvanced = new Set<AdvancedChartId>();
-    const advancedChartsOrder: AdvancedChartId[] = [];
-
-    if (Array.isArray(parsed.advancedChartsOrder)) {
-      for (const id of parsed.advancedChartsOrder) {
-        if (isAdvancedChartId(id) && !seenAdvanced.has(id)) {
-          seenAdvanced.add(id);
-          advancedChartsOrder.push(id);
-        }
-      }
-    }
-
-    for (const defaultId of DEFAULT_ADVANCED_CHARTS_ORDER) {
-      if (!seenAdvanced.has(defaultId)) {
-        advancedChartsOrder.push(defaultId);
-      }
-    }
-
-    const advancedAnalyticsOpen =
-      typeof parsed.advancedAnalyticsOpen === "boolean" ? parsed.advancedAnalyticsOpen : false;
-
     return {
       version: 1,
       widgets,
-      advancedChartsOrder,
-      advancedAnalyticsOpen,
     };
   } catch {
     return fallback;
@@ -268,13 +195,7 @@ export function parseDashboardLayout(rawJson: string | null): DashboardLayoutSta
 }
 
 export function moveArrayItem<T>(items: readonly T[], fromIndex: number, toIndex: number): T[] {
-  if (
-    fromIndex < 0 ||
-    toIndex < 0 ||
-    fromIndex >= items.length ||
-    toIndex >= items.length ||
-    fromIndex === toIndex
-  ) {
+  if (fromIndex < 0 || toIndex < 0 || fromIndex >= items.length || toIndex >= items.length || fromIndex === toIndex) {
     return [...items];
   }
   const result = [...items];
@@ -300,11 +221,6 @@ export function isDefaultDashboardLayout(layout: DashboardLayoutState): boolean 
     const a = layout.widgets[i];
     const b = def.widgets[i];
     if (a.id !== b.id || a.colSpan !== b.colSpan || a.visible !== b.visible) {
-      return false;
-    }
-  }
-  for (let i = 0; i < def.advancedChartsOrder.length; i++) {
-    if (layout.advancedChartsOrder[i] !== def.advancedChartsOrder[i]) {
       return false;
     }
   }

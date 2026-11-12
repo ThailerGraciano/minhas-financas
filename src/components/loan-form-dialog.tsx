@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Switch } from "@/components/ui/switch";
+import { orderByMostUsedCategory } from "@/lib/category-utils";
 
 type FormData = NonNullable<Awaited<ReturnType<typeof getTransactionFormData>>>;
 
@@ -125,7 +126,8 @@ export function LoanFormDialog({ trigger }: { trigger?: React.ReactNode }) {
     if (!formDataCache?.categories) return [];
     const targetType = watchedAlreadyReceived ? 'expense' : 'income';
     const filtered = formDataCache.categories.filter((c) => c.type === targetType);
-    return filtered.length > 0 ? filtered : formDataCache.categories.filter((c) => c.type !== 'transfer');
+    const baseList = filtered.length > 0 ? filtered : formDataCache.categories.filter((c) => c.type !== 'transfer');
+    return orderByMostUsedCategory(baseList);
   }, [formDataCache, watchedAlreadyReceived]);
 
   useEffect(() => {

@@ -28,7 +28,7 @@ A paleta foi idealizada para contraste máximo no modo escuro. O Laranja vibrant
 - **Sucesso / Receita (Verde):** `#10B981` (Tailwind `emerald-500`). Usado para valores de receita, saldos crescentes e gráficos indicativos positivos.
 - **Alerta / Despesa (Vermelho):** `#EF4444` (Tailwind `red-500`). Usado para marcações de despesas, valores negativos e botões de exclusão.
 
-> **Nota de Customização Rápida:** As cores do sistema e do modal de transações (Midnight + Apple Liquid Glass) são centralizadas em `src/components/transaction-theme.ts` (via presets como `midnight_electric`, `carbon_gold` e `emerald_banking`) e em `src/app/globals.css` (variável `--primary`). Consulte o `GEMINI.md` para instruções passo a passo.
+> **Nota de Customização Rápida (1 Linha para o Sistema Inteiro):** As cores da aplicação toda (Sidebar, Dashboard, Modais, Cards, Botões e Gráficos) são unificadas e controladas em um único lugar: `ACTIVE_THEME_ID` em `src/components/transaction-theme.ts` via atributo `data-theme` no `<html>`. Os presets prontos são: `obsidian_ultraviolet` (Padrão atual: Fundo `#000` preto absoluto + detalhes roxos Ultravioleta + Apple Liquid Glass), `midnight_electric`, `carbon_gold`, `emerald_banking` e `midnight_orange`. Para documentação completa, consulte `docs/Sistema de Temas e Cores.md` e o `GEMINI.md`.
 
 ### Textos (Typography)
 

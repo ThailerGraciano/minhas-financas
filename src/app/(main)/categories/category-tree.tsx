@@ -1,28 +1,23 @@
-'use client';
+"use client";
 
-import { useState, useRef, useEffect } from 'react';
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
-import { Switch } from '@/components/ui/switch';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Trash2, Loader2, Plus } from 'lucide-react';
-import { CATEGORY_ICONS_LIST, CategoryIcon } from '@/components/category-icon';
-import {
-  toggleCategoryPrediction,
-  toggleSubcategoryPrediction,
+  createSubcategory,
   deleteCategory,
   deleteSubcategory,
+  toggleCategoryPrediction,
+  toggleSubcategoryPrediction,
+  updateCategoryIcon,
   updateCategoryName,
   updateSubcategoryName,
-  updateCategoryIcon,
-  createSubcategory,
-} from '@/app/actions/categories';
+} from "@/app/actions/categories";
+import { CATEGORY_ICONS_LIST, CategoryIcon } from "@/components/category-icon";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
+import { Plus, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 export type Subcategory = {
   id: number;
@@ -64,13 +59,13 @@ function CategoryAccordionItem({ category }: { category: Category }) {
 
   const handleSaveName = async () => {
     setIsEditingName(false);
-    if (name !== category.name && name.trim() !== '') {
+    if (name !== category.name && name.trim() !== "") {
       setIsPending(true);
       const res = await updateCategoryName(category.id, name.trim());
       setIsPending(false);
       if (!res.success) {
         setName(category.name);
-        alert(res.error || 'Erro ao atualizar nome');
+        alert(res.error || "Erro ao atualizar nome");
       }
     } else {
       setName(category.name);
@@ -82,14 +77,14 @@ function CategoryAccordionItem({ category }: { category: Category }) {
     setIsPending(true);
     const res = await updateCategoryIcon(category.id, iconName);
     setIsPending(false);
-    if (!res.success) alert(res.error || 'Erro ao atualizar ícone');
+    if (!res.success) alert(res.error || "Erro ao atualizar ícone");
   };
 
   const handleTogglePrediction = async (checked: boolean) => {
     setIsPending(true);
     const res = await toggleCategoryPrediction(category.id, checked);
     setIsPending(false);
-    if (!res.success) alert(res.error || 'Erro ao atualizar previsão');
+    if (!res.success) alert(res.error || "Erro ao atualizar previsão");
   };
 
   const handleDelete = async () => {
@@ -97,11 +92,14 @@ function CategoryAccordionItem({ category }: { category: Category }) {
     setIsPending(true);
     const res = await deleteCategory(category.id);
     setIsPending(false);
-    if (!res.success) alert(res.error || 'Erro ao excluir categoria');
+    if (!res.success) alert(res.error || "Erro ao excluir categoria");
   };
 
   return (
-    <AccordionItem value={category.id.toString()} className="border rounded-lg bg-card text-card-foreground shadow-sm px-4">
+    <AccordionItem
+      value={category.id.toString()}
+      className="border border-white/[0.08] rounded-2xl bg-card/85 backdrop-blur-md text-card-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_8px_rgba(0,0,0,0.3)] px-4 mb-2.5 transition-all hover:bg-card/95 hover:border-white/15 overflow-hidden"
+    >
       <div className="flex items-center justify-between py-2">
         <div className="flex flex-1 items-center gap-3">
           {/* Ícone via Popover */}
@@ -110,8 +108,9 @@ function CategoryAccordionItem({ category }: { category: Category }) {
               <Button
                 variant="ghost"
                 size="icon"
-                className={`h-8 w-8 shrink-0 ${category.type === 'expense' ? 'text-red-500 hover:text-red-600 hover:bg-red-50' : 'text-green-500 hover:text-green-600 hover:bg-green-50'}`}
-                isLoading={isPending} disabled={isPending}
+                className={`h-8 w-8 shrink-0 ${category.type === "expense" ? "text-red-500 hover:text-red-600 hover:bg-red-50" : "text-green-500 hover:text-green-600 hover:bg-green-50"}`}
+                isLoading={isPending}
+                disabled={isPending}
                 onClick={(e) => e.stopPropagation()}
               >
                 <CategoryIcon name={category.icon} className="h-5 w-5" />
@@ -140,8 +139,8 @@ function CategoryAccordionItem({ category }: { category: Category }) {
               onChange={(e) => setName(e.target.value)}
               onBlur={handleSaveName}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSaveName();
-                if (e.key === 'Escape') {
+                if (e.key === "Enter") handleSaveName();
+                if (e.key === "Escape") {
                   setName(category.name);
                   setIsEditingName(false);
                 }
@@ -165,11 +164,7 @@ function CategoryAccordionItem({ category }: { category: Category }) {
         <div className="flex items-center gap-4 shrink-0">
           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
             <span className="text-sm text-muted-foreground">Previsão</span>
-            <Switch
-              checked={category.isPredictable}
-              onCheckedChange={handleTogglePrediction}
-              disabled={isPending}
-            />
+            <Switch checked={category.isPredictable} onCheckedChange={handleTogglePrediction} disabled={isPending} />
           </div>
           <Button
             variant="ghost"
@@ -183,7 +178,7 @@ function CategoryAccordionItem({ category }: { category: Category }) {
           >
             <Trash2 className="h-4 w-4" />
           </Button>
-          
+
           <AccordionTrigger className="w-8 justify-center py-0" />
         </div>
       </div>
@@ -220,13 +215,13 @@ function SubcategoryItem({ subcategory }: { subcategory: Subcategory }) {
 
   const handleSaveName = async () => {
     setIsEditingName(false);
-    if (name !== subcategory.name && name.trim() !== '') {
+    if (name !== subcategory.name && name.trim() !== "") {
       setIsPending(true);
       const res = await updateSubcategoryName(subcategory.id, name.trim());
       setIsPending(false);
       if (!res.success) {
         setName(subcategory.name);
-        alert(res.error || 'Erro ao atualizar nome');
+        alert(res.error || "Erro ao atualizar nome");
       }
     } else {
       setName(subcategory.name);
@@ -237,7 +232,7 @@ function SubcategoryItem({ subcategory }: { subcategory: Subcategory }) {
     setIsPending(true);
     const res = await toggleSubcategoryPrediction(subcategory.id, checked);
     setIsPending(false);
-    if (!res.success) alert(res.error || 'Erro ao atualizar previsão');
+    if (!res.success) alert(res.error || "Erro ao atualizar previsão");
   };
 
   const handleDelete = async () => {
@@ -245,7 +240,7 @@ function SubcategoryItem({ subcategory }: { subcategory: Subcategory }) {
     setIsPending(true);
     const res = await deleteSubcategory(subcategory.id);
     setIsPending(false);
-    if (!res.success) alert(res.error || 'Erro ao excluir subcategoria');
+    if (!res.success) alert(res.error || "Erro ao excluir subcategoria");
   };
 
   return (
@@ -259,8 +254,8 @@ function SubcategoryItem({ subcategory }: { subcategory: Subcategory }) {
             onChange={(e) => setName(e.target.value)}
             onBlur={handleSaveName}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') handleSaveName();
-              if (e.key === 'Escape') {
+              if (e.key === "Enter") handleSaveName();
+              if (e.key === "Escape") {
                 setName(subcategory.name);
                 setIsEditingName(false);
               }
@@ -279,17 +274,14 @@ function SubcategoryItem({ subcategory }: { subcategory: Subcategory }) {
       </div>
 
       <div className="flex items-center gap-3">
-        <Switch
-          checked={subcategory.isPredictable}
-          onCheckedChange={handleTogglePrediction}
-          disabled={isPending}
-        />
+        <Switch checked={subcategory.isPredictable} onCheckedChange={handleTogglePrediction} disabled={isPending} />
         <Button
           variant="ghost"
           size="icon"
           className="h-6 w-6 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
           onClick={handleDelete}
-          isLoading={isPending} disabled={isPending}
+          isLoading={isPending}
+          disabled={isPending}
         >
           <Trash2 className="h-3 w-3" />
         </Button>
@@ -299,7 +291,7 @@ function SubcategoryItem({ subcategory }: { subcategory: Subcategory }) {
 }
 
 function QuickAddSubcategory({ categoryId }: { categoryId: number }) {
-  const [name, setName] = useState('');
+  const [name, setName] = useState("");
   const [isPending, setIsPending] = useState(false);
 
   const handleAdd = async () => {
@@ -308,9 +300,9 @@ function QuickAddSubcategory({ categoryId }: { categoryId: number }) {
     const res = await createSubcategory(name.trim(), categoryId.toString());
     setIsPending(false);
     if (res.success) {
-      setName('');
+      setName("");
     } else {
-      alert(res.error || 'Erro ao adicionar subcategoria');
+      alert(res.error || "Erro ao adicionar subcategoria");
     }
   };
 
@@ -320,7 +312,7 @@ function QuickAddSubcategory({ categoryId }: { categoryId: number }) {
         value={name}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') {
+          if (e.key === "Enter") {
             e.preventDefault();
             handleAdd();
           }
@@ -329,12 +321,13 @@ function QuickAddSubcategory({ categoryId }: { categoryId: number }) {
         className="h-8 text-sm"
         disabled={isPending}
       />
-      <Button 
-        size="sm" 
-        variant="secondary" 
-        className="h-8 shrink-0" 
+      <Button
+        size="sm"
+        variant="secondary"
+        className="h-8 shrink-0"
         onClick={handleAdd}
-        isLoading={isPending} disabled={isPending || !name.trim()}
+        isLoading={isPending}
+        disabled={isPending || !name.trim()}
       >
         <Plus className="h-4 w-4" />
       </Button>

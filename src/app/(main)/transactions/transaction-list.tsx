@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 
 import { EditTransactionDialog } from "@/components/edit-transaction-dialog";
 import { TransactionDetailsDialog } from "@/components/transaction-details-dialog";
@@ -478,39 +479,81 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
 
   return (
     <div className="space-y-6">
-      {/* 1. Chips de Categoria */}
-      <div className="flex overflow-x-auto gap-2 pb-1 scrollbar-hide">
-        <Button
-          variant={selectedCategory === "Todas" ? "default" : "outline"}
-          size="sm"
-          className={`rounded-full shrink-0 h-8 sm:h-9 px-3.5 text-xs sm:text-sm ${
-            selectedCategory === "Todas" ? "bg-orange-500 hover:bg-orange-600 text-white border-transparent" : ""
-          }`}
+      {/* 1. Chips de Categoria (Apple Liquid Glass) */}
+      <div className="flex overflow-x-auto gap-2 pb-1 scrollbar-hide py-1">
+        <button
+          type="button"
+          className={cn(
+            "relative inline-flex items-center justify-center rounded-full shrink-0 h-8 sm:h-9 px-4 text-xs sm:text-sm font-semibold transition-all duration-300 cursor-pointer overflow-hidden backdrop-blur-xl select-none",
+            selectedCategory === "Todas"
+              ? "text-white border border-primary/60 shadow-[inset_0_1px_1px_rgba(255,255,255,0.40),0_4px_20px_rgba(130,10,209,0.40)]"
+              : "text-muted-foreground border border-white/[0.08] hover:border-white/25 hover:text-foreground hover:bg-white/[0.06] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]",
+          )}
+          style={
+            selectedCategory === "Todas"
+              ? {
+                  background: "linear-gradient(135deg, rgba(130, 10, 209, 0.75) 0%, rgba(90, 5, 150, 0.45) 100%)",
+                }
+              : {
+                  background:
+                    "linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%), rgba(12, 12, 18, 0.65)",
+                  boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.08)",
+                }
+          }
           onClick={() => setSelectedCategory("Todas")}
         >
-          Todas ({categoriesData.total})
-        </Button>
-        {categoriesData.list.map(([catName, count]) => (
-          <Button
-            key={catName}
-            variant={selectedCategory === catName ? "default" : "outline"}
-            size="sm"
-            className={`rounded-full shrink-0 h-8 sm:h-9 px-3.5 text-xs sm:text-sm ${
-              selectedCategory === catName ? "bg-orange-500 hover:bg-orange-600 text-white border-transparent" : ""
-            }`}
-            onClick={() => setSelectedCategory(catName)}
-          >
-            {catName} ({count})
-          </Button>
-        ))}
+          {/* Top specular reflection shimmer */}
+          <span className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/35 to-transparent" />
+          <span>Todas ({categoriesData.total})</span>
+        </button>
+        {categoriesData.list.map(([catName, count]) => {
+          const isSelected = selectedCategory === catName;
+          return (
+            <button
+              key={catName}
+              type="button"
+              className={cn(
+                "relative inline-flex items-center justify-center rounded-full shrink-0 h-8 sm:h-9 px-4 text-xs sm:text-sm font-semibold transition-all duration-300 cursor-pointer overflow-hidden backdrop-blur-xl select-none",
+                isSelected
+                  ? "text-white border border-primary/60 shadow-[inset_0_1px_1px_rgba(255,255,255,0.40),0_4px_20px_rgba(130,10,209,0.40)]"
+                  : "text-muted-foreground border border-white/[0.08] hover:border-white/25 hover:text-foreground hover:bg-white/[0.06] hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]",
+              )}
+              style={
+                isSelected
+                  ? {
+                      background: "linear-gradient(135deg, rgba(130, 10, 209, 0.75) 0%, rgba(90, 5, 150, 0.45) 100%)",
+                    }
+                  : {
+                      background:
+                        "linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%), rgba(12, 12, 18, 0.65)",
+                      boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.08)",
+                    }
+              }
+              onClick={() => setSelectedCategory(catName)}
+            >
+              <span className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/35 to-transparent" />
+              <span>
+                {catName} ({count})
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* 2. Controles (Toggles, Ordenação e Filtro) */}
-      <div className="flex flex-col gap-3 p-3 sm:p-4 rounded-2xl border border-border/50 bg-card shadow-sm mb-6">
+      {/* 2. Controles (Toggles, Ordenação e Filtro) - Apple Liquid Glass Container */}
+      <div className="flex flex-col gap-3 p-3.5 sm:p-4 rounded-3xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_12px_32px_rgba(0,0,0,0.5)] mb-6 relative overflow-hidden">
+        {/* Top edge shimmer */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+
         <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-between sm:gap-4 w-full">
           <Label
             htmlFor="show-only-pending"
-            className="flex items-center gap-1 sm:gap-2 px-2 py-2 rounded-xl bg-background/60 border border-border/40 text-[11px] sm:text-sm font-medium cursor-pointer select-none transition-colors hover:bg-background min-w-0"
+            className={cn(
+              "relative flex items-center gap-1.5 sm:gap-2 px-3 py-2 rounded-2xl text-[11px] sm:text-sm font-medium cursor-pointer select-none transition-all duration-300 min-w-0 overflow-hidden backdrop-blur-xl border",
+              showOnlyPending
+                ? "border-primary/50 text-foreground shadow-[inset_0_1px_1px_rgba(255,255,255,0.25),0_0_16px_rgba(130,10,209,0.2)] bg-gradient-to-r from-primary/20 to-primary/5"
+                : "border-white/[0.08] text-muted-foreground hover:text-foreground hover:border-white/20 bg-white/[0.03] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
+            )}
           >
             <Switch
               id="show-only-pending"
@@ -523,7 +566,12 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
 
           <Label
             htmlFor="group-cc"
-            className="flex items-center gap-1 sm:gap-2 px-2 py-2 rounded-xl bg-background/60 border border-border/40 text-[11px] sm:text-sm font-medium cursor-pointer select-none transition-colors hover:bg-background min-w-0"
+            className={cn(
+              "relative flex items-center gap-1.5 sm:gap-2 px-3 py-2 rounded-2xl text-[11px] sm:text-sm font-medium cursor-pointer select-none transition-all duration-300 min-w-0 overflow-hidden backdrop-blur-xl border",
+              groupCreditCards
+                ? "border-primary/50 text-foreground shadow-[inset_0_1px_1px_rgba(255,255,255,0.25),0_0_16px_rgba(130,10,209,0.2)] bg-gradient-to-r from-primary/20 to-primary/5"
+                : "border-white/[0.08] text-muted-foreground hover:text-foreground hover:border-white/20 bg-white/[0.03] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
+            )}
           >
             <Switch
               id="group-cc"
@@ -535,7 +583,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
           </Label>
         </div>
 
-        <div className="flex items-center justify-between w-full pt-2.5 border-t border-border/50 gap-2 sm:gap-4">
+        <div className="flex items-center justify-between w-full pt-2.5 border-t border-white/[0.08] gap-2 sm:gap-4">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <Label
               htmlFor="sort-by"
@@ -546,7 +594,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger
                 id="sort-by"
-                className="flex-1 sm:w-[190px] sm:flex-none h-9 bg-background rounded-xl border-border/40 text-xs sm:text-sm px-3 whitespace-nowrap *:data-[slot=select-value]:truncate"
+                className="flex-1 sm:w-[190px] sm:flex-none h-9 bg-white/[0.04] backdrop-blur-md rounded-xl border-white/[0.09] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] text-xs sm:text-sm px-3 whitespace-nowrap hover:bg-white/[0.08] hover:border-white/20 transition-all *:data-[slot=select-value]:truncate"
               >
                 <SelectValue placeholder="Ordenar por" />
               </SelectTrigger>
@@ -562,7 +610,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
           <Button
             variant="outline"
             size="sm"
-            className="h-9 px-3 gap-1.5 rounded-xl whitespace-nowrap text-xs sm:text-sm shrink-0 bg-background border-border/40 hover:bg-muted"
+            className="h-9 px-3 gap-1.5 rounded-xl whitespace-nowrap text-xs sm:text-sm shrink-0 bg-white/[0.04] backdrop-blur-md border-white/[0.09] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/[0.08] hover:border-white/20 transition-all"
           >
             <Filter className="w-3.5 h-3.5" />
             Filtros
@@ -571,7 +619,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
       </div>
 
       {displayedTransactions.length === 0 ? (
-        <div className="text-center p-12 border rounded-lg border-dashed text-muted-foreground bg-muted/20">
+        <div className="text-center p-12 border rounded-2xl border-dashed border-white/10 text-muted-foreground bg-card/60 backdrop-blur-md">
           Nenhuma transação encontrada para este período.
         </div>
       ) : (
@@ -602,7 +650,10 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                           setViewingTransaction(tx);
                         }
                       }}
-                      className={`group relative flex items-center justify-between p-2.5 sm:p-4 rounded-2xl bg-card hover:bg-muted/50 border border-border/50 shadow-sm transition-colors gap-2.5 sm:gap-4 ${!tx.isGroup ? "cursor-pointer" : ""}`}
+                      className={cn(
+                        "group relative flex items-center justify-between p-2.5 sm:p-4 rounded-2xl bg-card/85 backdrop-blur-md border border-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_16px_rgba(0,0,0,0.35)] transition-all duration-200 hover:bg-card/95 hover:border-white/15 gap-2.5 sm:gap-4 overflow-hidden",
+                        !tx.isGroup && "cursor-pointer",
+                      )}
                     >
                       {/* Esquerda (Componente Unificado de Status/Tipo com Tag + Descrição expandida) */}
                       <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">

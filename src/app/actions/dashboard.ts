@@ -8,8 +8,6 @@ import { addDays, addMonths, endOfMonth, format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { and, eq, gt, gte, inArray, isNotNull, lte, ne } from "drizzle-orm";
 
-import { getTransactions } from "./transactions";
-
 export type ExpenseBreakdown = {
   fixed: number;
   variable: number;
@@ -19,6 +17,10 @@ export type ExpenseBreakdown = {
 export type ReserveSparklinePoint = {
   month: string;
   balance: number;
+  balancePast: number | null;
+  balanceFuture: number | null;
+  isFuture: boolean;
+  isCurrent: boolean;
 };
 
 export type ReserveData = {
@@ -137,31 +139,54 @@ export async function getDashboardData(month?: string, dateMode: "due_date" | "l
     const essentialExpenseBase = fixedExpense > 0 ? fixedExpense : totalExpense;
     const coverageMonths = essentialExpenseBase > 0 ? reserveBalance / essentialExpenseBase : null;
 
-    // Sparkline dos últimos 6 meses
-    const pastMonthsDates = Array.from({ length: 6 }, (_, i) => subMonths(new Date(), 5 - i));
-    const sixMonthsAgoStr = format(pastMonthsDates[0], "yyyy-MM-01");
+    // Sparkline: 3 meses passados + mês atual (hoje no meio) + 3 meses futuros = 7 meses
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const pastMonthsDates = Array.from({ length: 4 }, (_, i) => subMonths(currentMonthStart, 3 - i));
+    const futureMonthsDates = Array.from({ length: 3 }, (_, i) => addMonths(currentMonthStart, i + 1));
 
-    const reservePastTxs = await db
-      .select({
-        type: transactions.type,
-        amount: transactions.amount,
-        dueDate: transactions.dueDate,
-        parentTransactionId: transactions.parentTransactionId,
-      })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.accountId, reserveAccount.id),
-          eq(transactions.status, "paid"),
-          gte(transactions.dueDate, sixMonthsAgoStr),
-          eq(transactions.userId, userId),
+    const threeMonthsAgoStr = format(pastMonthsDates[0], "yyyy-MM-01");
+    const lastFutureDateStr = format(endOfMonth(futureMonthsDates[futureMonthsDates.length - 1]), "yyyy-MM-dd");
+
+    const [reserveWindowTxs, userFixedTxs] = await Promise.all([
+      db
+        .select({
+          type: transactions.type,
+          amount: transactions.amount,
+          dueDate: transactions.dueDate,
+          competencyMonth: transactions.competencyMonth,
+          status: transactions.status,
+          parentTransactionId: transactions.parentTransactionId,
+          fixedTransactionId: transactions.fixedTransactionId,
+        })
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.accountId, reserveAccount.id),
+            ne(transactions.status, "ignored"),
+            gte(transactions.dueDate, threeMonthsAgoStr),
+            lte(transactions.dueDate, lastFutureDateStr),
+            eq(transactions.userId, userId),
+          ),
         ),
-      );
+      db
+        .select()
+        .from(fixedTransactions)
+        .where(and(eq(fixedTransactions.userId, userId), eq(fixedTransactions.active, true))),
+    ]);
 
     const deltasByMonth: Record<string, number> = {};
-    reservePastTxs.forEach((t) => {
-      const m = t.dueDate ? t.dueDate.substring(0, 7) : "";
+    const pendingDeltasByMonth: Record<string, number> = {};
+    const materializedFixedByMonth = new Set<string>();
+
+    reserveWindowTxs.forEach((t) => {
+      const m = t.dueDate ? t.dueDate.substring(0, 7) : t.competencyMonth;
       if (!m) return;
+
+      if (t.fixedTransactionId) {
+        materializedFixedByMonth.add(`${m}-${t.fixedTransactionId}`);
+      }
+
       const amt = Number(t.amount);
       let delta = 0;
       if (t.type === "income" || (t.type === "transfer" && t.parentTransactionId !== null)) {
@@ -173,26 +198,91 @@ export async function getDashboardData(month?: string, dateMode: "due_date" | "l
       ) {
         delta = -amt;
       }
-      deltasByMonth[m] = (deltasByMonth[m] || 0) + delta;
+
+      if (t.status === "paid") {
+        deltasByMonth[m] = (deltasByMonth[m] || 0) + delta;
+      } else if (t.status === "pending") {
+        pendingDeltasByMonth[m] = (pendingDeltasByMonth[m] || 0) + delta;
+      }
     });
 
+    const reserveFixedInflows = userFixedTxs.filter(
+      (ft) =>
+        (ft.type === "income" && ft.accountId === reserveAccount.id) ||
+        (ft.type === "transfer" && ft.destinationAccountId === reserveAccount.id),
+    );
+    const reserveFixedOutflows = userFixedTxs.filter(
+      (ft) =>
+        (ft.type === "expense" && ft.accountId === reserveAccount.id) ||
+        (ft.type === "transfer" && ft.accountId === reserveAccount.id),
+    );
+
     let runningBalance = reserveBalance;
-    const reversedPoints: ReserveSparklinePoint[] = [];
+    const reversedPastPoints: ReserveSparklinePoint[] = [];
     for (let i = pastMonthsDates.length - 1; i >= 0; i--) {
       const mDate = pastMonthsDates[i];
       const mKey = format(mDate, "yyyy-MM");
       const mLabel = format(mDate, "MMM", { locale: ptBR });
       const capitalized = mLabel.charAt(0).toUpperCase() + mLabel.slice(1).replace(".", "");
+      const isCurrent = i === pastMonthsDates.length - 1;
+      const rounded = Math.max(0, Math.round(runningBalance * 100) / 100);
 
-      reversedPoints.push({
+      reversedPastPoints.push({
         month: capitalized,
-        balance: Math.max(0, Math.round(runningBalance * 100) / 100),
+        balance: rounded,
+        balancePast: rounded,
+        balanceFuture: isCurrent ? rounded : null,
+        isFuture: false,
+        isCurrent,
       });
 
       const deltaThisMonth = deltasByMonth[mKey] || 0;
       runningBalance -= deltaThisMonth;
     }
-    const sparkline = reversedPoints.reverse();
+    const pastPoints = reversedPastPoints.reverse();
+
+    let runningFutureBalance = reserveBalance;
+    const futurePoints: ReserveSparklinePoint[] = [];
+    for (let i = 0; i < futureMonthsDates.length; i++) {
+      const mDate = futureMonthsDates[i];
+      const mKey = format(mDate, "yyyy-MM");
+      const mLabel = format(mDate, "MMM", { locale: ptBR });
+      const capitalized = mLabel.charAt(0).toUpperCase() + mLabel.slice(1).replace(".", "");
+
+      let monthFutureDelta = pendingDeltasByMonth[mKey] || 0;
+
+      for (const ft of reserveFixedInflows) {
+        const ftStartMonth = ft.startDate.substring(0, 7);
+        if (mKey >= ftStartMonth && !materializedFixedByMonth.has(`${mKey}-${ft.id}`)) {
+          monthFutureDelta += Number(ft.amount);
+        }
+      }
+
+      for (const ft of reserveFixedOutflows) {
+        const ftStartMonth = ft.startDate.substring(0, 7);
+        if (mKey >= ftStartMonth && !materializedFixedByMonth.has(`${mKey}-${ft.id}`)) {
+          monthFutureDelta -= Number(ft.amount);
+        }
+      }
+
+      if (reserveFixedInflows.length === 0) {
+        monthFutureDelta += fixedAporte;
+      }
+
+      runningFutureBalance += monthFutureDelta;
+      const roundedFuture = Math.max(0, Math.round(runningFutureBalance * 100) / 100);
+
+      futurePoints.push({
+        month: capitalized,
+        balance: roundedFuture,
+        balancePast: null,
+        balanceFuture: roundedFuture,
+        isFuture: true,
+        isCurrent: false,
+      });
+    }
+
+    const sparkline = [...pastPoints, ...futurePoints];
 
     reserveData = {
       accountName: reserveAccount.name,
@@ -494,6 +584,16 @@ export async function getInstallmentsChartData() {
 
   const dataByMonth: Record<string, Record<string, string | number | boolean>> = {};
   const keysSet = new Set<string>();
+  const keyStats: Record<
+    string,
+    {
+      maxCompetencyMonth: string;
+      maxMonthInWindow: string;
+      minMonthInWindow: string;
+      activeMonthsSet: Set<string>;
+      totalAmountInWindow: number;
+    }
+  > = {};
 
   sortedMonths.forEach((month) => {
     dataByMonth[month] = {
@@ -502,12 +602,34 @@ export async function getInstallmentsChartData() {
   });
 
   installments.forEach((t) => {
-    if (!dataByMonth[t.competencyMonth]) return;
     // Remove any trailing " (x/y)" from the description to group installments properly
     const key = t.description.replace(/\s*\(\d+\/\d+\)$/, "").trim();
+    const amount = Number(t.amount);
+
+    if (!keyStats[key]) {
+      keyStats[key] = {
+        maxCompetencyMonth: t.competencyMonth,
+        maxMonthInWindow: "",
+        minMonthInWindow: "9999-99",
+        activeMonthsSet: new Set<string>(),
+        totalAmountInWindow: 0,
+      };
+    } else if (t.competencyMonth > keyStats[key].maxCompetencyMonth) {
+      keyStats[key].maxCompetencyMonth = t.competencyMonth;
+    }
+
+    if (!dataByMonth[t.competencyMonth]) return;
     keysSet.add(key);
 
-    const amount = Number(t.amount);
+    if (t.competencyMonth > keyStats[key].maxMonthInWindow) {
+      keyStats[key].maxMonthInWindow = t.competencyMonth;
+    }
+    if (t.competencyMonth < keyStats[key].minMonthInWindow) {
+      keyStats[key].minMonthInWindow = t.competencyMonth;
+    }
+    keyStats[key].activeMonthsSet.add(t.competencyMonth);
+    keyStats[key].totalAmountInWindow += amount;
+
     if (typeof dataByMonth[t.competencyMonth][key] !== "number") {
       dataByMonth[t.competencyMonth][key] = 0;
     }
@@ -516,6 +638,36 @@ export async function getInstallmentsChartData() {
     if (t.installmentCurrent && t.installmentTotal) {
       dataByMonth[t.competencyMonth][`${key}_installment`] = `${t.installmentCurrent}/${t.installmentTotal}`;
     }
+  });
+
+  // Ordena as chaves para que os parcelamentos que demoram mais para quitar (maior duração / valor)
+  // fiquem na base do gráfico empilhado (primeiros índices) e os mais curtos fiquem no topo.
+  const sortedKeys = Array.from(keysSet).sort((a, b) => {
+    const statA = keyStats[a];
+    const statB = keyStats[b];
+    if (!statA || !statB) return 0;
+
+    // 1. Quem termina mais tarde dentro da janela visível fica mais na base
+    if (statA.maxMonthInWindow !== statB.maxMonthInWindow) {
+      return statB.maxMonthInWindow.localeCompare(statA.maxMonthInWindow);
+    }
+
+    // 2. Empate no fim da janela: quem demora mais para quitar no banco (além dos 12 meses) fica mais na base
+    if (statA.maxCompetencyMonth !== statB.maxCompetencyMonth) {
+      return statB.maxCompetencyMonth.localeCompare(statA.maxCompetencyMonth);
+    }
+
+    // 3. Maior quantidade de meses ativos na horizontal (ou início mais antigo) fica mais na base
+    if (statA.activeMonthsSet.size !== statB.activeMonthsSet.size) {
+      return statB.activeMonthsSet.size - statA.activeMonthsSet.size;
+    }
+
+    if (statA.minMonthInWindow !== statB.minMonthInWindow) {
+      return statA.minMonthInWindow.localeCompare(statB.minMonthInWindow);
+    }
+
+    // 4. Maior valor acumulado na janela fica mais na base
+    return statB.totalAmountInWindow - statA.totalAmountInWindow;
   });
 
   const chartData = sortedMonths.map((month) => {
@@ -530,117 +682,7 @@ export async function getInstallmentsChartData() {
 
   return {
     data: chartData,
-    keys: Array.from(keysSet),
-  };
-}
-
-export async function getIncomeVsExpenseData(
-  competencyMonth: string,
-  showOnlyPaid: boolean = false,
-  dateMode: "due_date" | "launch_date" = "due_date",
-) {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-  const userId = session.user.id;
-
-  const [allTransactions, allAccounts] = await Promise.all([
-    getTransactions(competencyMonth, undefined, dateMode),
-    db.select().from(accounts).where(eq(accounts.userId, userId)),
-  ]);
-
-  let totalIncome = 0;
-  let totalExpense = 0;
-
-  let totalPaidIncome = 0;
-  let totalPaidExpense = 0;
-  let totalCurrentBalance = 0;
-
-  const accountMap = new Map<
-    number,
-    {
-      accountName: string;
-      income: number;
-      expense: number;
-      currentBalance: number;
-      paidIncome: number;
-      paidExpense: number;
-    }
-  >();
-
-  allAccounts.forEach((acc) => {
-    totalCurrentBalance += Number(acc.currentBalance);
-    accountMap.set(acc.id, {
-      accountName: acc.name,
-      income: 0,
-      expense: 0,
-      currentBalance: Number(acc.currentBalance),
-      paidIncome: 0,
-      paidExpense: 0,
-    });
-  });
-
-  const filteredTransactions = showOnlyPaid ? allTransactions.filter((t) => t.status === "paid") : allTransactions;
-
-  allTransactions.forEach((t) => {
-    if (t.status === "paid") {
-      if (t.type === "income") {
-        if (t.accountId && accountMap.has(t.accountId)) {
-          accountMap.get(t.accountId)!.paidIncome += Number(t.amount);
-          totalPaidIncome += Number(t.amount);
-        }
-      } else if (t.type === "expense" || t.type === "credit_card_expense") {
-        if (t.accountId && accountMap.has(t.accountId)) {
-          accountMap.get(t.accountId)!.paidExpense += Number(t.amount);
-          totalPaidExpense += Number(t.amount);
-        }
-      }
-    }
-  });
-
-  filteredTransactions.forEach((t) => {
-    const amount = Number(t.amount);
-    const isIncome = t.type === "income";
-    const isExpense = t.type === "expense" || t.type === "credit_card_expense";
-
-    if (isIncome) totalIncome += amount;
-    if (isExpense) totalExpense += amount;
-
-    if (t.accountId && t.account) {
-      if (!accountMap.has(t.accountId)) {
-        accountMap.set(t.accountId, {
-          accountName: t.account.name,
-          income: 0,
-          expense: 0,
-          currentBalance: 0,
-          paidIncome: 0,
-          paidExpense: 0,
-        });
-      }
-      const acc = accountMap.get(t.accountId)!;
-      if (isIncome) acc.income += amount;
-      if (isExpense) acc.expense += amount;
-    }
-  });
-
-  const globalBaseBalance = totalCurrentBalance - totalPaidIncome + totalPaidExpense;
-  const globalData = { name: "Geral", income: totalIncome, expense: totalExpense, baseBalance: globalBaseBalance };
-
-  const byAccountData = Array.from(accountMap.values()).map((acc) => ({
-    accountName: acc.accountName,
-    income: acc.income,
-    expense: acc.expense,
-    baseBalance: acc.currentBalance - acc.paidIncome + acc.paidExpense,
-  }));
-
-  const accountVsGlobalData = byAccountData.map((acc) => ({
-    ...acc,
-    globalExpense: totalExpense,
-  }));
-
-  return {
-    global: globalData,
-    byAccount: byAccountData,
-    accountVsGlobal: accountVsGlobalData,
+    keys: sortedKeys,
   };
 }
 
@@ -1114,6 +1156,38 @@ export async function getCategoryForecastData() {
     }
   });
 
+  const sortedCategoryKeys = Array.from(categoryKeys).sort((a, b) => {
+    let activeMonthsA = 0;
+    let activeMonthsB = 0;
+    let totalA = 0;
+    let totalB = 0;
+    let lastActiveIdxA = -1;
+    let lastActiveIdxB = -1;
+
+    monthKeys.forEach((m, idx) => {
+      const valA = typeof monthlyData[m]?.[a] === "number" ? Number(monthlyData[m][a]) : 0;
+      const valB = typeof monthlyData[m]?.[b] === "number" ? Number(monthlyData[m][b]) : 0;
+      if (valA > 0) {
+        activeMonthsA += 1;
+        totalA += valA;
+        lastActiveIdxA = idx;
+      }
+      if (valB > 0) {
+        activeMonthsB += 1;
+        totalB += valB;
+        lastActiveIdxB = idx;
+      }
+    });
+
+    if (lastActiveIdxA !== lastActiveIdxB) {
+      return lastActiveIdxB - lastActiveIdxA;
+    }
+    if (activeMonthsA !== activeMonthsB) {
+      return activeMonthsB - activeMonthsA;
+    }
+    return totalB - totalA;
+  });
+
   const chartData = monthKeys.map((m) => {
     const date = new Date(`${m}-01T00:00:00`);
     const formattedMonth = format(date, "MMM/yyyy", { locale: ptBR });
@@ -1125,6 +1199,6 @@ export async function getCategoryForecastData() {
 
   return {
     data: chartData,
-    keys: Array.from(categoryKeys),
+    keys: sortedCategoryKeys,
   };
 }

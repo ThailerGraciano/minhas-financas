@@ -52,32 +52,29 @@ Sempre busque a melhor tipagem para os objetos, nunca utilize any ou as unknown 
 
 ## Customização da Paleta de Cores & Temas (Como alterar facilmente)
 
-O sistema possui uma arquitetura centralizada e modular em **dois pontos principais** para troca rápida de temas:
+O sistema possui uma **arquitetura unificada de tema** em um único ponto de controle para troca rápida da paleta em **100% da aplicação** (Sidebar, Dashboard, Modais, Cards, Botões, Badges e Gráficos):
 
-### 1. Modal de Transações (Midnight + Apple Liquid Glass)
+### 1. Como Mudar o Tema Inteiro em 1 Linha
 - **Arquivo de Configuração:** `src/components/transaction-theme.ts`
-- **Como alterar em 1 linha:** Mude a constante `ACTIVE_THEME`:
+- **Linha para alterar:**
   ```typescript
-  export const ACTIVE_THEME: ThemePreset = THEME_PRESETS.midnight_electric;
+  export const ACTIVE_THEME_ID: ThemeId = "obsidian_ultraviolet";
   ```
-- **Presets Prontos Disponíveis:**
-  - `midnight_electric`: Padrão atual Midnight `#0B1220` com Rosa Coral (`#FF7185`), Menta (`#42D6A0`) e Azul Cobalto (`#639BFF`).
-  - `carbon_gold`: Estilo C6 Black com Ouro (`#FBBF24`), Rubro (`#F87171`) e Azul Suave (`#93C5FD`).
-  - `emerald_banking`: Fundo grafite/esmeralda com Menta Intensa (`#10B981`) e Turquesa (`#38BDF8`).
-- **Como criar um novo Preset:** Adicione um novo objeto ao `THEME_PRESETS` em `src/components/transaction-theme.ts` definindo as superfícies em `midnight` e os accents contextuais em `accents` (`expense`, `income`, `transfer`).
+- O layout raiz (`src/app/layout.tsx`) injeta o atributo `data-theme={ACTIVE_THEME.id}` no `<html>`, aplicando automaticamente no `src/app/globals.css` todas as cores globais e semânticas.
 
-### 2. Paleta Global da Aplicação (Sidebar, Dashboard, Botões Gerais)
-- **Arquivo de Configuração:** `src/app/globals.css`
-- **Como alterar:** Modifique as variáveis principais no topo dos blocos `:root` e `.dark`:
-  - `--primary`: Cor de destaque da marca (botões principais, FAB, indicador da sidebar e anéis de foco).
-    - Ex: Laranja Original: `hsl(24 100% 50%)`
-    - Ex: Azul Cobalto / Electric: `hsl(217 91% 60%)` ou `#639BFF`
-    - Ex: Dourado C6 Carbon: `hsl(45 93% 47%)` ou `#FBBF24`
-    - Ex: Esmeralda Wealth: `hsl(160 84% 39%)` ou `#10B981`
-  - `--background`: Fundo principal das telas (ex: `hsl(240 10% 6%)` ou `#0B1220`).
-  - `--card`: Superfície dos cartões comuns (ex: `hsl(240 8% 11%)` ou `#111A2A`).
+### 2. Presets Prontos Disponíveis
+- `obsidian_ultraviolet`: Padrão atual preto absoluto `#000000` (OLED) com detalhes Roxo Nubank Ultravioleta (`#820AD1`), Verde Menta (`#00D287`), Rosa Coral (`#FF4D6D`) e efeito Apple Liquid Glass em componentes de seleção.
+- `midnight_electric`: Visual Midnight `#0B1220` com Rosa Coral (`#FF7185`), Menta (`#42D6A0`) e Azul Cobalto (`#639BFF`).
+- `carbon_gold`: Estilo C6 Black com Ouro (`#FBBF24`), Rubro (`#F87171`) e Azul Suave (`#93C5FD`).
+- `emerald_banking`: Fundo grafite/esmeralda com Menta Intensa (`#10B981`) e Turquesa (`#38BDF8`).
+- `midnight_orange`: Estilo clássico Minhas Finanças com Laranja Neon (`#F97316`), Menta e Rosa.
 
-### 3. Estrutura Modular do Modal de Transações
+### 3. Como Criar um Novo Preset
+1. Adicione um novo objeto em `THEME_PRESETS` em `src/components/transaction-theme.ts` com suas superfícies e accents.
+2. Adicione as variáveis CSS correspondentes sob `[data-theme="seu_id"]` em `src/app/globals.css`.
+3. Altere `ACTIVE_THEME_ID = "seu_id"`.
+
+### 4. Estrutura Modular do Modal de Transações
 Para alterar ou customizar seções do modal individualmente, os componentes estão isolados em `src/components/transaction-form/`:
 - `form-header.tsx`: Título, pílula de tipo, fechar e abas segmentadas.
 - `amount-card.tsx`: Valor numérico formatado (`CurrencyInput`) e toggle de status (Pago/Recebido vs Pendente).

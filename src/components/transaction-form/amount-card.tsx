@@ -27,7 +27,7 @@ export const AmountCard = React.memo(function AmountCard({
   return (
     <GlassCard elevated>
       <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-[#718096]">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Valor da transação
         </span>
         {canShowStatus && (
@@ -58,7 +58,7 @@ export const AmountCard = React.memo(function AmountCard({
           name="amount"
           value={amount}
           onValueChange={onAmountChange}
-          className="h-12 min-w-0 text-3xl sm:text-4xl font-bold tabular-nums bg-transparent border-0 p-0 text-[#F2F5FA] placeholder:text-[#526176] focus-visible:ring-0 focus-visible:outline-none"
+          className="h-12 min-w-0 text-3xl sm:text-4xl font-bold tabular-nums bg-transparent border-0 p-0 text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0 focus-visible:outline-none"
           placeholder="0,00"
           autoFocus
         />

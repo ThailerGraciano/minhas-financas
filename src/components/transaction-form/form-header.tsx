@@ -19,16 +19,7 @@ export const FormHeader = React.memo(function FormHeader({
   onTabChange,
 }: FormHeaderProps) {
   return (
-    <DialogHeader
-      className="shrink-0 px-4 sm:px-6 pt-3 sm:pt-4 pb-3.5 space-y-0"
-      style={{
-        background: "rgba(17, 26, 42, 0.72)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-        boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.10)",
-      }}
-    >
+    <DialogHeader className="shrink-0 px-4 sm:px-6 pt-3 sm:pt-4 pb-3.5 space-y-0 bg-card/80 backdrop-blur-xl border-b border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.10)]">
       <DialogTitle className="sr-only">Nova transação</DialogTitle>
 
       {/* Mobile sheet pull handle */}
@@ -36,7 +27,7 @@ export const FormHeader = React.memo(function FormHeader({
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <span className="text-sm font-semibold tracking-wide text-[#F2F5FA]">
+          <span className="text-sm font-semibold tracking-wide text-foreground">
             Nova transação
           </span>
           <span
@@ -59,7 +50,7 @@ export const FormHeader = React.memo(function FormHeader({
         <DialogClose asChild>
           <button
             type="button"
-            className="size-8 rounded-full flex items-center justify-center text-[#A7B3C5] hover:text-[#F2F5FA] bg-white/[0.04] hover:bg-white/[0.10] border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all cursor-pointer"
+            className="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground bg-white/[0.04] hover:bg-white/[0.10] border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all cursor-pointer"
             aria-label="Fechar"
           >
             <X className="size-4" />
@@ -67,8 +58,8 @@ export const FormHeader = React.memo(function FormHeader({
         </DialogClose>
       </div>
 
-      {/* Segmented control for Type */}
-      <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-[#0B1220]/70 p-1 border border-white/[0.06] backdrop-blur-md">
+      {/* Segmented control for Type (Apple Liquid Glass pill) */}
+      <div className="mt-3 grid grid-cols-3 gap-1 rounded-2xl bg-black/50 p-1 border border-white/[0.08] backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)]">
         {(["expense", "income", "transfer"] as TransactionTab[]).map((item) => {
           const isSelected = tab === item;
           const tabConfig = TRANSACTION_ACCENTS[item];
@@ -77,18 +68,18 @@ export const FormHeader = React.memo(function FormHeader({
               key={item}
               type="button"
               onClick={() => onTabChange(item)}
-              className="relative flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium transition-all duration-200 cursor-pointer"
+              className="relative flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-medium transition-all duration-300 cursor-pointer overflow-hidden"
               style={
                 isSelected
                   ? {
-                      backgroundColor: tabConfig.elevatedBg,
+                      background: `linear-gradient(145deg, ${tabConfig.elevatedBg} 0%, rgba(18, 18, 26, 0.95) 100%)`,
                       borderColor: tabConfig.border,
                       borderWidth: 1,
-                      color: "#F2F5FA",
-                      boxShadow: `0 2px 10px ${tabConfig.subtleGlow}`,
+                      color: "var(--foreground)",
+                      boxShadow: `inset 0 1px 1px 0 rgba(255, 255, 255, 0.28), 0 4px 14px ${tabConfig.subtleGlow}`,
                     }
                   : {
-                      color: "#A7B3C5",
+                      color: "var(--muted-foreground)",
                     }
               }
             >

@@ -39,19 +39,13 @@ interface MonthBudgetWorkspaceProps {
   onRefreshData: () => Promise<void>;
 }
 
-function MonthBudgetWorkspace({
-  data,
-  selectedMonth,
-  onRefreshData,
-}: MonthBudgetWorkspaceProps) {
+function MonthBudgetWorkspace({ data, selectedMonth, onRefreshData }: MonthBudgetWorkspaceProps) {
   const router = useRouter();
 
   // Sincroniza o estado local quando os dados do servidor (ou mês selecionado) mudam
   const [prevDataRef, setPrevDataRef] = useState<BudgetData>(data);
   const [selectedIncomeIds, setSelectedIncomeIds] = useState<string[]>(data.selectedIncomeIds);
-  const [localCategories, setLocalCategories] = useState<CategoryBudgetHierarchy[]>(
-    data.categories,
-  );
+  const [localCategories, setLocalCategories] = useState<CategoryBudgetHierarchy[]>(data.categories);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSavingPlan, setIsSavingPlan] = useState(false);
 
@@ -73,10 +67,7 @@ function MonthBudgetWorkspace({
     return data.availableIncomes.filter((inc) => idSet.has(inc.id));
   }, [data.availableIncomes, selectedIncomeIds]);
 
-  const effectiveItems = useMemo(
-    () => extractEffectiveBudgetItems(localCategories),
-    [localCategories],
-  );
+  const effectiveItems = useMemo(() => extractEffectiveBudgetItems(localCategories), [localCategories]);
 
   const plannerSummary = useMemo(
     () => calculateBudgetPlannerSummary(selectedIncomes, effectiveItems),
@@ -95,11 +86,7 @@ function MonthBudgetWorkspace({
       else if (item.pillar === "goals") goalsTotal += item.amount;
     }
 
-    const baseForDistribution = Math.max(
-      plannerSummary.selectedIncomeTotal,
-      plannerSummary.totalBudgetedExpenses,
-      1,
-    );
+    const baseForDistribution = Math.max(plannerSummary.selectedIncomeTotal, plannerSummary.totalBudgetedExpenses, 1);
     const freeForPillars = Math.max(0, plannerSummary.projectedBalance);
 
     return {
@@ -115,8 +102,7 @@ function MonthBudgetWorkspace({
   }, [effectiveItems, plannerSummary]);
 
   const activeDetailsItem = useMemo(
-    () =>
-      detailsItemKey ? effectiveItems.find((i) => i.itemKey === detailsItemKey) ?? null : null,
+    () => (detailsItemKey ? (effectiveItems.find((i) => i.itemKey === detailsItemKey) ?? null) : null),
     [detailsItemKey, effectiveItems],
   );
 
@@ -126,9 +112,7 @@ function MonthBudgetWorkspace({
       const isCurrentlySelected = selectedIncomeIds.includes(incomeId);
       if (isCurrentlySelected) {
         const nextIds = selectedIncomeIds.filter((id) => id !== incomeId);
-        const unlinkedCount = effectiveItems.filter(
-          (item) => item.incomeSourceId === incomeId,
-        ).length;
+        const unlinkedCount = effectiveItems.filter((item) => item.incomeSourceId === incomeId).length;
 
         setSelectedIncomeIds(nextIds);
         if (unlinkedCount > 0) {
@@ -221,9 +205,7 @@ function MonthBudgetWorkspace({
                   percent: newSubLimit > 0 ? (sub.consumed / newSubLimit) * 100 : 0,
                 };
               });
-              const newCatLimit = roundCurrency(
-                updatedSubs.reduce((acc, s) => acc + s.limit, 0),
-              );
+              const newCatLimit = roundCurrency(updatedSubs.reduce((acc, s) => acc + s.limit, 0));
               return {
                 ...cat,
                 limit: newCatLimit,
@@ -248,9 +230,7 @@ function MonthBudgetWorkspace({
       remainingByIncome.set(summary.income.id, summary.remainingCapacity);
     }
 
-    const sortedUnallocated = [...plannerSummary.unallocatedItems].sort(
-      (a, b) => b.amount - a.amount,
-    );
+    const sortedUnallocated = [...plannerSummary.unallocatedItems].sort((a, b) => b.amount - a.amount);
 
     const assignments = new Map<string, string>();
     for (const item of sortedUnallocated) {
@@ -379,12 +359,10 @@ function MonthBudgetWorkspace({
   return (
     <div className="space-y-6 mt-4 pb-24">
       {/* Barra superior rápida de ações do Orçamento */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-[#1A1A22] px-4 py-3 rounded-2xl border border-white/5">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-card/70 backdrop-blur-xl px-4 py-3 rounded-2xl border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)]">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span
-            className={`w-2 h-2 rounded-full ${
-              hasUnsavedChanges ? "bg-amber-400 animate-pulse" : "bg-emerald-500"
-            }`}
+            className={`w-2 h-2 rounded-full ${hasUnsavedChanges ? "bg-amber-400 animate-pulse" : "bg-emerald-500"}`}
           />
           <span>
             {hasUnsavedChanges
@@ -493,7 +471,7 @@ function MonthBudgetWorkspace({
       {/* Barra Flutuante de Salvamento quando há alterações pendentes */}
       {hasUnsavedChanges && (
         <div className="fixed bottom-16 md:bottom-4 left-4 right-4 md:left-auto md:right-8 z-40 md:w-[480px] animate-in slide-in-from-bottom-6 duration-200">
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-[#1A1A24]/95 p-3.5 shadow-2xl backdrop-blur-xl">
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-primary/40 bg-card/90 p-3.5 shadow-2xl backdrop-blur-2xl">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
                 <Save className="h-4 w-4" />
@@ -553,9 +531,7 @@ export function BudgetsClientPage({ initialData, closingDay }: BudgetsClientPage
       headerContent={() => (
         <div className="flex flex-col space-y-1">
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-              Orçamento Base Zero
-            </h1>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">Orçamento Base Zero</h1>
             <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
               Zero-Based Budgeting
             </span>

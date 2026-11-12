@@ -47,7 +47,7 @@ export function BottomNavigationBar() {
   const isMoreActive = moreItems.some((item) => pathname.startsWith(item.href)) || pathname.startsWith("/settings");
 
   return (
-    <nav className="fixed bottom-0 left-0 w-full h-16 bg-[#0B0B10]/95 backdrop-blur-lg border-t border-white/5 flex items-center justify-around px-2 z-50 md:hidden">
+    <nav className="fixed bottom-0 left-0 w-full h-16 bg-black/65 backdrop-blur-2xl border-t border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.06),0_-8px_32px_rgba(0,0,0,0.6)] flex items-center justify-around px-2 z-50 md:hidden">
       {mainTabs.map((item) => {
         const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
 
@@ -56,10 +56,13 @@ export function BottomNavigationBar() {
             key={item.name}
             href={item.href}
             className={cn(
-              "flex flex-col items-center justify-center w-full h-full gap-1 text-[10px] font-medium transition-colors select-none",
+              "relative flex flex-col items-center justify-center w-full h-full gap-1 text-[10px] font-medium transition-colors select-none",
               isActive ? "text-primary font-semibold" : "text-muted-foreground hover:text-foreground",
             )}
           >
+            {isActive && (
+              <span className="pointer-events-none absolute -top-[1px] inset-x-4 h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent shadow-[0_0_12px_var(--primary)]" />
+            )}
             <item.icon className={cn("w-5 h-5 transition-transform", isActive && "scale-110 text-primary")} />
             <span className={cn(isActive && "text-primary")}>{item.name}</span>
           </Link>
@@ -82,7 +85,7 @@ export function BottomNavigationBar() {
         </SheetTrigger>
         <SheetContent
           side="bottom"
-          className="p-0 border-t border-white/10 bg-[#0B0B10]/98 backdrop-blur-xl rounded-t-3xl z-[100]"
+          className="p-0 border-t border-white/[0.12] bg-card/90 backdrop-blur-2xl rounded-t-3xl z-[100] shadow-[0_-12px_40px_rgba(0,0,0,0.7)]"
         >
           <SheetHeader className="p-4 border-b border-white/5 text-left">
             <SheetTitle className="text-base font-bold text-foreground">Menu & Ferramentas</SheetTitle>

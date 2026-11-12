@@ -7,8 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import { Loader2 } from 'lucide-react';
 import { registerUser } from '@/app/actions/auth';
+import { BrandLogo } from '@/components/brand-logo';
+import { InteractiveBackground } from '@/components/InteractiveBackground';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -31,7 +32,7 @@ export default function RegisterPage() {
       } else {
         router.push('/login');
       }
-    } catch (err) {
+    } catch {
       setError('Ocorreu um erro inesperado.');
     } finally {
       setIsLoading(false);
@@ -39,19 +40,23 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-black/95 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-emerald-600/20 blur-[120px]" />
-      <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-blue-600/20 blur-[120px]" />
-      
-      <Card className="w-full max-w-md z-10 border-white/10 bg-black/40 backdrop-blur-xl shadow-2xl">
-        <CardHeader className="space-y-2 text-center pb-6">
-          <div className="mx-auto bg-primary/10 w-12 h-12 rounded-full flex items-center justify-center mb-2">
-            <span className="text-xl font-bold text-primary">B</span>
-          </div>
-          <CardTitle className="text-2xl font-bold tracking-tight text-white">Criar uma conta</CardTitle>
-          <CardDescription className="text-gray-400">Comece a controlar suas finanças hoje</CardDescription>
-        </CardHeader>
+    <div className="flex items-center justify-center min-h-screen bg-[#0B0B10] relative overflow-hidden px-4">
+      <InteractiveBackground />
+
+      <div className="relative w-full max-w-md z-10">
+        <div className="absolute -inset-2 bg-[#820AD1]/25 blur-3xl opacity-60 rounded-[3rem] pointer-events-none" />
+
+        <Card className="relative overflow-hidden w-full border-[#BA42FF]/20 bg-[#08040F]/80 backdrop-blur-2xl shadow-[0_0_50px_-12px_rgba(130,10,209,0.45)] rounded-2xl">
+          <div className="pointer-events-none absolute -top-24 -right-24 w-56 h-56 rounded-full bg-gradient-to-br from-[#BA42FF]/25 via-[#820AD1]/10 to-transparent blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-24 w-56 h-56 rounded-full bg-gradient-to-tr from-[#5E0BE0]/25 via-[#820AD1]/10 to-transparent blur-2xl" />
+
+          <CardHeader className="space-y-3 text-center pb-6 relative z-10">
+            <div className="mx-auto pt-2">
+              <BrandLogo variant="stacked" iconSize={76} />
+            </div>
+            <CardTitle className="text-xl font-bold tracking-tight text-white pt-1">Criar uma conta</CardTitle>
+            <CardDescription className="text-gray-400">Comece a controlar suas finanças hoje</CardDescription>
+          </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -107,7 +112,7 @@ export default function RegisterPage() {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex flex-col items-center justify-center border-t border-white/5 pt-6 pb-2">
+        <CardFooter className="flex flex-col items-center justify-center border-t border-white/5 pt-6 pb-2 relative z-10">
           <p className="text-sm text-gray-400">
             Já possui uma conta?{' '}
             <Link href="/login" className="text-primary hover:text-primary/80 font-medium transition-colors">
@@ -115,7 +120,8 @@ export default function RegisterPage() {
             </Link>
           </p>
         </CardFooter>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }

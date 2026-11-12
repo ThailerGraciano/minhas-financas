@@ -17,17 +17,11 @@ export const GlassCard = React.memo(function GlassCard({
   return (
     <div
       className={cn(
-        "rounded-2xl p-4 sm:p-5 transition-all duration-200",
+        "rounded-2xl p-4 sm:p-5 transition-all duration-200 border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_16px_rgba(0,0,0,0.25)] backdrop-blur-md",
+        elevated ? "bg-[var(--card-elevated)]/75" : "bg-card/70",
         className
       )}
-      style={{
-        background: elevated ? "rgba(21, 31, 49, 0.72)" : "rgba(17, 26, 42, 0.65)",
-        backdropFilter: "blur(14px)",
-        WebkitBackdropFilter: "blur(14px)",
-        border: "1px solid rgba(255, 255, 255, 0.07)",
-        boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 4px 16px rgba(0, 0, 0, 0.25)",
-        ...style,
-      }}
+      style={style}
       {...props}
     >
       {children}
@@ -48,7 +42,7 @@ export const Field = React.memo(function Field({
 }: FieldProps) {
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <Label className="text-xs font-medium text-[#A7B3C5]">{label}</Label>
+      <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
       {children}
     </div>
   );

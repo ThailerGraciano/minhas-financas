@@ -44,7 +44,7 @@ export function AccountsCarousel({
         {accounts.map((acc) => (
           <div
             key={acc.id}
-            className="flex-shrink-0 w-[200px] bg-card rounded-2xl sm:rounded-[1.5rem] p-4 flex flex-col space-y-3 shadow-sm border border-white/5 hover:border-white/10 transition-all"
+            className="flex-shrink-0 w-[200px] bg-card/85 backdrop-blur-md rounded-2xl sm:rounded-[1.5rem] p-4 flex flex-col space-y-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_16px_rgba(0,0,0,0.35)] border border-white/[0.08] hover:border-white/20 hover:bg-card/95 transition-all overflow-hidden"
           >
             <div className="flex items-center justify-between">
               <div className="w-10 h-10 rounded-xl bg-background/80 flex items-center justify-center border border-white/5">

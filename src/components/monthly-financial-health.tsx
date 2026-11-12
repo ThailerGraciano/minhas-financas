@@ -82,7 +82,9 @@ export function MonthlyFinancialHealth({
   const distributableSurplus = Math.max(0, netResult);
 
   return (
-    <div className="bg-card rounded-[2rem] border border-white/5 shadow-sm p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden h-full">
+    <div className="bg-card/70 backdrop-blur-xl rounded-[2rem] border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] p-5 sm:p-6 flex flex-col justify-between relative overflow-hidden h-full">
+      {/* Specular top highlight */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
       {/* Background glow sutil */}
       <div
         className={cn(

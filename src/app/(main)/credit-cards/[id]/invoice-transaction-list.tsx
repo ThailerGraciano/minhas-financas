@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { orderByMostUsedCategory } from "@/lib/category-utils";
 import { ArrowDown, ArrowUp, ArrowUpDown, Edit, Search, Trash, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { TransactionStatusToggle } from "./transaction-status-toggle";
@@ -136,7 +137,7 @@ export function InvoiceTransactionList({
       }
     }
 
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+    return orderByMostUsedCategory(Array.from(map.values()), transactions);
   }, [categories, transactions]);
 
   const availableSubcategories = useMemo(() => {
@@ -279,7 +280,7 @@ export function InvoiceTransactionList({
 
   return (
     <>
-      <div className="mb-4 p-3 sm:p-4 rounded-xl border bg-muted/20 space-y-3">
+      <div className="mb-4 p-3.5 sm:p-4 rounded-2xl border border-white/[0.08] bg-card/65 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] space-y-3 relative overflow-hidden">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Pesquisa por nome */}
           <div className="space-y-1.5">
@@ -468,10 +469,7 @@ export function InvoiceTransactionList({
                   >
                     {formatCurrency(Number(tx.amount))}
                   </TableCell>
-                  <TableCell
-                    className="text-right px-1 sm:px-4 py-2 sm:py-4"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <TableCell className="text-right px-1 sm:px-4 py-2 sm:py-4" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-0.5 sm:gap-2">
                       <TransactionStatusToggle transactionId={tx.id} initialStatus={tx.status} />
                       <Button

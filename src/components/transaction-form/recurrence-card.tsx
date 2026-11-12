@@ -39,7 +39,7 @@ export const RecurrenceCard = React.memo(function RecurrenceCard({
   return (
     <GlassCard className="space-y-4">
       <div>
-        <Label className="text-xs font-medium text-[#A7B3C5]">
+        <Label className="text-xs font-medium text-muted-foreground">
           Modalidade / Recorrência
         </Label>
         <div className="mt-2 grid grid-cols-3 gap-2">
@@ -71,14 +71,7 @@ export const RecurrenceCard = React.memo(function RecurrenceCard({
       </div>
 
       {kind === "installment" && (
-        <div
-          className="rounded-xl p-3.5 flex flex-col gap-3 transition-all duration-200"
-          style={{
-            backgroundColor: "rgba(16, 26, 42, 0.85)",
-            border: "1px solid rgba(255, 255, 255, 0.07)",
-            boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.04)",
-          }}
-        >
+        <div className="rounded-xl p-3.5 flex flex-col gap-3 transition-all duration-200 bg-[var(--card)]/90 border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Parcela inicial">
               <Input
@@ -86,7 +79,7 @@ export const RecurrenceCard = React.memo(function RecurrenceCard({
                 min={1}
                 value={installment}
                 onChange={(e) => onInstallmentChange(e.target.value)}
-                className="h-10 rounded-xl bg-[#0B1220]/80 border-[#29384E] text-[#F2F5FA] focus:border-[var(--accent)]"
+                className="h-10 rounded-xl bg-background/80 border-border text-foreground"
               />
             </Field>
             <Field label="Total de parcelas">
@@ -95,13 +88,13 @@ export const RecurrenceCard = React.memo(function RecurrenceCard({
                 min={2}
                 value={totalInstallments}
                 onChange={(e) => onTotalInstallmentsChange(e.target.value)}
-                className="h-10 rounded-xl bg-[#0B1220]/80 border-[#29384E] text-[#F2F5FA] focus:border-[var(--accent)]"
+                className="h-10 rounded-xl bg-background/80 border-border text-foreground"
               />
             </Field>
           </div>
 
           <div className="flex items-center justify-between gap-3 pt-1">
-            <Label className="text-xs text-[#A7B3C5]">
+            <Label className="text-xs text-muted-foreground">
               O valor digitado é o total da compra?
             </Label>
             <Switch
@@ -117,7 +110,7 @@ export const RecurrenceCard = React.memo(function RecurrenceCard({
             />
           </div>
 
-          <p className="text-xs text-[#718096]">
+          <p className="text-xs text-muted-foreground">
             Serão geradas {totalInstallments} parcelas de {money(monthlyAmount)} (residual ajustado na última).
           </p>
         </div>

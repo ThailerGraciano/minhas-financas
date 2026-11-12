@@ -226,13 +226,146 @@ export const THEME_PRESETS: Record<string, ThemePreset> = {
       },
     },
   },
+
+  /**
+   * 4. MIDNIGHT ORANGE (Classic Minhas Finanças)
+   * Base escura profunda com Laranja vibrante, Verde Menta e Rosa Coral.
+   */
+  midnight_orange: {
+    id: "midnight_orange",
+    name: "Midnight Orange",
+    description: "Visual original Minhas Finanças com Laranja Neon clássico",
+    midnight: {
+      bgPrincipal: "#0B101B",
+      bgSecundario: "#0F1624",
+      surface: "#141D2E",
+      surfaceElevated: "#1A253A",
+      hover: "#22314D",
+      active: "#2A3C5E",
+      input: "#121A2A",
+      border: "#2C3D5A",
+      textPrincipal: "#F8FAFC",
+      textSecundario: "#94A3B8",
+      textAuxiliar: "#64748B",
+      textDesabilitado: "#475569",
+    },
+    accents: {
+      expense: {
+        name: "Despesa",
+        primary: "#F43F5E",
+        hover: "#FB7185",
+        active: "#E11D48",
+        softBg: "#2B161E",
+        elevatedBg: "#3A1B27",
+        border: "#6E283A",
+        rgb: "244, 63, 94",
+        glow: "rgba(244, 63, 94, 0.22)",
+        subtleGlow: "rgba(244, 63, 94, 0.08)",
+      },
+      income: {
+        name: "Receita",
+        primary: "#10B981",
+        hover: "#34D399",
+        active: "#059669",
+        softBg: "#112922",
+        elevatedBg: "#16382E",
+        border: "#226352",
+        rgb: "16, 185, 129",
+        glow: "rgba(16, 185, 129, 0.22)",
+        subtleGlow: "rgba(16, 185, 129, 0.08)",
+      },
+      transfer: {
+        name: "Transferência",
+        primary: "#F97316",
+        hover: "#FB923C",
+        active: "#EA580C",
+        softBg: "#2B1C13",
+        elevatedBg: "#3B2416",
+        border: "#6E381C",
+        rgb: "249, 115, 22",
+        glow: "rgba(249, 115, 22, 0.22)",
+        subtleGlow: "rgba(249, 115, 22, 0.08)",
+      },
+    },
+  },
+
+  /**
+   * 5. OBSIDIAN ULTRAVIOLET (Nubank Ultravioleta Black + Apple Liquid Glass)
+   * Fundo preto absoluto (#000000), detalhes roxos Ultravioleta e vidro líquido.
+   */
+  obsidian_ultraviolet: {
+    id: "obsidian_ultraviolet",
+    name: "Obsidian Ultraviolet",
+    description: "Preto absoluto OLED com detalhes roxos Nubank Ultravioleta e Apple Liquid Glass",
+    midnight: {
+      bgPrincipal: "#000000",
+      bgSecundario: "#050508",
+      surface: "#0A0A0F",
+      surfaceElevated: "#111118",
+      hover: "#1A1A24",
+      active: "#252533",
+      input: "#0A0A0F",
+      border: "#1F1F2C",
+      textPrincipal: "#F8FAFC",
+      textSecundario: "#94A3B8",
+      textAuxiliar: "#64748B",
+      textDesabilitado: "#475569",
+    },
+    accents: {
+      expense: {
+        name: "Despesa",
+        primary: "#FF4D6D",
+        hover: "#FF6B85",
+        active: "#E63956",
+        softBg: "#250E15",
+        elevatedBg: "#36141F",
+        border: "#5C1D2A",
+        rgb: "255, 77, 109",
+        glow: "rgba(255, 77, 109, 0.22)",
+        subtleGlow: "rgba(255, 77, 109, 0.08)",
+      },
+      income: {
+        name: "Receita",
+        primary: "#00D287",
+        hover: "#1BE39B",
+        active: "#00B875",
+        softBg: "#082319",
+        elevatedBg: "#0D3525",
+        border: "#155A3E",
+        rgb: "0, 210, 135",
+        glow: "rgba(0, 210, 135, 0.22)",
+        subtleGlow: "rgba(0, 210, 135, 0.08)",
+      },
+      transfer: {
+        name: "Transferência",
+        primary: "#820AD1",
+        hover: "#9B2CE8",
+        active: "#6E08B3",
+        softBg: "#1C0A2E",
+        elevatedBg: "#290F43",
+        border: "#4E157D",
+        rgb: "130, 10, 209",
+        glow: "rgba(130, 10, 209, 0.26)",
+        subtleGlow: "rgba(130, 10, 209, 0.10)",
+      },
+    },
+  },
 };
+
+export type ThemeId =
+  | "midnight_electric"
+  | "carbon_gold"
+  | "emerald_banking"
+  | "midnight_orange"
+  | "obsidian_ultraviolet";
 
 /* ==========================================================================
    CONFIGURAÇÃO ATIVA DO SISTEMA
-   Para mudar a paleta inteira, altere apenas a linha abaixo!
+   Para mudar a paleta inteira, altere apenas o ID do tema abaixo!
+   Opções: "midnight_electric" | "carbon_gold" | "emerald_banking" | "midnight_orange" | "obsidian_ultraviolet"
    ========================================================================== */
-export const ACTIVE_THEME: ThemePreset = THEME_PRESETS.midnight_electric;
+export const ACTIVE_THEME_ID: ThemeId = "obsidian_ultraviolet";
+export const ACTIVE_THEME: ThemePreset = THEME_PRESETS[ACTIVE_THEME_ID];
 
 export const MIDNIGHT_TOKENS: MidnightBaseTokens = ACTIVE_THEME.midnight;
 export const TRANSACTION_ACCENTS: Record<TransactionTab, AccentColorConfig> = ACTIVE_THEME.accents;

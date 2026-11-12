@@ -47,13 +47,13 @@ export function TransactionsClientPage({
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 w-full">
         <div className="flex items-center gap-3">
           <h1 className="text-3xl font-bold tracking-tight">Transações</h1>
-          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full border border-orange-500/30 bg-orange-500/10 text-orange-500 whitespace-nowrap">
+          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full border border-primary/40 bg-primary/10 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-md whitespace-nowrap">
             {totalCount} {totalCount === 1 ? "lançamento" : "lançamentos"}
           </span>
         </div>
         <div className="w-full md:w-auto">
           <Select value={initialAccountId?.toString() || "all"} onValueChange={handleAccountChange}>
-            <SelectTrigger className="w-full md:w-[200px] bg-muted/40 border-border/50 rounded-lg h-10">
+            <SelectTrigger className="w-full md:w-[200px] bg-white/[0.03] border-white/[0.09] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-md rounded-xl h-10 hover:bg-white/[0.06] hover:border-white/20 transition-all">
               <SelectValue placeholder="Todas as contas" />
             </SelectTrigger>
             <SelectContent>

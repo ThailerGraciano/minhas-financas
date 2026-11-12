@@ -22,7 +22,7 @@ export async function BalanceAllocator({ projectedBalance, competencyMonth }: Ba
   const capitalizedMonth = monthName.charAt(0).toUpperCase() + monthName.slice(1);
 
   return (
-    <Card className="rounded-[1.5rem] sm:rounded-[2rem] border-white/10 shadow-sm bg-card overflow-hidden">
+    <Card className="rounded-[1.5rem] sm:rounded-[2rem] border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden">
       <CardHeader className="pb-3 pt-5 px-5 sm:px-6">
         <CardTitle className="text-lg font-bold flex items-center gap-2 text-foreground">
           <Wallet className="w-5 h-5 text-primary" />
@@ -70,7 +70,7 @@ export async function BalanceAllocator({ projectedBalance, competencyMonth }: Ba
               return (
                 <div
                   key={rule.id}
-                  className="bg-card border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-primary/40 transition-all shadow-sm group"
+                  className="bg-card/85 backdrop-blur-md border border-white/[0.08] rounded-2xl p-4 sm:p-5 flex flex-col justify-between hover:border-primary/40 hover:bg-card/95 transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_16px_rgba(0,0,0,0.35)] group"
                 >
                   <div>
                     {/* Linha Superior: Título e Badge com fundo laranja translúcido */}

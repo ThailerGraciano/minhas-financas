@@ -1,11 +1,11 @@
 {
-  "name": "Minhas Finanças AI",
-  "short_name": "Budget Buddy",
+  "name": "TGF | Minhas Finanças",
+  "short_name": "TGF Finanças",
   "description": "Seu assistente financeiro inteligente.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0F0F13",
-  "theme_color": "#FF6B00",
+  "background_color": "#05020A",
+  "theme_color": "#820AD1",
   "orientation": "portrait",
   "icons": [
     {

@@ -46,6 +46,13 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-card-elevated: var(--card-elevated);
+  --color-expense: var(--color-expense);
+  --color-expense-soft: var(--color-expense-soft);
+  --color-income: var(--color-income);
+  --color-income-soft: var(--color-income-soft);
+  --color-transfer: var(--color-transfer);
+  --color-transfer-soft: var(--color-transfer-soft);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -56,107 +63,299 @@
 }
 
 /* ==========================================================================
-   PALETA DE CORES GLOBAL DO SISTEMA (TAILWIND CSS v4 + SHADCN/UI)
-   Para trocar o tema global, altere as variáveis principais abaixo:
-   - --primary: Cor de destaque da marca (botões, logotipo, links)
-   - --background: Cor de fundo da aplicação
-   - --card: Superfície dos cartões
+   PALETAS DE CORES GLOBAIS DO SISTEMA (TAILWIND CSS v4 + SHADCN/UI)
+   O tema ativo é controlado por data-theme no <html> via ACTIVE_THEME_ID
+   em src/components/transaction-theme.ts.
+   Presets disponíveis:
+   - midnight_electric: Visual Midnight + Blue Electric (Padrão)
+   - carbon_gold: Estilo C6 Carbon com Dourado
+   - emerald_banking: Estilo Private Banking Esmeralda
+   - midnight_orange: Visual clássico com Laranja Vibrante
    ========================================================================== */
 
-:root {
+:root,
+.dark,
+[data-theme="midnight_electric"] {
   /* Superfícies & Fundo */
-  --background: hsl(240 10% 6%);
-  --foreground: hsl(0 0% 98%);
-  --card: hsl(240 8% 11%);
-  --card-foreground: hsl(0 0% 98%);
-  --popover: hsl(240 8% 11%);
-  --popover-foreground: hsl(0 0% 98%);
+  --background: #0B1220;
+  --foreground: #F2F5FA;
+  --card: #111A2A;
+  --card-foreground: #F2F5FA;
+  --card-elevated: #151F31;
+  --popover: #111A2A;
+  --popover-foreground: #F2F5FA;
 
   /* Destaque Principal da Marca */
-  --primary: hsl(24 100% 50%);
-  --primary-foreground: hsl(0 0% 100%);
+  --primary: #639BFF;
+  --primary-foreground: #FFFFFF;
 
   /* Cores Semânticas Auxiliares */
-  --secondary: hsl(240 5% 15%);
-  --secondary-foreground: hsl(0 0% 98%);
-  --muted: hsl(240 5% 15%);
-  --muted-foreground: hsl(240 5% 65%);
-  --accent: hsl(240 5% 15%);
-  --accent-foreground: hsl(0 0% 98%);
-  --destructive: hsl(0 84% 60%);
-  --destructive-foreground: hsl(0 0% 98%);
-  --success: hsl(142 71% 45%);
-  --success-foreground: hsl(0 0% 98%);
-  --border: hsl(240 5% 15%);
-  --input: hsl(240 5% 10%);
-  --ring: hsl(24 100% 50%);
+  --secondary: #1C293D;
+  --secondary-foreground: #F2F5FA;
+  --muted: #151F31;
+  --muted-foreground: #A7B3C5;
+  --accent: #1C293D;
+  --accent-foreground: #F2F5FA;
+  --destructive: #FF7185;
+  --destructive-foreground: #FFFFFF;
+  --success: #42D6A0;
+  --success-foreground: #0B1220;
+  --border: #29384E;
+  --input: #101A2A;
+  --ring: #639BFF;
+  --radius: 1rem;
 
   /* Gráficos Financeiros */
-  --chart-1: oklch(0.64 0.19 25.1);
-  --chart-2: oklch(0.68 0.16 260);
-  --chart-3: oklch(0.75 0.18 150);
-  --chart-4: oklch(0.7 0.19 65);
-  --chart-5: oklch(0.62 0.18 300);
-  --chart-6: oklch(0.75 0.15 200);
-  --chart-7: oklch(0.65 0.18 15);
-  --chart-8: oklch(0.85 0.15 100);
-  --chart-9: oklch(0.6 0.15 280);
-  --chart-10: oklch(0.7 0.15 45);
-
-  --radius: 1rem;
+  --chart-1: #FF7185;
+  --chart-2: #42D6A0;
+  --chart-3: #639BFF;
+  --chart-4: #FBBF24;
+  --chart-5: #A78BFA;
+  --chart-6: #38BDF8;
+  --chart-7: #F472B6;
+  --chart-8: #34D399;
+  --chart-9: #818CF8;
+  --chart-10: #FB923C;
 
   /* Barra Lateral (Sidebar) */
-  --sidebar: hsl(240 10% 6%);
-  --sidebar-foreground: hsl(0 0% 98%);
-  --sidebar-primary: hsl(24 100% 50%);
-  --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(240 5% 15%);
-  --sidebar-accent-foreground: hsl(0 0% 98%);
-  --sidebar-border: hsl(240 5% 15%);
-  --sidebar-ring: hsl(24 100% 50%);
+  --sidebar: #0B1220;
+  --sidebar-foreground: #F2F5FA;
+  --sidebar-primary: #639BFF;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #151F31;
+  --sidebar-accent-foreground: #F2F5FA;
+  --sidebar-border: #29384E;
+  --sidebar-ring: #639BFF;
+
+  /* Cores Semânticas de Transação */
+  --color-expense: #FF7185;
+  --color-expense-soft: #2A1924;
+  --color-income: #42D6A0;
+  --color-income-soft: #132A28;
+  --color-transfer: #639BFF;
+  --color-transfer-soft: #18263A;
 }
 
-.dark {
-  --background: hsl(240 10% 6%);
-  --foreground: hsl(0 0% 98%);
-  --card: hsl(240 8% 11%);
-  --card-foreground: hsl(0 0% 98%);
-  --popover: hsl(240 8% 11%);
-  --popover-foreground: hsl(0 0% 98%);
-  --primary: hsl(24 100% 50%);
-  --primary-foreground: hsl(0 0% 100%);
-  --secondary: hsl(240 5% 15%);
-  --secondary-foreground: hsl(0 0% 98%);
-  --muted: hsl(240 5% 15%);
-  --muted-foreground: hsl(240 5% 65%);
-  --accent: hsl(240 5% 15%);
-  --accent-foreground: hsl(0 0% 98%);
-  --destructive: hsl(0 84% 60%);
-  --destructive-foreground: hsl(0 0% 98%);
-  --success: hsl(142 71% 45%);
-  --success-foreground: hsl(0 0% 98%);
-  --border: hsl(240 5% 15%);
-  --input: hsl(240 5% 10%);
-  --ring: hsl(24 100% 50%);
-  --chart-1: oklch(0.74 0.18 25.1);
-  --chart-2: oklch(0.78 0.15 260);
-  --chart-3: oklch(0.85 0.16 150);
-  --chart-4: oklch(0.8 0.17 65);
-  --chart-5: oklch(0.72 0.16 300);
-  --chart-6: oklch(0.85 0.13 200);
-  --chart-7: oklch(0.75 0.16 15);
-  --chart-8: oklch(0.95 0.13 100);
-  --chart-9: oklch(0.7 0.14 280);
-  --chart-10: oklch(0.8 0.14 45);
+[data-theme="carbon_gold"] {
+  --background: #0A0A0C;
+  --foreground: #F8FAFC;
+  --card: #18181E;
+  --card-foreground: #F8FAFC;
+  --card-elevated: #202028;
+  --popover: #18181E;
+  --popover-foreground: #F8FAFC;
+
+  --primary: #FBBF24;
+  --primary-foreground: #0A0A0C;
+
+  --secondary: #282834;
+  --secondary-foreground: #F8FAFC;
+  --muted: #202028;
+  --muted-foreground: #9CA3AF;
+  --accent: #282834;
+  --accent-foreground: #F8FAFC;
+  --destructive: #F87171;
+  --destructive-foreground: #FFFFFF;
+  --success: #34D399;
+  --success-foreground: #0A0A0C;
+  --border: #2E2E3C;
+  --input: #14141A;
+  --ring: #FBBF24;
   --radius: 1rem;
-  --sidebar: hsl(240 10% 6%);
-  --sidebar-foreground: hsl(0 0% 98%);
-  --sidebar-primary: hsl(24 100% 50%);
-  --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(240 5% 15%);
-  --sidebar-accent-foreground: hsl(0 0% 98%);
-  --sidebar-border: hsl(240 5% 15%);
-  --sidebar-ring: hsl(24 100% 50%);
+
+  --chart-1: #F87171;
+  --chart-2: #FBBF24;
+  --chart-3: #93C5FD;
+  --chart-4: #34D399;
+  --chart-5: #C084FC;
+  --chart-6: #38BDF8;
+  --chart-7: #FB7185;
+  --chart-8: #F59E0B;
+  --chart-9: #A78BFA;
+  --chart-10: #FB923C;
+
+  --sidebar: #0A0A0C;
+  --sidebar-foreground: #F8FAFC;
+  --sidebar-primary: #FBBF24;
+  --sidebar-primary-foreground: #0A0A0C;
+  --sidebar-accent: #202028;
+  --sidebar-accent-foreground: #F8FAFC;
+  --sidebar-border: #2E2E3C;
+  --sidebar-ring: #FBBF24;
+
+  --color-expense: #F87171;
+  --color-expense-soft: #2B1A1E;
+  --color-income: #FBBF24;
+  --color-income-soft: #2B2416;
+  --color-transfer: #93C5FD;
+  --color-transfer-soft: #172338;
+}
+
+[data-theme="emerald_banking"] {
+  --background: #061311;
+  --foreground: #F0FDF4;
+  --card: #0F2623;
+  --card-foreground: #F0FDF4;
+  --card-elevated: #15332F;
+  --popover: #0F2623;
+  --popover-foreground: #F0FDF4;
+
+  --primary: #10B981;
+  --primary-foreground: #FFFFFF;
+
+  --secondary: #1D423D;
+  --secondary-foreground: #F0FDF4;
+  --muted: #15332F;
+  --muted-foreground: #A7F3D0;
+  --accent: #1D423D;
+  --accent-foreground: #F0FDF4;
+  --destructive: #FB7185;
+  --destructive-foreground: #FFFFFF;
+  --success: #10B981;
+  --success-foreground: #061311;
+  --border: #1E4741;
+  --input: #0B1F1C;
+  --ring: #10B981;
+  --radius: 1rem;
+
+  --chart-1: #FB7185;
+  --chart-2: #10B981;
+  --chart-3: #38BDF8;
+  --chart-4: #FBBF24;
+  --chart-5: #A78BFA;
+  --chart-6: #34D399;
+  --chart-7: #F472B6;
+  --chart-8: #6EE7B7;
+  --chart-9: #60A5FA;
+  --chart-10: #FB923C;
+
+  --sidebar: #061311;
+  --sidebar-foreground: #F0FDF4;
+  --sidebar-primary: #10B981;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #15332F;
+  --sidebar-accent-foreground: #F0FDF4;
+  --sidebar-border: #1E4741;
+  --sidebar-ring: #10B981;
+
+  --color-expense: #FB7185;
+  --color-expense-soft: #29171C;
+  --color-income: #10B981;
+  --color-income-soft: #102922;
+  --color-transfer: #38BDF8;
+  --color-transfer-soft: #122736;
+}
+
+[data-theme="midnight_orange"] {
+  --background: #0B101B;
+  --foreground: #F8FAFC;
+  --card: #141D2E;
+  --card-foreground: #F8FAFC;
+  --card-elevated: #1A253A;
+  --popover: #141D2E;
+  --popover-foreground: #F8FAFC;
+
+  --primary: #F97316;
+  --primary-foreground: #FFFFFF;
+
+  --secondary: #22314D;
+  --secondary-foreground: #F8FAFC;
+  --muted: #1A253A;
+  --muted-foreground: #94A3B8;
+  --accent: #22314D;
+  --accent-foreground: #F8FAFC;
+  --destructive: #F43F5E;
+  --destructive-foreground: #FFFFFF;
+  --success: #10B981;
+  --success-foreground: #FFFFFF;
+  --border: #2C3D5A;
+  --input: #121A2A;
+  --ring: #F97316;
+  --radius: 1rem;
+
+  --chart-1: #F43F5E;
+  --chart-2: #10B981;
+  --chart-3: #F97316;
+  --chart-4: #38BDF8;
+  --chart-5: #A855F7;
+  --chart-6: #FBBF24;
+  --chart-7: #FB7185;
+  --chart-8: #34D399;
+  --chart-9: #818CF8;
+  --chart-10: #FB923C;
+
+  --sidebar: #0B101B;
+  --sidebar-foreground: #F8FAFC;
+  --sidebar-primary: #F97316;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #1A253A;
+  --sidebar-accent-foreground: #F8FAFC;
+  --sidebar-border: #2C3D5A;
+  --sidebar-ring: #F97316;
+
+  --color-expense: #F43F5E;
+  --color-expense-soft: #2B161E;
+  --color-income: #10B981;
+  --color-income-soft: #112922;
+  --color-transfer: #F97316;
+  --color-transfer-soft: #2B1C13;
+}
+
+[data-theme="obsidian_ultraviolet"] {
+  /* Fundo preto absoluto OLED */
+  --background: #000000;
+  --foreground: #F8FAFC;
+  --card: #08080C;
+  --card-foreground: #F8FAFC;
+  --card-elevated: #0E0E14;
+  --popover: #0A0A10;
+  --popover-foreground: #F8FAFC;
+
+  /* Roxo Nubank Ultravioleta em detalhes */
+  --primary: #820AD1;
+  --primary-foreground: #FFFFFF;
+
+  --secondary: #14141E;
+  --secondary-foreground: #F8FAFC;
+  --muted: #101018;
+  --muted-foreground: #94A3B8;
+  --accent: #161622;
+  --accent-foreground: #F8FAFC;
+  --destructive: #FF4D6D;
+  --destructive-foreground: #FFFFFF;
+  --success: #00D287;
+  --success-foreground: #000000;
+  --border: #1C1C28;
+  --input: #08080D;
+  --ring: #820AD1;
+  --radius: 1rem;
+
+  --chart-1: #820AD1;
+  --chart-2: #00D287;
+  --chart-3: #FF4D6D;
+  --chart-4: #A855F7;
+  --chart-5: #38BDF8;
+  --chart-6: #FBBF24;
+  --chart-7: #F43F5E;
+  --chart-8: #34D399;
+  --chart-9: #C084FC;
+  --chart-10: #FB923C;
+
+  --sidebar: #000000;
+  --sidebar-foreground: #F8FAFC;
+  --sidebar-primary: #820AD1;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #111118;
+  --sidebar-accent-foreground: #F8FAFC;
+  --sidebar-border: #181822;
+  --sidebar-ring: #820AD1;
+
+  --color-expense: #FF4D6D;
+  --color-expense-soft: #250E15;
+  --color-income: #00D287;
+  --color-income-soft: #082319;
+  --color-transfer: #820AD1;
+  --color-transfer-soft: #1C0A2E;
 }
 
 @layer base {

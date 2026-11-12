@@ -2,14 +2,27 @@
 
 import { db } from '@/db';
 import { categories, subcategories, transactions } from '@/db/schema';
+import { buildCategoryUsageOrderBy } from '@/lib/category-utils';
 import { eq, and } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/auth';
 
-export async function getCategories() {
+export async function getCategories(options?: { orderBy?: 'name' | 'usage' }) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
+
+  if (options?.orderBy === 'name') {
+    return await db.query.categories.findMany({
+      where: eq(categories.userId, userId),
+      with: { 
+        subcategories: {
+          orderBy: (subcategories, { asc }) => [asc(subcategories.name)]
+        }
+      },
+      orderBy: (categories, { asc }) => [asc(categories.name)]
+    });
+  }
 
   return await db.query.categories.findMany({
     where: eq(categories.userId, userId),
@@ -18,7 +31,7 @@ export async function getCategories() {
         orderBy: (subcategories, { asc }) => [asc(subcategories.name)]
       }
     },
-    orderBy: (categories, { asc }) => [asc(categories.name)]
+    orderBy: buildCategoryUsageOrderBy({ userId })
   });
 }
 

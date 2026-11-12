@@ -163,7 +163,7 @@ export function LoanOriginAccountCard({ originAccounts }: LoanOriginAccountCardP
   const tableRows = showTableAllRows ? progressionData : progressionData.slice(0, 6);
 
   return (
-    <Card className="rounded-3xl border border-white/10 shadow-sm overflow-hidden bg-card/60 backdrop-blur">
+    <Card className="rounded-3xl border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] overflow-hidden bg-card/70 backdrop-blur-xl">
       <CardHeader className="pb-4 border-b border-white/5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { orderByMostUsedCategory } from "@/lib/category-utils";
 import { addMonths, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useRouter } from "next/navigation";
@@ -114,7 +115,8 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
   const filteredCategories = useMemo(() => {
     if (!formData?.categories || !transaction) return [];
     const targetType = transaction.type === "income" ? "income" : "expense";
-    return formData.categories.filter((c: Category) => c.type === targetType || c.type === "expense"); // transfer/credit_card_expense use expense categories
+    const filtered = formData.categories.filter((c: Category) => c.type === targetType || c.type === "expense"); // transfer/credit_card_expense use expense categories
+    return orderByMostUsedCategory(filtered);
   }, [formData, transaction]);
 
   const activeSubcategories = useMemo(() => {

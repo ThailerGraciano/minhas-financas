@@ -6,20 +6,8 @@ import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   roundCurrency,
   validateAllocationToIncome,
@@ -27,15 +15,7 @@ import {
   type BudgetPlanItem,
 } from "@/lib/budget-planner-utils";
 import { cn } from "@/lib/utils";
-import {
-  AlertCircle,
-  Banknote,
-  Heart,
-  Link2Off,
-  Sparkles,
-  Target,
-  Trash2,
-} from "lucide-react";
+import { AlertCircle, Banknote, Heart, Link2Off, Sparkles, Target, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -82,9 +62,7 @@ function BudgetItemDetailsForm({
 }: BudgetItemDetailsFormProps) {
   const [amount, setAmount] = useState<number | undefined>(item.amount);
   const [pillar, setPillar] = useState<BudgetPillar>(item.pillar);
-  const [incomeSourceId, setIncomeSourceId] = useState<string>(
-    item.incomeSourceId ?? "__none__",
-  );
+  const [incomeSourceId, setIncomeSourceId] = useState<string>(item.incomeSourceId ?? "__none__");
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
@@ -101,8 +79,7 @@ function BudgetItemDetailsForm({
   );
 
   const currentLinkedIncome = selectedIncomes.find((inc) => inc.id === item.incomeSourceId);
-  const utilizationPercent =
-    candidateAmount > 0 ? (item.consumed / candidateAmount) * 100 : item.percent;
+  const utilizationPercent = candidateAmount > 0 ? (item.consumed / candidateAmount) * 100 : item.percent;
 
   const handleApply = (e: React.FormEvent) => {
     e.preventDefault();
@@ -160,9 +137,7 @@ function BudgetItemDetailsForm({
               <span className="text-muted-foreground">Consumo no período:</span>
               <span className="font-bold text-foreground tabular-nums">
                 {formatCurrency(item.consumed)} / {formatCurrency(candidateAmount || item.amount)}{" "}
-                <span className="text-muted-foreground font-normal">
-                  ({utilizationPercent.toFixed(0)}%)
-                </span>
+                <span className="text-muted-foreground font-normal">({utilizationPercent.toFixed(0)}%)</span>
               </span>
             </div>
             <Progress
@@ -247,9 +222,7 @@ function BudgetItemDetailsForm({
             {targetIncomeId && (
               <span className="text-[11px] text-muted-foreground tabular-nums">
                 Capacidade na receita:{" "}
-                <strong className="text-emerald-400">
-                  {formatCurrency(validation.remainingCapacity)}
-                </strong>
+                <strong className="text-emerald-400">{formatCurrency(validation.remainingCapacity)}</strong>
               </span>
             )}
           </div>
@@ -359,12 +332,10 @@ export function BudgetItemDetailsSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-md bg-[#16161D] border-l border-white/10 p-0 flex flex-col"
+        className="w-full sm:max-w-md bg-card/90 backdrop-blur-2xl border-l border-white/[0.12] p-0 flex flex-col shadow-2xl"
       >
         <SheetHeader className="p-5 pb-2 border-b border-white/5">
-          <SheetTitle className="text-lg font-bold text-foreground">
-            Detalhes e Alocação do Orçamento
-          </SheetTitle>
+          <SheetTitle className="text-lg font-bold text-foreground">Detalhes e Alocação do Orçamento</SheetTitle>
           <SheetDescription className="text-xs text-muted-foreground">
             Ajuste o valor orçado, o pilar ou escolha a receita fixa que financiará esta categoria.
           </SheetDescription>
@@ -385,4 +356,3 @@ export function BudgetItemDetailsSheet({
     </Sheet>
   );
 }
-

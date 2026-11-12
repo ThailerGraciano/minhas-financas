@@ -41,7 +41,7 @@ import {
   Sparkles,
   Wallet,
 } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useMeasure } from "react-use";
 import { toast } from "sonner";
 
@@ -112,8 +112,7 @@ export function getCategoryPalette(categoryName: string): PaletteItem {
   return COLOR_PALETTES[Math.abs(hash) % COLOR_PALETTES.length];
 }
 
-const formatBRL = (val: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
+const formatBRL = (val: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
 
 interface DraggableExpenseTileProps {
   item: BudgetPlanItem;
@@ -199,9 +198,7 @@ function DraggableExpenseTile({
                   {item.label}
                 </span>
                 {item.subcategoryName && height >= 78 && (
-                  <span className="text-[10px] text-muted-foreground/80 block truncate">
-                    {item.categoryName}
-                  </span>
+                  <span className="text-[10px] text-muted-foreground/80 block truncate">{item.categoryName}</span>
                 )}
               </div>
             </div>
@@ -225,9 +222,7 @@ function DraggableExpenseTile({
       ) : isMedium ? (
         <div className="flex flex-col justify-between h-full w-full">
           <div className="flex items-start justify-between gap-0.5 min-w-0">
-            <span className={cn("font-bold text-[11px] leading-tight truncate", palette.text)}>
-              {item.label}
-            </span>
+            <span className={cn("font-bold text-[11px] leading-tight truncate", palette.text)}>{item.label}</span>
           </div>
           <div className="flex items-end justify-between gap-1 mt-auto w-full">
             <span className="font-bold text-[10px] text-foreground tracking-tight tabular-nums truncate">
@@ -329,7 +324,7 @@ function DroppableIncomeContainer({
             : undefined
       }
       className={cn(
-        "rounded-2xl border bg-[#14141B] flex flex-col overflow-hidden transition-all duration-200",
+        "rounded-2xl border bg-card/80 backdrop-blur-md flex flex-col overflow-hidden transition-all duration-200",
         isStackedMobile ? "relative w-full" : "absolute",
         isOver && isValidNewTarget
           ? "border-emerald-400 ring-2 ring-emerald-500/40 bg-emerald-950/20 shadow-lg z-20"
@@ -345,15 +340,12 @@ function DroppableIncomeContainer({
       {/* Cabeçalho do Contêiner da Receita (Seção 4.2.A) */}
       <div
         style={isStackedMobile ? undefined : { height: headerHeight }}
-        className="px-3 py-2 bg-[#1C1C26] border-b border-white/5 flex flex-col justify-between shrink-0"
+        className="px-3 py-2 bg-card/90 border-b border-white/5 flex flex-col justify-between shrink-0"
       >
         <div className="flex items-start justify-between gap-2 min-w-0">
           <div className="flex items-center gap-1.5 min-w-0">
             <div className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-            <span
-              className="font-bold text-xs sm:text-sm text-foreground truncate"
-              title={summary.income.name}
-            >
+            <span className="font-bold text-xs sm:text-sm text-foreground truncate" title={summary.income.name}>
               {summary.income.name}
             </span>
           </div>
@@ -368,24 +360,17 @@ function DroppableIncomeContainer({
             value={Math.min(100, Math.max(0, summary.committedPercent))}
             className={cn(
               "h-1 bg-white/10",
-              summary.committedPercent >= 100
-                ? "[&>div]:bg-amber-500"
-                : "[&>div]:bg-emerald-500",
+              summary.committedPercent >= 100 ? "[&>div]:bg-amber-500" : "[&>div]:bg-emerald-500",
             )}
           />
           <div className="flex items-center justify-between gap-1 text-[10px] text-muted-foreground tabular-nums">
             <span className="truncate">
-              Vinculado:{" "}
-              <strong className="text-foreground">{formatBRL(summary.allocatedAmount)}</strong> (
+              Vinculado: <strong className="text-foreground">{formatBRL(summary.allocatedAmount)}</strong> (
               {summary.committedPercent.toFixed(0)}%)
             </span>
             <span className="shrink-0">
               Disponível:{" "}
-              <strong
-                className={
-                  summary.remainingCapacity > 0.005 ? "text-emerald-400" : "text-muted-foreground"
-                }
-              >
+              <strong className={summary.remainingCapacity > 0.005 ? "text-emerald-400" : "text-muted-foreground"}>
                 {formatBRL(summary.remainingCapacity)}
               </strong>
             </span>
@@ -417,9 +402,7 @@ function DroppableIncomeContainer({
               <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate">
                 Soltar para vincular • Restará{" "}
-                {formatBRL(
-                  Math.max(0, (dragValidation?.remainingCapacity || 0) - activeDragItem.amount),
-                )}
+                {formatBRL(Math.max(0, (dragValidation?.remainingCapacity || 0) - activeDragItem.amount))}
               </span>
             </>
           ) : (
@@ -429,12 +412,7 @@ function DroppableIncomeContainer({
       )}
 
       {/* Área Interna Proporcional do Treemap da Receita (Seção 4.2.B & Seção 7) */}
-      <div
-        className={cn(
-          "relative flex-1 m-2 rounded-xl overflow-hidden",
-          isStackedMobile ? "min-h-[190px]" : "",
-        )}
-      >
+      <div className={cn("relative flex-1 m-2 rounded-xl overflow-hidden", isStackedMobile ? "min-h-[190px]" : "")}>
         {tiles.map((tile) => {
           if (tile.type === "free_capacity") {
             if (tile.width < 12 || tile.height < 12) return null;
@@ -595,16 +573,13 @@ function UnallocatedExpensesTray({
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="text-sm sm:text-base font-bold text-foreground">
-                Categorias sem receita vinculada
-              </h4>
+              <h4 className="text-sm sm:text-base font-bold text-foreground">Categorias sem receita vinculada</h4>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/5 text-muted-foreground border border-white/10">
                 {items.length} {items.length === 1 ? "item" : "itens"}
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Arraste os blocos abaixo para dentro de uma receita acima, ou clique em um bloco para
-              vincular/editar
+              Arraste os blocos abaixo para dentro de uma receita acima, ou clique em um bloco para vincular/editar
             </p>
           </div>
         </div>
@@ -629,8 +604,7 @@ function UnallocatedExpensesTray({
             <span>Todas as despesas orçadas estão vinculadas a receitas!</span>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Arraste qualquer bloco de uma receita de volta para esta bandeja se quiser remover o
-            vínculo.
+            Arraste qualquer bloco de uma receita de volta para esta bandeja se quiser remover o vínculo.
           </p>
         </div>
       ) : (
@@ -698,7 +672,7 @@ export function BudgetVisualPlanner({
   );
 
   const activeDragItem = useMemo(
-    () => (activeDragKey ? allItems.find((i) => i.itemKey === activeDragKey) ?? null : null),
+    () => (activeDragKey ? (allItems.find((i) => i.itemKey === activeDragKey) ?? null) : null),
     [activeDragKey, allItems],
   );
 
@@ -709,12 +683,7 @@ export function BudgetVisualPlanner({
   }, [summary.incomeSummaries.length]);
 
   const incomeLayouts = useMemo(
-    () =>
-      computeIncomeContainersLayout(
-        summary.incomeSummaries,
-        Math.max(0, mapWidth),
-        mapHeight,
-      ),
+    () => computeIncomeContainersLayout(summary.incomeSummaries, Math.max(0, mapWidth), mapHeight),
     [summary.incomeSummaries, mapWidth, mapHeight],
   );
 
@@ -758,10 +727,7 @@ export function BudgetVisualPlanner({
       );
 
       if (!validation.valid) {
-        toast.error(
-          validation.reason ||
-            "Esta despesa ultrapassa a capacidade restante da receita selecionada.",
-        );
+        toast.error(validation.reason || "Esta despesa ultrapassa a capacidade restante da receita selecionada.");
         return;
       }
 
@@ -774,7 +740,7 @@ export function BudgetVisualPlanner({
   };
 
   return (
-    <div className="bg-[#1A1A22] rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-white/5 shadow-sm space-y-5">
+    <div className="bg-card/70 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] space-y-5">
       {/* Cabeçalho do Planejador Visual */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-start gap-3">
@@ -783,33 +749,29 @@ export function BudgetVisualPlanner({
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-base sm:text-lg font-bold text-foreground">
-                Planejador Visual de Orçamento
-              </h3>
+              <h3 className="text-base sm:text-lg font-bold text-foreground">Planejador Visual de Orçamento</h3>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                 Treemap & Drag and Drop
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Arraste os blocos de despesas para dentro das receitas fixas ou clique em qualquer
-              bloco para editar valores e vínculos
+              Arraste os blocos de despesas para dentro das receitas fixas ou clique em qualquer bloco para editar
+              valores e vínculos
             </p>
           </div>
         </div>
 
-        {onAutoDistribute &&
-          summary.unallocatedItems.length > 0 &&
-          selectedIncomes.length > 0 && (
-            <button
-              type="button"
-              onClick={onAutoDistribute}
-              className="self-start md:self-center text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 border border-primary/25 rounded-xl px-3 py-2 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
-              title="Encaixar automaticamente as categorias sem vínculo nas receitas com saldo disponível"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Sugerir Alocação Automática</span>
-            </button>
-          )}
+        {onAutoDistribute && summary.unallocatedItems.length > 0 && selectedIncomes.length > 0 && (
+          <button
+            type="button"
+            onClick={onAutoDistribute}
+            className="self-start md:self-center text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 border border-primary/25 rounded-xl px-3 py-2 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+            title="Encaixar automaticamente as categorias sem vínculo nas receitas com saldo disponível"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Sugerir Alocação Automática</span>
+          </button>
+        )}
       </div>
 
       {/* Alerta caso as despesas orçadas superem as receitas selecionadas (Seção 6.2) */}
@@ -818,20 +780,19 @@ export function BudgetVisualPlanner({
           <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
           <div className="space-y-0.5">
             <p className="font-bold text-rose-300">
-              As despesas orçadas ({formatBRL(summary.totalBudgetedExpenses)}) superam as receitas
-              selecionadas ({formatBRL(summary.selectedIncomeTotal)}) em{" "}
-              {formatBRL(Math.abs(summary.projectedBalance))}.
+              As despesas orçadas ({formatBRL(summary.totalBudgetedExpenses)}) superam as receitas selecionadas (
+              {formatBRL(summary.selectedIncomeTotal)}) em {formatBRL(Math.abs(summary.projectedBalance))}.
             </p>
             <p className="text-rose-200/80">
-              As categorias que excedem a capacidade das receitas permanecem preservadas na bandeja
-              &quot;Categorias sem receita vinculada&quot; e continuam contabilizadas no Saldo
-              Previsto.
+              As categorias que excedem a capacidade das receitas permanecem preservadas na bandeja &quot;Categorias sem
+              receita vinculada&quot; e continuam contabilizadas no Saldo Previsto.
             </p>
           </div>
         </div>
       )}
 
       <DndContext
+        id="budget-planner-dnd"
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragCancel={handleDragCancel}
@@ -846,19 +807,17 @@ export function BudgetVisualPlanner({
                 Nenhuma receita selecionada para distribuição
               </h4>
               <p className="text-xs text-muted-foreground max-w-md">
-                Selecione ao menos uma receita na seção &quot;Receitas do Mês Selecionadas&quot;
-                acima para habilitar os contêineres de distribuição proporcional.
+                Selecione ao menos uma receita na seção &quot;Receitas do Mês Selecionadas&quot; acima para habilitar os
+                contêineres de distribuição proporcional.
               </p>
             </div>
           ) : allItems.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-8 text-center flex flex-col items-center justify-center gap-2">
               <Info className="w-8 h-8 text-muted-foreground/60" />
-              <h4 className="font-bold text-sm sm:text-base text-foreground">
-                Nenhuma categoria orçada neste período
-              </h4>
+              <h4 className="font-bold text-sm sm:text-base text-foreground">Nenhuma categoria orçada neste período</h4>
               <p className="text-xs text-muted-foreground max-w-md">
-                Clique em &quot;Novo Orçamento&quot; no topo da página para definir limites de
-                gastos e distribuí-los entre suas receitas.
+                Clique em &quot;Novo Orçamento&quot; no topo da página para definir limites de gastos e distribuí-los
+                entre suas receitas.
               </p>
             </div>
           ) : (
@@ -925,19 +884,12 @@ export function BudgetVisualPlanner({
               <div className="flex items-center gap-2">
                 <CategoryIcon
                   name={activeDragItem.categoryIcon || activeDragItem.categoryName}
-                  className={cn(
-                    "w-4 h-4 shrink-0",
-                    getCategoryPalette(activeDragItem.categoryName).text,
-                  )}
+                  className={cn("w-4 h-4 shrink-0", getCategoryPalette(activeDragItem.categoryName).text)}
                 />
-                <span className="font-bold text-xs text-foreground truncate">
-                  {activeDragItem.label}
-                </span>
+                <span className="font-bold text-xs text-foreground truncate">{activeDragItem.label}</span>
               </div>
               <div className="mt-1.5 flex items-center justify-between text-xs">
-                <span className="font-black text-foreground tabular-nums">
-                  {formatBRL(activeDragItem.amount)}
-                </span>
+                <span className="font-black text-foreground tabular-nums">{formatBRL(activeDragItem.amount)}</span>
                 <span className="text-[10px] text-muted-foreground">Arrastando...</span>
               </div>
             </div>
@@ -947,4 +899,3 @@ export function BudgetVisualPlanner({
     </div>
   );
 }
-

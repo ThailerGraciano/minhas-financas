@@ -3,7 +3,6 @@
 import { getDashboardFullData } from "@/app/actions/dashboard-full";
 import { AccountBalancesSummary } from "@/components/account-balances-summary";
 import { AccountsCarousel } from "@/components/accounts-carousel";
-import { AdvancedAnalyticsSection } from "@/components/advanced-analytics-section";
 import { BalanceEvolutionChart, COLOR_FUTURE, COLOR_PAST } from "@/components/balance-evolution-chart";
 import { CategoryForecastChart } from "@/components/category-forecast-chart";
 import { ExpenseTreemap } from "@/components/charts/ExpenseTreemap";
@@ -26,7 +25,6 @@ import {
   reorderWidgetsById,
   subscribeDashboardLayout,
   writeDashboardLayoutToStorage,
-  type AdvancedChartId,
   type DashboardLayoutState,
   type DashboardWidgetConfig,
   type DashboardWidgetId,
@@ -64,7 +62,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
-import { type ReactNode, useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { toast } from "sonner";
 
 type DashboardFullData = Awaited<ReturnType<typeof getDashboardFullData>>;
@@ -149,8 +147,7 @@ function SortableDashboardWidget({
       className={cn(
         "dashboard-widget-cell group/widget relative col-span-1 flex flex-col min-w-0 transition-all duration-200",
         COL_SPAN_CLASSES[config.colSpan],
-        isEditMode &&
-          "p-2.5 sm:p-3 rounded-[2rem] border-2 border-dashed border-primary/35 bg-primary/[0.02]",
+        isEditMode && "p-2.5 sm:p-3 rounded-[2rem] border-2 border-dashed border-primary/35 bg-primary/[0.02]",
         isDragging && "opacity-30 scale-[0.98]",
         isOver && !isDragging && "ring-2 ring-primary bg-primary/10 rounded-[2rem] shadow-xl",
       )}
@@ -391,26 +388,6 @@ export function DashboardClientPage({
     [persistLayout],
   );
 
-  const handleReorderAdvancedCharts = useCallback(
-    (newOrder: AdvancedChartId[]) => {
-      persistLayout((prev) => ({
-        ...prev,
-        advancedChartsOrder: newOrder,
-      }));
-    },
-    [persistLayout],
-  );
-
-  const handleToggleAdvancedOpen = useCallback(
-    (open: boolean) => {
-      persistLayout((prev) => ({
-        ...prev,
-        advancedAnalyticsOpen: open,
-      }));
-    },
-    [persistLayout],
-  );
-
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveDragId(String(event.active.id) as DashboardWidgetId);
   }, []);
@@ -447,12 +424,12 @@ export function DashboardClientPage({
   );
 
   const activeDragMeta = useMemo(
-    () => (activeDragId ? DASHBOARD_WIDGETS_META.find((m) => m.id === activeDragId) ?? null : null),
+    () => (activeDragId ? (DASHBOARD_WIDGETS_META.find((m) => m.id === activeDragId) ?? null) : null),
     [activeDragId],
   );
 
   const activeDragConfig = useMemo(
-    () => (activeDragId ? layout.widgets.find((w) => w.id === activeDragId) ?? null : null),
+    () => (activeDragId ? (layout.widgets.find((w) => w.id === activeDragId) ?? null) : null),
     [activeDragId, layout.widgets],
   );
 
@@ -589,7 +566,8 @@ export function DashboardClientPage({
             case "accounts-carousel":
               if (!hasCarouselAccounts) {
                 return (
-                  <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] p-6 border border-white/5 text-center text-xs text-muted-foreground">
+                  <div className="bg-card/70 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] p-6 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] text-center text-xs text-muted-foreground relative overflow-hidden">
+                    <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                     Nenhuma conta operacional cadastrada no momento.
                   </div>
                 );
@@ -608,7 +586,9 @@ export function DashboardClientPage({
 
             case "balance-evolution":
               return (
-                <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border border-white/5 shadow-sm w-full min-w-0 h-full flex flex-col justify-between">
+                <div className="bg-card/70 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] w-full min-w-0 h-full flex flex-col justify-between relative overflow-hidden">
+                  {/* Specular top highlight */}
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                   <div className="flex flex-row items-center gap-2 mb-4">
                     <TrendingUp className="h-5 w-5 text-primary shrink-0" />
                     <div>
@@ -655,7 +635,9 @@ export function DashboardClientPage({
 
             case "expenses-forecast":
               return (
-                <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border border-white/5 shadow-sm w-full min-w-0 h-full flex flex-col justify-between">
+                <div className="bg-card/70 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] w-full min-w-0 h-full flex flex-col justify-between relative overflow-hidden">
+                  {/* Specular top highlight */}
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                   <div className="flex flex-row items-center gap-2 mb-4">
                     <TrendingUp className="h-5 w-5 text-primary shrink-0" />
                     <div>
@@ -673,7 +655,9 @@ export function DashboardClientPage({
 
             case "expense-treemap":
               return (
-                <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border border-white/5 shadow-sm w-full min-w-0 h-full flex flex-col justify-between">
+                <div className="bg-card/70 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] w-full min-w-0 h-full flex flex-col justify-between relative overflow-hidden">
+                  {/* Specular top highlight */}
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                   <div className="flex flex-row items-center gap-2 mb-4">
                     <Grid3X3 className="h-5 w-5 text-primary shrink-0" />
                     <div>
@@ -689,7 +673,9 @@ export function DashboardClientPage({
 
             case "income-treemap":
               return (
-                <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border border-white/5 shadow-sm w-full min-w-0 h-full flex flex-col justify-between">
+                <div className="bg-card/70 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] w-full min-w-0 h-full flex flex-col justify-between relative overflow-hidden">
+                  {/* Specular top highlight */}
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                   <div className="flex flex-row items-center gap-2 mb-4">
                     <Grid3X3 className="h-5 w-5 text-emerald-500 shrink-0" />
                     <div>
@@ -705,7 +691,9 @@ export function DashboardClientPage({
 
             case "open-invoices":
               return (
-                <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border border-white/5 shadow-sm w-full min-w-0 h-full flex flex-col justify-between">
+                <div className="bg-card/70 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] w-full min-w-0 h-full flex flex-col justify-between relative overflow-hidden">
+                  {/* Specular top highlight */}
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                   <div className="flex flex-row items-center gap-2 mb-6">
                     <CreditCardIcon className="h-5 w-5 text-primary shrink-0" />
                     <div>
@@ -721,7 +709,9 @@ export function DashboardClientPage({
 
             case "installments-projection":
               return (
-                <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border border-white/5 shadow-sm w-full min-w-0 h-full flex flex-col justify-between">
+                <div className="bg-card/70 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] w-full min-w-0 h-full flex flex-col justify-between relative overflow-hidden">
+                  {/* Specular top highlight */}
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                   <div className="flex flex-row items-center gap-2 mb-4">
                     <Layers className="h-5 w-5 text-primary shrink-0" />
                     <div>
@@ -744,7 +734,8 @@ export function DashboardClientPage({
             case "goals-stash":
               if (!hasStashAccounts) {
                 return (
-                  <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] p-6 border border-white/5 flex items-center gap-3 text-xs text-muted-foreground">
+                  <div className="bg-card/70 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] p-6 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] flex items-center gap-3 text-xs text-muted-foreground relative overflow-hidden">
+                    <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                     <Target className="w-5 h-5 text-primary shrink-0" />
                     <span>
                       Nenhuma caixinha ou meta cadastrada neste período. Este bloco fica oculto automaticamente fora do
@@ -757,7 +748,9 @@ export function DashboardClientPage({
 
             case "category-forecast":
               return (
-                <div className="bg-card rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border border-white/5 shadow-sm w-full min-w-0 h-full flex flex-col justify-between">
+                <div className="bg-card/70 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] w-full min-w-0 h-full flex flex-col justify-between relative overflow-hidden">
+                  {/* Specular top highlight */}
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
                   <div className="flex flex-row items-center gap-2 mb-4">
                     <Grid3X3 className="h-5 w-5 text-primary shrink-0" />
                     <div>
@@ -775,19 +768,6 @@ export function DashboardClientPage({
                     />
                   </div>
                 </div>
-              );
-
-            case "advanced-analytics":
-              return (
-                <AdvancedAnalyticsSection
-                  incomeVsExpenseData={dashboard.incomeVsExpenseData}
-                  selectedMonth={selectedMonth}
-                  chartsOrder={layout.advancedChartsOrder}
-                  onReorderCharts={handleReorderAdvancedCharts}
-                  isOpen={layout.advancedAnalyticsOpen}
-                  onToggleOpen={handleToggleAdvancedOpen}
-                  isEditMode={isEditMode}
-                />
               );
           }
         };
@@ -880,6 +860,7 @@ export function DashboardClientPage({
             )}
 
             <DndContext
+              id="dashboard-dnd-context"
               sensors={sensors}
               collisionDetection={dashboardCollisionStrategy}
               onDragStart={handleDragStart}

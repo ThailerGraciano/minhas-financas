@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { InteractiveBackground } from "@/components/InteractiveBackground";
 
 export default function LoginPage() {
@@ -66,15 +67,17 @@ export default function LoginPage() {
       <main className="flex-1 flex items-center justify-center z-10 px-4">
         <div className="relative w-full max-w-md">
           {/* Ambient Glow */}
-          <div className="absolute -inset-2 bg-primary/20 blur-3xl opacity-60 rounded-[3rem] pointer-events-none" />
+          <div className="absolute -inset-2 bg-[#820AD1]/25 blur-3xl opacity-60 rounded-[3rem] pointer-events-none" />
 
-          <Card className="relative w-full border-white/10 bg-[#0B0B10]/60 backdrop-blur-xl shadow-2xl rounded-2xl">
-            <Tabs defaultValue="entrar" className="w-full">
+          <Card className="relative overflow-hidden w-full border-[#BA42FF]/20 bg-[#08040F]/80 backdrop-blur-2xl shadow-[0_0_50px_-12px_rgba(130,10,209,0.45)] rounded-2xl">
+            {/* Decorative ultraviolet corner arcs matching brand guide */}
+            <div className="pointer-events-none absolute -top-24 -right-24 w-56 h-56 rounded-full bg-gradient-to-br from-[#BA42FF]/25 via-[#820AD1]/10 to-transparent blur-2xl" />
+            <div className="pointer-events-none absolute -bottom-24 -left-24 w-56 h-56 rounded-full bg-gradient-to-tr from-[#5E0BE0]/25 via-[#820AD1]/10 to-transparent blur-2xl" />
+
+            <Tabs defaultValue="entrar" className="w-full relative z-10">
               <CardHeader className="space-y-4 text-center pb-6">
                 <div className="mx-auto pt-2">
-                  <h1 className="text-4xl font-extrabold tracking-tighter bg-gradient-to-r from-primary via-amber-500 to-primary bg-clip-text text-transparent drop-shadow-sm">
-                    B / MF
-                  </h1>
+                  <BrandLogo variant="stacked" iconSize={80} />
                 </div>
                 <CardDescription className="text-gray-400">Gerencie suas finanças com inteligência</CardDescription>
 

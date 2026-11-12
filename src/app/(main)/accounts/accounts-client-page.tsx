@@ -66,7 +66,9 @@ export function AccountsClientPage({ initialAccounts }: { initialAccounts: Accou
       </div>
 
       {/* 2. Card de Saldo Consolidado */}
-      <Card className="bg-card border border-white/5 rounded-2xl p-5 shadow-sm relative overflow-hidden">
+      <Card className="bg-card/70 backdrop-blur-xl border border-white/[0.08] rounded-3xl p-5 sm:p-6 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),0_8px_32px_rgba(0,0,0,0.4)] relative overflow-hidden">
+        {/* Top specular reflection shimmer */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/25 to-transparent" />
         {/* Background Glow */}
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -83,7 +85,7 @@ export function AccountsClientPage({ initialAccounts }: { initialAccounts: Accou
               {showBalance ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
             </button>
           </div>
-          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 text-xs font-bold tracking-wide">
+          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 text-xs font-bold tracking-wide border border-emerald-500/20">
             <span>↗</span>
             <span>+2.4% no mês</span>
           </div>
@@ -104,7 +106,7 @@ export function AccountsClientPage({ initialAccounts }: { initialAccounts: Accou
         </div>
 
         {/* Rodapé do card */}
-        <div className="pt-3 border-t border-white/5 flex items-center justify-between text-xs relative z-10">
+        <div className="pt-3 border-t border-white/[0.08] flex items-center justify-between text-xs relative z-10">
           <div className="flex items-center gap-2 text-muted-foreground">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span>
@@ -121,7 +123,7 @@ export function AccountsClientPage({ initialAccounts }: { initialAccounts: Accou
       </Card>
 
       {/* 3. Barra de Filtros Horizontais */}
-      <div className="flex overflow-x-auto gap-3 py-2 scrollbar-hide no-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+      <div className="flex overflow-x-auto gap-2.5 py-2 scrollbar-hide no-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {filterOptions.map((option) => {
           const isActive = selectedFilter === option.id;
           return (
@@ -129,12 +131,13 @@ export function AccountsClientPage({ initialAccounts }: { initialAccounts: Accou
               key={option.id}
               type="button"
               onClick={() => setSelectedFilter(option.id)}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all shrink-0 cursor-pointer ${
+              className={`relative rounded-full px-4 py-2 text-xs sm:text-sm font-semibold transition-all shrink-0 cursor-pointer backdrop-blur-xl select-none overflow-hidden ${
                 isActive
-                  ? "bg-primary text-white shadow-sm"
-                  : "bg-secondary/50 border border-white/10 text-muted-foreground hover:text-foreground hover:bg-secondary/70"
+                  ? "bg-primary text-white border border-primary/60 shadow-[inset_0_1px_1px_rgba(255,255,255,0.40),0_4px_20px_rgba(130,10,209,0.40)]"
+                  : "bg-card/75 border border-white/[0.08] text-muted-foreground hover:text-foreground hover:bg-card/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
               }`}
             >
+              <span className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
               {option.label}
             </button>
           );

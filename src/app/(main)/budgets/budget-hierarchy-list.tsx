@@ -5,15 +5,7 @@ import { CategoryIcon } from "@/components/category-icon";
 import { Progress } from "@/components/ui/progress";
 import type { BudgetIncomeSource } from "@/lib/budget-planner-utils";
 import { cn } from "@/lib/utils";
-import {
-  Banknote,
-  ChevronDown,
-  ChevronUp,
-  Edit3,
-  FolderOpen,
-  Plus,
-  ShieldAlert,
-} from "lucide-react";
+import { Banknote, ChevronDown, ChevronUp, Edit3, FolderOpen, Plus, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 
 interface BudgetHierarchyListProps {
@@ -89,11 +81,7 @@ export function BudgetHierarchyList({
     }
   };
 
-  const renderIncomeLinkBadge = (
-    itemKey: string,
-    incomeSourceId: string | null,
-    isBudgeted: boolean,
-  ) => {
+  const renderIncomeLinkBadge = (itemKey: string, incomeSourceId: string | null, isBudgeted: boolean) => {
     if (!isBudgeted) return null;
     const incomeName = incomeSourceId ? incomeMap.get(incomeSourceId) : null;
 
@@ -126,17 +114,14 @@ export function BudgetHierarchyList({
 
   if (categories.length === 0) {
     return (
-      <div className="bg-[#1A1A22] rounded-3xl p-8 border border-white/5 text-center flex flex-col items-center justify-center space-y-4 shadow-sm">
+      <div className="bg-card/60 backdrop-blur-md rounded-3xl p-8 border border-dashed border-white/10 text-center flex flex-col items-center justify-center space-y-4 shadow-sm">
         <div className="w-12 h-12 rounded-2xl bg-white/5 text-muted-foreground flex items-center justify-center">
           <ShieldAlert className="w-6 h-6" />
         </div>
         <div className="space-y-1">
-          <h3 className="font-semibold text-lg text-foreground">
-            Nenhum orçamento definido para este mês
-          </h3>
+          <h3 className="font-semibold text-lg text-foreground">Nenhum orçamento definido para este mês</h3>
           <p className="text-sm text-muted-foreground max-w-md">
-            Comece distribuindo limites para suas categorias essenciais seguindo a metodologia de
-            Orçamento Base Zero.
+            Comece distribuindo limites para suas categorias essenciais seguindo a metodologia de Orçamento Base Zero.
           </p>
         </div>
         <button
@@ -155,9 +140,7 @@ export function BudgetHierarchyList({
     <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
         <h3 className="text-lg font-bold text-foreground">Categorias e Subcategorias Orçadas</h3>
-        <span className="text-xs text-muted-foreground">
-          {categories.length} categorias cadastradas
-        </span>
+        <span className="text-xs text-muted-foreground">{categories.length} categorias cadastradas</span>
       </div>
 
       <div className="space-y-3">
@@ -171,7 +154,7 @@ export function BudgetHierarchyList({
           return (
             <div
               key={cat.id}
-              className="bg-[#1A1A22] rounded-2xl sm:rounded-3xl border border-white/5 shadow-sm overflow-hidden transition-all duration-200"
+              className="bg-card/85 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_16px_rgba(0,0,0,0.35)] overflow-hidden transition-all duration-200 hover:bg-card/95 hover:border-white/15"
             >
               {/* Cabeçalho do Bloco Pai */}
               <div className="p-4 sm:p-5 flex flex-col space-y-3">
@@ -182,16 +165,12 @@ export function BudgetHierarchyList({
                     </div>
                     <div className="flex flex-col min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-foreground text-sm sm:text-base truncate">
-                          {cat.name}
-                        </span>
+                        <span className="font-bold text-foreground text-sm sm:text-base truncate">{cat.name}</span>
                         {getPillarBadge(cat.pillar)}
-                        {isParentDraggableUnit &&
-                          renderIncomeLinkBadge(`cat:${cat.id}`, cat.incomeSourceId, true)}
+                        {isParentDraggableUnit && renderIncomeLinkBadge(`cat:${cat.id}`, cat.incomeSourceId, true)}
                       </div>
                       <span className="text-xs text-muted-foreground mt-0.5">
-                        {cat.subcategories.length}{" "}
-                        {cat.subcategories.length === 1 ? "subcategoria" : "subcategorias"}
+                        {cat.subcategories.length} {cat.subcategories.length === 1 ? "subcategoria" : "subcategorias"}
                         {hasBudgetedSubs ? " • Orçado por subcategorias" : ""}
                       </span>
                     </div>
@@ -235,11 +214,7 @@ export function BudgetHierarchyList({
                       title={isExpanded ? "Recolher subcategorias" : "Expandir subcategorias"}
                       className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors cursor-pointer"
                     >
-                      {isExpanded ? (
-                        <ChevronUp className="w-4 h-4" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4" />
-                      )}
+                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
@@ -257,16 +232,12 @@ export function BudgetHierarchyList({
                   <div className="flex items-center gap-3">
                     <span>
                       Efetivado:{" "}
-                      <strong className="text-foreground font-medium">
-                        {formatCurrency(cat.effective)}
-                      </strong>
+                      <strong className="text-foreground font-medium">{formatCurrency(cat.effective)}</strong>
                     </span>
                     <span>•</span>
                     <span>
                       Pendente / Fatura:{" "}
-                      <strong className="text-foreground font-medium">
-                        {formatCurrency(cat.pending)}
-                      </strong>
+                      <strong className="text-foreground font-medium">{formatCurrency(cat.pending)}</strong>
                     </span>
                   </div>
                   {cat.consumed > cat.limit && cat.limit > 0 && (
@@ -289,27 +260,19 @@ export function BudgetHierarchyList({
                         <div key={sub.id} className="space-y-1.5 py-1">
                           <div className="flex items-center justify-between text-xs gap-2 flex-wrap">
                             <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                              <span className="font-medium text-foreground/90 truncate">
-                                {sub.name}
-                              </span>
+                              <span className="font-medium text-foreground/90 truncate">{sub.name}</span>
                               {sub.limit === 0 ? (
                                 <span className="text-[10px] text-muted-foreground bg-white/5 px-1.5 py-0.2 rounded">
                                   Teto Pai
                                 </span>
                               ) : (
-                                renderIncomeLinkBadge(
-                                  `sub:${sub.id}`,
-                                  sub.incomeSourceId,
-                                  sub.limit > 0,
-                                )
+                                renderIncomeLinkBadge(`sub:${sub.id}`, sub.incomeSourceId, sub.limit > 0)
                               )}
                             </div>
 
                             <div className="flex items-center gap-2 shrink-0 tabular-nums">
                               <span className="font-medium text-muted-foreground">
-                                <span className={subPercentColor}>
-                                  {formatCurrency(sub.consumed)}
-                                </span>
+                                <span className={subPercentColor}>{formatCurrency(sub.consumed)}</span>
                                 {sub.limit > 0 && <span> / {formatCurrency(sub.limit)}</span>}
                               </span>
                               {sub.limit > 0 && (

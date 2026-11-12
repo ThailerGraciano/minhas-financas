@@ -42,8 +42,7 @@ export function BudgetExecutiveCards({
     hasOverBudgetWarning,
   } = summary;
 
-  const committedPercent =
-    selectedIncomeTotal > 0 ? (totalBudgetedExpenses / selectedIncomeTotal) * 100 : 0;
+  const committedPercent = selectedIncomeTotal > 0 ? (totalBudgetedExpenses / selectedIncomeTotal) * 100 : 0;
   const isBalancePositive = projectedBalance >= -0.005;
 
   return (
@@ -51,7 +50,7 @@ export function BudgetExecutiveCards({
       {/* 5 Indicadores Resumidos (Seção 4.1) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         {/* 1. Receita Prevista */}
-        <div className="bg-[#1A1A22] rounded-2xl p-4 sm:p-5 border border-white/5 shadow-sm flex flex-col justify-between relative overflow-hidden">
+        <div className="bg-card/70 backdrop-blur-xl rounded-2xl p-4 sm:p-5 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] flex flex-col justify-between relative overflow-hidden">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
               Receita Prevista
@@ -82,7 +81,7 @@ export function BudgetExecutiveCards({
         </div>
 
         {/* 2. Despesas Orçadas */}
-        <div className="bg-[#1A1A22] rounded-2xl p-4 sm:p-5 border border-white/5 shadow-sm flex flex-col justify-between relative overflow-hidden">
+        <div className="bg-card/70 backdrop-blur-xl rounded-2xl p-4 sm:p-5 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] flex flex-col justify-between relative overflow-hidden">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
               Despesas Orçadas
@@ -110,7 +109,7 @@ export function BudgetExecutiveCards({
         </div>
 
         {/* 3. Saldo Previsto */}
-        <div className="bg-[#1A1A22] rounded-2xl p-4 sm:p-5 border border-white/5 shadow-sm flex flex-col justify-between relative overflow-hidden">
+        <div className="bg-card/70 backdrop-blur-xl rounded-2xl p-4 sm:p-5 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] flex flex-col justify-between relative overflow-hidden">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
               Saldo Previsto
@@ -133,9 +132,7 @@ export function BudgetExecutiveCards({
           <div className="my-2.5 flex items-center gap-2.5">
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                isBalancePositive
-                  ? "bg-emerald-500/10 text-emerald-500"
-                  : "bg-rose-500/10 text-rose-500"
+                isBalancePositive ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
               }`}
             >
               <Wallet className="w-4 h-4" />
@@ -157,7 +154,7 @@ export function BudgetExecutiveCards({
         </div>
 
         {/* 4. Total Distribuído */}
-        <div className="bg-[#1A1A22] rounded-2xl p-4 sm:p-5 border border-white/5 shadow-sm flex flex-col justify-between relative overflow-hidden">
+        <div className="bg-card/70 backdrop-blur-xl rounded-2xl p-4 sm:p-5 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] flex flex-col justify-between relative overflow-hidden">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
               Total Distribuído
@@ -185,7 +182,7 @@ export function BudgetExecutiveCards({
         </div>
 
         {/* 5. Total Sem Distribuição */}
-        <div className="bg-[#1A1A22] rounded-2xl p-4 sm:p-5 border border-white/5 shadow-sm flex flex-col justify-between relative overflow-hidden sm:col-span-2 lg:col-span-1">
+        <div className="bg-card/70 backdrop-blur-xl rounded-2xl p-4 sm:p-5 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] flex flex-col justify-between relative overflow-hidden sm:col-span-2 lg:col-span-1">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
               Sem Distribuição
@@ -197,17 +194,14 @@ export function BudgetExecutiveCards({
                   : "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
               }`}
             >
-              {summary.unallocatedItems.length}{" "}
-              {summary.unallocatedItems.length === 1 ? "item" : "itens"}
+              {summary.unallocatedItems.length} {summary.unallocatedItems.length === 1 ? "item" : "itens"}
             </span>
           </div>
 
           <div className="my-2.5 flex items-center gap-2.5">
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                totalUndistributed > 0.005
-                  ? "bg-amber-500/10 text-amber-400"
-                  : "bg-emerald-500/10 text-emerald-400"
+                totalUndistributed > 0.005 ? "bg-amber-500/10 text-amber-400" : "bg-emerald-500/10 text-emerald-400"
               }`}
             >
               <FolderOpen className="w-4 h-4" />
@@ -226,12 +220,10 @@ export function BudgetExecutiveCards({
       </div>
 
       {/* Barra de Distribuição por Pilar (Stacked Progress Bar) */}
-      <div className="bg-[#1A1A22] rounded-2xl sm:rounded-3xl p-5 border border-white/5 shadow-sm space-y-4">
+      <div className="bg-card/70 backdrop-blur-xl rounded-2xl sm:rounded-3xl p-5 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] space-y-4 relative overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <h3 className="text-sm font-semibold text-foreground">
-              Distribuição do Orçamento por Pilar
-            </h3>
+            <h3 className="text-sm font-semibold text-foreground">Distribuição do Orçamento por Pilar</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
               Visualização percentual das metas do Orçamento Base Zero
             </p>
@@ -278,9 +270,7 @@ export function BudgetExecutiveCards({
           <div className="flex items-center gap-2.5">
             <span className="w-3 h-3 rounded-full bg-orange-500 shrink-0" />
             <div className="flex flex-col min-w-0">
-              <span className="text-xs font-medium text-muted-foreground truncate">
-                Necessidades Fixas
-              </span>
+              <span className="text-xs font-medium text-muted-foreground truncate">Necessidades Fixas</span>
               <span className="text-xs font-bold text-foreground tabular-nums">
                 {formatCurrency(pillars.needsAmount)}{" "}
                 <span className="text-[10px] text-muted-foreground font-normal">
@@ -293,9 +283,7 @@ export function BudgetExecutiveCards({
           <div className="flex items-center gap-2.5">
             <span className="w-3 h-3 rounded-full bg-amber-500 shrink-0" />
             <div className="flex flex-col min-w-0">
-              <span className="text-xs font-medium text-muted-foreground truncate">
-                Estilo de Vida
-              </span>
+              <span className="text-xs font-medium text-muted-foreground truncate">Estilo de Vida</span>
               <span className="text-xs font-bold text-foreground tabular-nums">
                 {formatCurrency(pillars.lifestyleAmount)}{" "}
                 <span className="text-[10px] text-muted-foreground font-normal">
@@ -308,9 +296,7 @@ export function BudgetExecutiveCards({
           <div className="flex items-center gap-2.5">
             <span className="w-3 h-3 rounded-full bg-emerald-500 shrink-0" />
             <div className="flex flex-col min-w-0">
-              <span className="text-xs font-medium text-muted-foreground truncate">
-                Metas & Aportes
-              </span>
+              <span className="text-xs font-medium text-muted-foreground truncate">Metas & Aportes</span>
               <span className="text-xs font-bold text-foreground tabular-nums">
                 {formatCurrency(pillars.goalsAmount)}{" "}
                 <span className="text-[10px] text-muted-foreground font-normal">
@@ -323,9 +309,7 @@ export function BudgetExecutiveCards({
           <div className="flex items-center gap-2.5">
             <span className="w-3 h-3 rounded-full bg-blue-500 shrink-0" />
             <div className="flex flex-col min-w-0">
-              <span className="text-xs font-medium text-muted-foreground truncate">
-                Saldo Livre
-              </span>
+              <span className="text-xs font-medium text-muted-foreground truncate">Saldo Livre</span>
               <span className="text-xs font-bold text-foreground tabular-nums">
                 {formatCurrency(pillars.freeAmount)}{" "}
                 <span className="text-[10px] text-muted-foreground font-normal">

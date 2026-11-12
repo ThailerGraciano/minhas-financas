@@ -1,6 +1,5 @@
 "use client";
 
-import { ModeToggle } from "@/components/mode-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +10,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import {
-  Bell,
   ChevronLeft,
   ChevronRight,
   CreditCard,
@@ -34,6 +32,7 @@ import { signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BrandLogo } from "./brand-logo";
 import { useSidebar } from "./sidebar-provider";
 import { TransactionFormDialog } from "./transaction-form-dialog";
 
@@ -121,28 +120,20 @@ export function Navigation({ user }: { user?: HeaderUserData }) {
 
   return (
     <>
-      {/* Desktop Sidebar */}
+      {/* Desktop Sidebar (Apple Liquid Glass translucency) */}
       <aside
         className={cn(
-          "hidden md:flex flex-col fixed left-0 top-0 h-screen bg-background border-r border-white/5 z-40 transition-all duration-300",
+          "hidden md:flex flex-col fixed left-0 top-0 h-screen bg-black/60 backdrop-blur-2xl border-r border-white/[0.08] z-40 transition-all duration-300",
           isCollapsed ? "w-[80px]" : "w-64",
         )}
       >
         <div
           className={cn(
             "h-20 flex items-center shrink-0 transition-all duration-300",
-            isCollapsed ? "justify-center px-0" : "px-6 gap-3",
+            isCollapsed ? "justify-center px-0" : "px-5",
           )}
         >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary via-orange-500 to-amber-600 flex items-center justify-center font-black text-white text-base shadow-md shadow-primary/25 ring-1 ring-white/20 select-none shrink-0">
-            MF
-          </div>
-          {!isCollapsed && (
-            <div className="flex flex-col min-w-0">
-              <span className="text-lg font-bold tracking-tight whitespace-nowrap overflow-hidden">Finanças</span>
-              <span className="text-[11px] text-muted-foreground font-medium">Gestão Pessoal</span>
-            </div>
-          )}
+          <BrandLogo variant={isCollapsed ? "icon" : "horizontal"} iconSize={42} />
         </div>
 
         {/* Nova Transação Desktop Button */}
@@ -173,14 +164,14 @@ export function Navigation({ user }: { user?: HeaderUserData }) {
                 href={item.href}
                 title={isCollapsed ? item.name : undefined}
                 className={cn(
-                  "flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 overflow-hidden",
+                  "flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 overflow-hidden",
                   isCollapsed ? "justify-center" : "gap-3",
                   isActive
-                    ? "bg-white/5 text-white border-l-4 border-primary rounded-l-none"
+                    ? "bg-gradient-to-r from-[#820AD1]/30 via-[#820AD1]/15 to-transparent text-white border border-[#BA42FF]/30 shadow-[0_0_20px_-6px_rgba(150,40,250,0.45)]"
                     : "text-muted-foreground hover:bg-white/5 hover:text-white",
                 )}
               >
-                <item.icon className="w-5 h-5 shrink-0" />
+                <item.icon className={cn("w-5 h-5 shrink-0 transition-colors", isActive && "text-[#C048FF]")} />
                 {!isCollapsed && <span className="whitespace-nowrap">{item.name}</span>}
               </Link>
             );
@@ -214,14 +205,16 @@ export function Navigation({ user }: { user?: HeaderUserData }) {
             href="/settings"
             title={isCollapsed ? "Configurações" : undefined}
             className={cn(
-              "flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 overflow-hidden",
+              "flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 overflow-hidden",
               isCollapsed ? "justify-center" : "gap-3",
               pathname.startsWith("/settings")
-                ? "bg-white/5 text-white border-l-4 border-primary rounded-l-none"
+                ? "bg-gradient-to-r from-[#820AD1]/30 via-[#820AD1]/15 to-transparent text-white border border-[#BA42FF]/30 shadow-[0_0_20px_-6px_rgba(150,40,250,0.45)]"
                 : "text-muted-foreground hover:bg-white/5 hover:text-white",
             )}
           >
-            <Settings className="w-5 h-5 shrink-0" />
+            <Settings
+              className={cn("w-5 h-5 shrink-0 transition-colors", pathname.startsWith("/settings") && "text-[#C048FF]")}
+            />
             {!isCollapsed && <span className="whitespace-nowrap">Configurações</span>}
           </Link>
 
@@ -237,28 +230,26 @@ export function Navigation({ user }: { user?: HeaderUserData }) {
             {!isCollapsed && <span className="whitespace-nowrap">Recolher</span>}
           </button>
 
-          <div className={cn("flex items-center mt-2", isCollapsed ? "flex-col gap-4" : "justify-between px-3")}>
-            <ModeToggle />
-            <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
-              title="Sair da conta"
-              className="text-muted-foreground hover:text-destructive transition-colors flex items-center justify-center p-2 rounded-lg cursor-pointer"
-            >
-              <LogOut className="w-5 h-5 shrink-0" />
-            </button>
-          </div>
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            title="Sair da conta"
+            className={cn(
+              "flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 text-muted-foreground hover:bg-destructive/10 hover:text-destructive cursor-pointer mt-1",
+              isCollapsed ? "justify-center" : "gap-3",
+            )}
+          >
+            <LogOut className="w-5 h-5 shrink-0" />
+            {!isCollapsed && <span className="whitespace-nowrap">Sair</span>}
+          </button>
         </div>
       </aside>
 
-      {/* Mobile Top Header com o estilo executivo */}
-      <header className="md:hidden flex h-16 items-center justify-between bg-background/95 backdrop-blur-md px-4 sticky top-0 z-40 border-b border-white/5 transition-all">
-        {/* Lado Esquerdo: Logo MF com degradê e Identificação da Tela */}
+      {/* Mobile Top Header com o estilo Apple Liquid Glass */}
+      <header className="md:hidden flex h-16 items-center justify-between bg-black/60 backdrop-blur-2xl px-4 sticky top-0 z-40 border-b border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.06)] transition-all">
+        {/* Lado Esquerdo: Logo TGF e Identificação da Tela */}
         <div className="flex items-center gap-3 min-w-0">
-          <div className="relative group flex items-center justify-center shrink-0">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary via-orange-500 to-amber-600 flex items-center justify-center font-black text-white text-sm shadow-md shadow-primary/25 ring-1 ring-white/20 select-none">
-              MF
-            </div>
-          </div>
+          <BrandLogo variant="mobile" iconSize={36} />
+          <div className="h-5 w-[1px] bg-white/10 shrink-0" />
           <div className="flex flex-col min-w-0">
             <span className="font-bold text-sm sm:text-base leading-tight tracking-tight truncate">
               {pageInfo.title}
@@ -269,21 +260,8 @@ export function Navigation({ user }: { user?: HeaderUserData }) {
           </div>
         </div>
 
-        {/* Lado Direito: Notificações, Tema e Avatar com Menu */}
+        {/* Lado Direito: Avatar com Menu */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-          {/* Botão de Notificações */}
-          <button
-            type="button"
-            aria-label="Notificações"
-            className="relative w-9 h-9 rounded-full bg-card hover:bg-muted/80 border border-white/10 flex items-center justify-center text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-sm hover:border-white/20 active:scale-95"
-          >
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary ring-2 ring-background animate-pulse" />
-          </button>
-
-          {/* Alternador de Tema */}
-          <ModeToggle />
-
           {/* Avatar com Menu Suspenso */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

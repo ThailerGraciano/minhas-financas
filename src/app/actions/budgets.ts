@@ -17,6 +17,7 @@ import {
   roundCurrency,
   type BudgetIncomeSource,
 } from "@/lib/budget-planner-utils";
+import { buildCategoryUsageOrderBy } from "@/lib/category-utils";
 import { buildGlobalCompetencyCondition } from "@/lib/competency-utils";
 import { endOfMonth, format, parseISO, subMonths } from "date-fns";
 import { and, eq, inArray, isNull, lte, ne } from "drizzle-orm";
@@ -274,6 +275,7 @@ export async function getBudgetData(month: string): Promise<BudgetData> {
   // 5. Categorias e Subcategorias do usuário
   const userCategories = await db.query.categories.findMany({
     where: and(eq(categories.userId, userId), eq(categories.type, "expense")),
+    orderBy: buildCategoryUsageOrderBy({ userId }),
     with: {
       subcategories: true,
     },

@@ -5,8 +5,8 @@ import { CategoryIcon } from "@/components/category-icon";
 import { Progress } from "@/components/ui/progress";
 import type { BudgetIncomeSource } from "@/lib/budget-planner-utils";
 import { cn } from "@/lib/utils";
-import { Banknote, ChevronDown, ChevronUp, Edit3, FolderOpen, Plus, ShieldAlert } from "lucide-react";
-import { useState } from "react";
+import { Banknote, ChevronDown, ChevronUp, Edit3, Flame, FolderOpen, Plus, ShieldAlert } from "lucide-react";
+import { useMemo, useState } from "react";
 
 interface BudgetHierarchyListProps {
   categories: CategoryBudgetHierarchy[];
@@ -38,6 +38,26 @@ export function BudgetHierarchyList({
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
 
   const incomeMap = new Map(selectedIncomes.map((inc) => [inc.id, inc.name]));
+
+  const sortedCategories = useMemo(() => {
+    return [...categories].sort((a, b) => {
+      const aExceeded = a.limit > 0 && a.consumed > a.limit;
+      const bExceeded = b.limit > 0 && b.consumed > b.limit;
+      if (aExceeded !== bExceeded) return aExceeded ? -1 : 1;
+      if (aExceeded && bExceeded) {
+        return b.consumed - b.limit - (a.consumed - a.limit);
+      }
+
+      const aHasLimit = a.limit > 0;
+      const bHasLimit = b.limit > 0;
+      if (aHasLimit !== bHasLimit) return aHasLimit ? -1 : 1;
+      if (aHasLimit && bHasLimit) {
+        return b.percent - a.percent;
+      }
+
+      return b.consumed - a.consumed;
+    });
+  }, [categories]);
 
   const toggleExpand = (catId: number) => {
     setExpandedCategories((prev) => ({
@@ -119,9 +139,9 @@ export function BudgetHierarchyList({
           <ShieldAlert className="w-6 h-6" />
         </div>
         <div className="space-y-1">
-          <h3 className="font-semibold text-lg text-foreground">Nenhum orçamento definido para este mês</h3>
+          <h3 className="font-semibold text-lg text-foreground">Nenhum orçamento global definido ainda</h3>
           <p className="text-sm text-muted-foreground max-w-md">
-            Comece distribuindo limites para suas categorias essenciais seguindo a metodologia de Orçamento Base Zero.
+            Defina uma única vez os limites para suas categorias e subcategorias e acompanhe mês a mês quando ultrapassar o planejado.
           </p>
         </div>
         <button
@@ -140,33 +160,59 @@ export function BudgetHierarchyList({
     <div className="space-y-4">
       <div className="flex items-center justify-between px-1">
         <h3 className="text-lg font-bold text-foreground">Categorias e Subcategorias Orçadas</h3>
-        <span className="text-xs text-muted-foreground">{categories.length} categorias cadastradas</span>
+        <span className="text-xs text-muted-foreground">{categories.length} categorias exibidas</span>
       </div>
 
       <div className="space-y-3">
-        {categories.map((cat) => {
+        {sortedCategories.map((cat) => {
           const isExpanded = expandedCategories[cat.id] !== false;
-          const progressColor = getProgressColor(cat.percent);
-          const percentColor = getPercentTextColor(cat.percent);
+          const isUnbudgeted = cat.limit <= 0;
+          const isExceeded = cat.limit > 0 && cat.consumed > cat.limit;
+          const progressColor = isUnbudgeted ? "[&>div]:bg-muted-foreground/40" : getProgressColor(cat.percent);
+          const percentColor = isUnbudgeted ? "text-muted-foreground" : getPercentTextColor(cat.percent);
           const hasBudgetedSubs = cat.subcategories.some((s) => s.limit > 0);
           const isParentDraggableUnit = !hasBudgetedSubs && cat.limit > 0;
 
           return (
             <div
               key={cat.id}
-              className="bg-card/85 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_16px_rgba(0,0,0,0.35)] overflow-hidden transition-all duration-200 hover:bg-card/95 hover:border-white/15"
+              className={cn(
+                "bg-card/85 backdrop-blur-md rounded-2xl sm:rounded-3xl border shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_16px_rgba(0,0,0,0.35)] overflow-hidden transition-all duration-200 hover:bg-card/95",
+                isExceeded
+                  ? "border-rose-500/35 hover:border-rose-500/50"
+                  : "border-white/[0.08] hover:border-white/15",
+              )}
             >
               {/* Cabeçalho do Bloco Pai */}
               <div className="p-4 sm:p-5 flex flex-col space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-white/5 text-primary flex items-center justify-center shrink-0 border border-white/5">
+                    <div
+                      className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border",
+                        isExceeded
+                          ? "bg-rose-500/10 text-rose-400 border-rose-500/25"
+                          : "bg-white/5 text-primary border-white/5",
+                      )}
+                    >
                       <CategoryIcon name={cat.icon || cat.name} className="w-5 h-5" />
                     </div>
                     <div className="flex flex-col min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-foreground text-sm sm:text-base truncate">{cat.name}</span>
-                        {getPillarBadge(cat.pillar)}
+                        {!isUnbudgeted ? (
+                          getPillarBadge(cat.pillar)
+                        ) : (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/5 text-muted-foreground border border-white/10">
+                            Sem limite definido
+                          </span>
+                        )}
+                        {isExceeded && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30 flex items-center gap-1">
+                            <Flame className="w-3 h-3" />
+                            Ultrapassou {formatCurrency(cat.consumed - cat.limit)}
+                          </span>
+                        )}
                         {isParentDraggableUnit && renderIncomeLinkBadge(`cat:${cat.id}`, cat.incomeSourceId, true)}
                       </div>
                       <span className="text-xs text-muted-foreground mt-0.5">
@@ -180,13 +226,15 @@ export function BudgetHierarchyList({
                     <div className="flex flex-col items-end">
                       <div className="text-sm sm:text-base font-bold text-foreground tabular-nums">
                         <span className={percentColor}>{formatCurrency(cat.consumed)}</span>
-                        <span className="text-muted-foreground font-normal text-xs sm:text-sm">
-                          {" "}
-                          / {formatCurrency(cat.limit)}
-                        </span>
+                        {!isUnbudgeted && (
+                          <span className="text-muted-foreground font-normal text-xs sm:text-sm">
+                            {" "}
+                            / {formatCurrency(cat.limit)}
+                          </span>
+                        )}
                       </div>
                       <span className={cn("text-xs font-semibold tabular-nums", percentColor)}>
-                        {cat.percent.toFixed(1)}% utilizado
+                        {isUnbudgeted ? "Gasto sem teto" : `${cat.percent.toFixed(1)}% utilizado`}
                       </span>
                     </div>
 
@@ -266,7 +314,14 @@ export function BudgetHierarchyList({
                                   Teto Pai
                                 </span>
                               ) : (
-                                renderIncomeLinkBadge(`sub:${sub.id}`, sub.incomeSourceId, sub.limit > 0)
+                                <>
+                                  {sub.consumed > sub.limit && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                                      +{formatCurrency(sub.consumed - sub.limit)}
+                                    </span>
+                                  )}
+                                  {renderIncomeLinkBadge(`sub:${sub.id}`, sub.incomeSourceId, sub.limit > 0)}
+                                </>
                               )}
                             </div>
 

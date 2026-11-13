@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   AnyPgColumn,
   boolean,
@@ -10,6 +10,7 @@ import {
   primaryKey,
   serial,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -382,32 +383,45 @@ export const marketReceiptTransactionsRelations = relations(marketReceiptTransac
   }),
 }));
 
-export const budgets = pgTable("budgets", {
-  id: serial("id").primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id)
-    .notNull(),
-  categoryId: integer("category_id")
-    .references(() => categories.id)
-    .notNull(),
-  subcategoryId: integer("subcategory_id").references(() => subcategories.id),
-  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
-  pillar: varchar("pillar", { length: 50 }).notNull(), // needs, lifestyle, goals
-  month: varchar("month", { length: 7 }).notNull(), // YYYY-MM
-  incomeSourceId: varchar("income_source_id", { length: 100 }),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export const budgets = pgTable(
+  "budgets",
+  {
+    id: serial("id").primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    categoryId: integer("category_id")
+      .references(() => categories.id)
+      .notNull(),
+    subcategoryId: integer("subcategory_id").references(() => subcategories.id),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    pillar: varchar("pillar", { length: 50 }).notNull(), // needs, lifestyle, goals
+    incomeSourceId: varchar("income_source_id", { length: 100 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_budgets_user_cat_parent")
+      .on(table.userId, table.categoryId)
+      .where(sql`${table.subcategoryId} IS NULL`),
+    uniqueIndex("idx_budgets_user_cat_sub")
+      .on(table.userId, table.categoryId, table.subcategoryId)
+      .where(sql`${table.subcategoryId} IS NOT NULL`),
+  ],
+);
 
-export const budgetMonthConfigs = pgTable("budget_month_configs", {
-  id: serial("id").primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id)
-    .notNull(),
-  month: varchar("month", { length: 7 }).notNull(), // YYYY-MM
-  selectedIncomeIds: jsonb("selected_income_ids").$type<string[]>().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export const budgetMonthConfigs = pgTable(
+  "budget_month_configs",
+  {
+    id: serial("id").primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    selectedIncomeIds: jsonb("selected_income_ids").$type<string[]>().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("idx_budget_month_configs_user").on(table.userId)],
+);
 
 export const budgetsRelations = relations(budgets, ({ one }) => ({
   user: one(users, {

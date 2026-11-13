@@ -71,6 +71,20 @@
       "when": 1789425012525,
       "tag": "0009_perfect_tigra",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791000000000,
+      "tag": "0010_launch_due_dates",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794536400000,
+      "tag": "0011_global_budgets",
+      "breakpoints": true
     }
   ]
 }

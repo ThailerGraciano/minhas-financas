@@ -3,6 +3,7 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import {
+  Bot,
   CreditCard,
   Download,
   HandCoins,
@@ -38,6 +39,7 @@ const moreItems = [
   { name: "Mercado", href: "/market", icon: ShoppingCart },
   { name: "Categorias", href: "/categories", icon: PieChart },
   { name: "Importar", href: "/import", icon: Download },
+  { name: "Assistente AI", href: "/assistant", icon: Bot },
 ];
 
 export function BottomNavigationBar() {

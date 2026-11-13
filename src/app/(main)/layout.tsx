@@ -1,4 +1,6 @@
 import { auth } from "@/auth";
+import { AssistantProvider } from "@/components/assistant/assistant-context";
+import { AssistantDrawer } from "@/components/assistant/assistant-drawer";
 import { BottomNavigationBar } from "@/components/bottom-navigation-bar";
 import { QuickActionListener } from "@/components/quick-action-listener";
 import { SidebarLayout } from "@/components/sidebar-layout";
@@ -12,14 +14,17 @@ export default async function MainLayout({
   const session = await auth();
 
   return (
-    <SidebarProvider>
-      <SidebarLayout user={session?.user}>
-        <main className="flex-1 px-2 md:px-8 py-4 md:py-8 pb-24 md:pb-8 relative container mx-auto max-w-7xl w-full">
-          {children}
-          <QuickActionListener />
-        </main>
-        <BottomNavigationBar />
-      </SidebarLayout>
-    </SidebarProvider>
+    <AssistantProvider userId={session?.user?.id}>
+      <SidebarProvider>
+        <SidebarLayout user={session?.user}>
+          <main className="flex-1 px-2 md:px-8 py-4 md:py-8 pb-24 md:pb-8 relative container mx-auto max-w-7xl w-full">
+            {children}
+            <QuickActionListener />
+          </main>
+          <AssistantDrawer />
+          <BottomNavigationBar />
+        </SidebarLayout>
+      </SidebarProvider>
+    </AssistantProvider>
   );
 }

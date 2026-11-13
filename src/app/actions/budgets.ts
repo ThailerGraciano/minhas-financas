@@ -19,11 +19,16 @@ import {
 } from "@/lib/budget-planner-utils";
 import { buildCategoryUsageOrderBy } from "@/lib/category-utils";
 import { buildGlobalCompetencyCondition } from "@/lib/competency-utils";
+import { getDefaultCompetencyMonth } from "@/lib/date-utils";
 import { endOfMonth, format, parseISO, subMonths } from "date-fns";
-import { and, eq, inArray, isNull, lte, ne } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 export type BudgetPillar = "needs" | "lifestyle" | "goals";
+
+function isBudgetPillar(value: unknown): value is BudgetPillar {
+  return value === "needs" || value === "lifestyle" || value === "goals";
+}
 
 export type SubcategoryBudgetHierarchy = {
   id: number;
@@ -121,7 +126,7 @@ async function fetchMonthAvailableIncomes(
   const sources: BudgetIncomeSource[] = [];
   const handledFixedIds = new Set<string>();
 
-  // 1. Receitas fixas ativas cadastradas em fixed_transactions
+  // 1. Receitas fixas ativas cadastradas em fixed_transactions que já iniciaram até o mês
   for (const ft of activeFixedIncomes) {
     handledFixedIds.add(ft.id);
     const materializedTxs = monthIncomeTxs.filter((t) => t.fixedTransactionId === ft.id);
@@ -144,7 +149,7 @@ async function fetchMonthAvailableIncomes(
     });
   }
 
-  // 2. Transações de receita do mês que não vieram de uma fixed_transaction já listada
+  // 2. Transações de receita do mês (avulsas ou vinculadas a fixas inativas) não listadas acima
   for (const tx of monthIncomeTxs) {
     if (tx.fixedTransactionId && handledFixedIds.has(tx.fixedTransactionId)) {
       continue;
@@ -184,24 +189,22 @@ export async function getBudgetData(month: string): Promise<BudgetData> {
   const allCards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
   const condition = buildGlobalCompetencyCondition(month, closingDay, userId, allCards);
 
-  // 1. Receitas disponíveis para o mês (fixas e lançadas no ciclo) + configuração salva do mês
-  const [availableIncomes, monthConfigs] = await Promise.all([
+  // 1. Receitas disponíveis no período + configuração global de seleção + limites orçamentários
+  const [availableIncomes, globalConfigs, userBudgets] = await Promise.all([
     fetchMonthAvailableIncomes(userId, month, closingDay, allCards),
     db
       .select()
       .from(budgetMonthConfigs)
-      .where(and(eq(budgetMonthConfigs.userId, userId), eq(budgetMonthConfigs.month, month)))
+      .where(eq(budgetMonthConfigs.userId, userId))
       .limit(1),
+    db
+      .select()
+      .from(budgets)
+      .where(eq(budgets.userId, userId)),
   ]);
 
-  const monthConfig = monthConfigs[0];
+  const monthConfig = globalConfigs[0];
   const availableIncomeIdSet = new Set(availableIncomes.map((inc) => inc.id));
-
-  // 2. Orçamentos cadastrados para o mês
-  const userBudgets = await db
-    .select()
-    .from(budgets)
-    .where(and(eq(budgets.userId, userId), eq(budgets.month, month)));
 
   let selectedIncomeIds: string[];
   const hasCustomIncomeSelection = Boolean(monthConfig);
@@ -213,17 +216,15 @@ export async function getBudgetData(month: string): Promise<BudgetData> {
     selectedIncomeIds = availableIncomes.map((inc) => inc.id);
   }
 
-  // Garante que qualquer receita que já possua orçamento vinculado no banco esteja selecionada
-  // caso não haja configuração explícita desmarcando-a
-  if (!hasCustomIncomeSelection) {
-    const selectedSet = new Set(selectedIncomeIds);
-    for (const b of userBudgets) {
-      if (b.incomeSourceId && availableIncomeIdSet.has(b.incomeSourceId)) {
-        selectedSet.add(b.incomeSourceId);
-      }
+  // Garante que qualquer receita disponível que possua orçamento vinculado esteja selecionada
+  // (preservando vínculos com receitas avulsas do mês ou recém-vinculadas)
+  const selectedSet = new Set(selectedIncomeIds);
+  for (const b of userBudgets) {
+    if (b.incomeSourceId && availableIncomeIdSet.has(b.incomeSourceId)) {
+      selectedSet.add(b.incomeSourceId);
     }
-    selectedIncomeIds = Array.from(selectedSet);
   }
+  selectedIncomeIds = Array.from(selectedSet);
 
   const selectedIncomeSet = new Set(selectedIncomeIds);
   const selectedIncomesSum = roundCurrency(
@@ -360,10 +361,11 @@ export async function getBudgetData(month: string): Promise<BudgetData> {
     const firstBudgetedSubRecord = userBudgets.find(
       (b) => b.categoryId === cat.id && b.subcategoryId !== null && Number(b.amount) > 0,
     );
-    const pillar: BudgetPillar =
-      (parentBudget?.pillar as BudgetPillar) ||
-      (firstBudgetedSubRecord?.pillar as BudgetPillar) ||
-      "needs";
+    const pillar: BudgetPillar = isBudgetPillar(parentBudget?.pillar)
+      ? parentBudget.pillar
+      : isBudgetPillar(firstBudgetedSubRecord?.pillar)
+        ? firstBudgetedSubRecord.pillar
+        : "needs";
 
     const catPercent = catLimit > 0 ? (catConsumed / catLimit) * 100 : 0;
     const parentIncomeSourceId =
@@ -493,7 +495,7 @@ export async function saveBudgetLimit(data: SaveBudgetInput) {
       }
     }
 
-    // Se houver uma receita vinculada, valida a capacidade no servidor
+    // Se houver uma receita vinculada, valida a capacidade no servidor contra as receitas disponíveis no período
     if (data.incomeSourceId) {
       const [appSettings] = await db
         .select()
@@ -501,10 +503,14 @@ export async function saveBudgetLimit(data: SaveBudgetInput) {
         .where(eq(settings.userId, userId))
         .limit(1);
       const closingDay = appSettings?.closingDay || 25;
+      const targetMonth =
+        typeof data.month === "string" && /^\d{4}-\d{2}$/.test(data.month)
+          ? data.month
+          : getDefaultCompetencyMonth(closingDay);
       const allCards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
       const availableIncomes = await fetchMonthAvailableIncomes(
         userId,
-        data.month,
+        targetMonth,
         closingDay,
         allCards,
       );
@@ -517,12 +523,12 @@ export async function saveBudgetLimit(data: SaveBudgetInput) {
         };
       }
 
-      const monthBudgets = await db
+      const globalBudgets = await db
         .select()
         .from(budgets)
-        .where(and(eq(budgets.userId, userId), eq(budgets.month, data.month)));
+        .where(eq(budgets.userId, userId));
 
-      const otherAllocated = monthBudgets
+      const otherAllocated = globalBudgets
         .filter((b) => {
           if (data.id && b.id === data.id) return false;
           if (
@@ -552,14 +558,13 @@ export async function saveBudgetLimit(data: SaveBudgetInput) {
 
     await db.transaction(async (tx) => {
       // Regra 6.3: Se o usuário está definindo orçamento em subcategoria, remove eventual
-      // registro de teto pai (subcategoryId IS NULL) da mesma categoria no mês para evitar duplicidade.
+      // registro de teto pai (subcategoryId IS NULL) da mesma categoria para evitar duplicidade.
       if (subcatId !== null) {
         await tx
           .delete(budgets)
           .where(
             and(
               eq(budgets.userId, userId),
-              eq(budgets.month, data.month),
               eq(budgets.categoryId, data.categoryId),
               isNull(budgets.subcategoryId),
             ),
@@ -586,45 +591,52 @@ export async function saveBudgetLimit(data: SaveBudgetInput) {
           .set(updatePayload)
           .where(and(eq(budgets.id, data.id), eq(budgets.userId, userId)));
       } else {
-        const existing = await tx
-          .select()
-          .from(budgets)
-          .where(
-            and(
-              eq(budgets.userId, userId),
-              eq(budgets.month, data.month),
-              eq(budgets.categoryId, data.categoryId),
-              subcatId ? eq(budgets.subcategoryId, subcatId) : isNull(budgets.subcategoryId),
-            ),
-          )
-          .limit(1);
+        const setOnConflict: {
+          amount: string;
+          pillar: string;
+          updatedAt: Date;
+          incomeSourceId?: string | null;
+        } = {
+          amount: data.amount.toFixed(2),
+          pillar: data.pillar,
+          updatedAt: new Date(),
+        };
+        if (data.incomeSourceId !== undefined) {
+          setOnConflict.incomeSourceId = data.incomeSourceId;
+        }
 
-        if (existing.length > 0) {
-          const updatePayload: {
-            amount: string;
-            pillar: string;
-            updatedAt: Date;
-            incomeSourceId?: string | null;
-          } = {
-            amount: data.amount.toFixed(2),
-            pillar: data.pillar,
-            updatedAt: new Date(),
-          };
-          if (data.incomeSourceId !== undefined) {
-            updatePayload.incomeSourceId = data.incomeSourceId;
-          }
-
-          await tx.update(budgets).set(updatePayload).where(eq(budgets.id, existing[0].id));
+        if (subcatId !== null) {
+          await tx
+            .insert(budgets)
+            .values({
+              userId,
+              categoryId: data.categoryId,
+              subcategoryId: subcatId,
+              amount: data.amount.toFixed(2),
+              pillar: data.pillar,
+              incomeSourceId: data.incomeSourceId ?? null,
+            })
+            .onConflictDoUpdate({
+              target: [budgets.userId, budgets.categoryId, budgets.subcategoryId],
+              targetWhere: sql`${budgets.subcategoryId} IS NOT NULL`,
+              set: setOnConflict,
+            });
         } else {
-          await tx.insert(budgets).values({
-            userId,
-            categoryId: data.categoryId,
-            subcategoryId: subcatId,
-            amount: data.amount.toFixed(2),
-            pillar: data.pillar,
-            month: data.month,
-            incomeSourceId: data.incomeSourceId ?? null,
-          });
+          await tx
+            .insert(budgets)
+            .values({
+              userId,
+              categoryId: data.categoryId,
+              subcategoryId: null,
+              amount: data.amount.toFixed(2),
+              pillar: data.pillar,
+              incomeSourceId: data.incomeSourceId ?? null,
+            })
+            .onConflictDoUpdate({
+              target: [budgets.userId, budgets.categoryId],
+              targetWhere: sql`${budgets.subcategoryId} IS NULL`,
+              set: setOnConflict,
+            });
         }
       }
     });
@@ -642,7 +654,7 @@ export async function saveBudgetLimit(data: SaveBudgetInput) {
 }
 
 export interface SaveBudgetPlanInput {
-  month: string;
+  month?: string;
   selectedIncomeIds: string[];
   items: Array<{
     budgetId?: number;
@@ -655,7 +667,7 @@ export interface SaveBudgetPlanInput {
 }
 
 /**
- * Salva de uma só vez a seleção de receitas do mês, as alocações entre despesas e receitas
+ * Salva de uma só vez a seleção de receitas, as alocações entre despesas e receitas
  * e eventuais ajustes de valores orçados do Planejador Visual de Orçamento.
  */
 export async function saveBudgetPlan(
@@ -665,10 +677,6 @@ export async function saveBudgetPlan(
   if (!session?.user?.id) return { success: false, error: "Não autorizado." };
   const userId = session.user.id;
 
-  if (!/^\d{4}-\d{2}$/.test(input.month)) {
-    return { success: false, error: "Período inválido." };
-  }
-
   try {
     const [appSettings] = await db
       .select()
@@ -676,10 +684,14 @@ export async function saveBudgetPlan(
       .where(eq(settings.userId, userId))
       .limit(1);
     const closingDay = appSettings?.closingDay || 25;
+    const targetMonth =
+      typeof input.month === "string" && /^\d{4}-\d{2}$/.test(input.month)
+        ? input.month
+        : getDefaultCompetencyMonth(closingDay);
     const allCards = await db.select().from(creditCards).where(eq(creditCards.userId, userId));
 
     const [availableIncomes, userCategories, userSubcategories] = await Promise.all([
-      fetchMonthAvailableIncomes(userId, input.month, closingDay, allCards),
+      fetchMonthAvailableIncomes(userId, targetMonth, closingDay, allCards),
       db
         .select({ id: categories.id })
         .from(categories)
@@ -733,7 +745,7 @@ export async function saveBudgetPlan(
         if (!selectedIncomeSet.has(item.incomeSourceId)) {
           return {
             success: false,
-            error: "Uma despesa foi vinculada a uma receita que não está selecionada para o mês.",
+            error: "Uma despesa foi vinculada a uma receita que não está selecionada para o período.",
           };
         }
 
@@ -770,84 +782,86 @@ export async function saveBudgetPlan(
       }
     }
 
-    // Persistência transacional
+    // Persistência transacional com índices únicos (evita duplicidades em salvamentos simultâneos)
     await db.transaction(async (tx) => {
-      // 1. Salva a seleção de receitas do mês
-      const existingConfig = await tx
-        .select()
-        .from(budgetMonthConfigs)
-        .where(
-          and(eq(budgetMonthConfigs.userId, userId), eq(budgetMonthConfigs.month, input.month)),
-        )
-        .limit(1);
-
-      if (existingConfig.length > 0) {
-        await tx
-          .update(budgetMonthConfigs)
-          .set({
-            selectedIncomeIds: validSelectedIncomeIds,
-            updatedAt: new Date(),
-          })
-          .where(eq(budgetMonthConfigs.id, existingConfig[0].id));
-      } else {
-        await tx.insert(budgetMonthConfigs).values({
+      // 1. Salva a seleção de receitas
+      await tx
+        .insert(budgetMonthConfigs)
+        .values({
           userId,
-          month: input.month,
           selectedIncomeIds: validSelectedIncomeIds,
           updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: budgetMonthConfigs.userId,
+          set: {
+            selectedIncomeIds: validSelectedIncomeIds,
+            updatedAt: new Date(),
+          },
         });
-      }
 
-      // 2. Busca os registros atuais de orçamento do mês para atualizar ou inserir com segurança
-      const currentMonthBudgets = await tx
-        .select()
-        .from(budgets)
-        .where(and(eq(budgets.userId, userId), eq(budgets.month, input.month)));
-
-      // Remove tetos pai de categorias que agora possuem subcategorias orçadas
+      // 2. Remove tetos pai de categorias que agora possuem subcategorias orçadas
       for (const catId of categoriesWithSubs) {
         await tx
           .delete(budgets)
           .where(
             and(
               eq(budgets.userId, userId),
-              eq(budgets.month, input.month),
               eq(budgets.categoryId, catId),
               isNull(budgets.subcategoryId),
             ),
           );
       }
 
+      // 3. Upsert atômico de cada item de orçamento
       for (const item of input.items) {
-        const match = currentMonthBudgets.find(
-          (b) =>
-            (item.budgetId && b.id === item.budgetId) ||
-            (b.categoryId === item.categoryId &&
-              (item.subcategoryId === null
-                ? b.subcategoryId === null
-                : b.subcategoryId === item.subcategoryId)),
-        );
+        const formattedAmount = roundCurrency(item.amount).toFixed(2);
+        const now = new Date();
 
-        if (match) {
+        if (item.subcategoryId !== null) {
           await tx
-            .update(budgets)
-            .set({
-              amount: roundCurrency(item.amount).toFixed(2),
+            .insert(budgets)
+            .values({
+              userId,
+              categoryId: item.categoryId,
+              subcategoryId: item.subcategoryId,
+              amount: formattedAmount,
               pillar: item.pillar,
               incomeSourceId: item.incomeSourceId,
-              updatedAt: new Date(),
+              updatedAt: now,
             })
-            .where(and(eq(budgets.id, match.id), eq(budgets.userId, userId)));
+            .onConflictDoUpdate({
+              target: [budgets.userId, budgets.categoryId, budgets.subcategoryId],
+              targetWhere: sql`${budgets.subcategoryId} IS NOT NULL`,
+              set: {
+                amount: formattedAmount,
+                pillar: item.pillar,
+                incomeSourceId: item.incomeSourceId,
+                updatedAt: now,
+              },
+            });
         } else {
-          await tx.insert(budgets).values({
-            userId,
-            categoryId: item.categoryId,
-            subcategoryId: item.subcategoryId,
-            amount: roundCurrency(item.amount).toFixed(2),
-            pillar: item.pillar,
-            month: input.month,
-            incomeSourceId: item.incomeSourceId,
-          });
+          await tx
+            .insert(budgets)
+            .values({
+              userId,
+              categoryId: item.categoryId,
+              subcategoryId: null,
+              amount: formattedAmount,
+              pillar: item.pillar,
+              incomeSourceId: item.incomeSourceId,
+              updatedAt: now,
+            })
+            .onConflictDoUpdate({
+              target: [budgets.userId, budgets.categoryId],
+              targetWhere: sql`${budgets.subcategoryId} IS NULL`,
+              set: {
+                amount: formattedAmount,
+                pillar: item.pillar,
+                incomeSourceId: item.incomeSourceId,
+                updatedAt: now,
+              },
+            });
         }
       }
     });

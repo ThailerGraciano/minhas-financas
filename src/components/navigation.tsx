@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import {
+  Bot,
   ChevronLeft,
   ChevronRight,
   CreditCard,
@@ -56,6 +57,7 @@ const navItems = [
   { name: "Mercado", href: "/market", icon: ShoppingCart },
   { name: "Categorias", href: "/categories", icon: PieChart },
   { name: "Importar", href: "/import", icon: Download },
+  { name: "Assistente AI", href: "/assistant", icon: Bot },
 ];
 
 function getInitials(name?: string | null, email?: string | null): string {
@@ -108,6 +110,9 @@ function getPageInfo(pathname: string): { title: string; subtitle: string } {
   }
   if (pathname.startsWith("/import")) {
     return { title: "Importar", subtitle: "Extratos Bancários" };
+  }
+  if (pathname.startsWith("/assistant")) {
+    return { title: "Assistente AI", subtitle: "Consultor Financeiro Gemini" };
   }
   return { title: "Finanças", subtitle: "Gestão Pessoal" };
 }

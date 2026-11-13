@@ -42,11 +42,11 @@ export function BudgetIncomeSelector({
           </div>
           <div>
             <h3 className="text-sm sm:text-base font-bold text-foreground">
-              Nenhuma receita fixa ou prevista cadastrada neste mês
+              Nenhuma receita fixa ou prevista cadastrada neste período
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Cadastre uma receita fixa (ex: Salário, Adiantamento) pelo botão global de Nova Transação para distribuir
-              suas despesas nos contêineres de receita.
+              Cadastre uma receita fixa ou lançamento de receita pelo botão global de Nova Transação para usar como
+              base e distribuir seus limites.
             </p>
           </div>
         </div>
@@ -63,13 +63,13 @@ export function BudgetIncomeSelector({
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-sm sm:text-base font-bold text-foreground">Receitas do Mês Selecionadas</h3>
+              <h3 className="text-sm sm:text-base font-bold text-foreground">Receitas Selecionadas</h3>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 {selectedIncomeIds.length} de {availableIncomes.length} ativas
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Selecione as receitas fixas que formarão os blocos principais de distribuição deste mês
+              Selecione as receitas (fixas vigentes e avulsas do mês) que compõem a base do seu orçamento
             </p>
           </div>
         </div>

@@ -7,7 +7,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "TGF | Minhas Finanças",
+  title: "Minhas Finanças",
   description: "Gerenciador financeiro pessoal inteligente",
   manifest: "/manifest.json",
   icons: {
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "TGF Finanças",
+    title: "Minhas Finanças",
   },
 };
 
@@ -32,6 +32,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  themeColor: "#05020A",
 };
 
 export default function RootLayout({

@@ -1,6 +1,6 @@
 {
-  "name": "TGF | Minhas Finanças",
-  "short_name": "TGF Finanças",
+  "name": "Minhas Finanças",
+  "short_name": "Minhas Finanças",
   "description": "Seu assistente financeiro inteligente.",
   "start_url": "/",
   "display": "standalone",

@@ -2,11 +2,12 @@
 
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { accounts, creditCards, fixedTransactions, settings, transactions } from "@/db/schema";
-import { buildGlobalCompetencyCondition } from "@/lib/competency-utils";
-import { addDays, addMonths, endOfMonth, format, subMonths } from "date-fns";
+import { accounts, budgets, categories, creditCards, fixedTransactions, settings, transactions } from "@/db/schema";
+import { buildGlobalCompetencyCondition, getInvoiceCondition } from "@/lib/competency-utils";
+import { getDefaultCompetencyMonth, getTodayInBrazil } from "@/lib/date-utils";
+import { addDays, addMonths, differenceInCalendarDays, endOfMonth, format, parseISO, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { and, eq, gt, gte, inArray, isNotNull, lte, ne } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, isNotNull, lte, ne, or, type SQL } from "drizzle-orm";
 
 export type ExpenseBreakdown = {
   fixed: number;
@@ -926,6 +927,7 @@ export async function getExpensesForecastData() {
       id: fixedTransactions.id,
       amount: fixedTransactions.amount,
       startDate: fixedTransactions.startDate,
+      type: fixedTransactions.type,
     })
     .from(fixedTransactions)
     .where(
@@ -946,10 +948,31 @@ export async function getExpensesForecastData() {
     );
   }
 
-  const monthlyData: Record<string, { Parcelas: number; Fixas: number; Variáveis: number; isFuture: boolean }> = {};
+  const monthlyData: Record<
+    string,
+    {
+      Parcelas: number;
+      Fixas: number;
+      Variáveis: number;
+      Cartão: number;
+      Conta: number;
+      varCartao: number;
+      varConta: number;
+      isFuture: boolean;
+    }
+  > = {};
 
   monthKeys.forEach((m) => {
-    monthlyData[m] = { Parcelas: 0, Fixas: 0, Variáveis: 0, isFuture: m > currentMonth };
+    monthlyData[m] = {
+      Parcelas: 0,
+      Fixas: 0,
+      Variáveis: 0,
+      Cartão: 0,
+      Conta: 0,
+      varCartao: 0,
+      varConta: 0,
+      isFuture: m > currentMonth,
+    };
   });
 
   const materializedFixedIdsByMonth: Record<string, Set<string>> = {};
@@ -963,6 +986,13 @@ export async function getExpensesForecastData() {
     const amt = Number(t.amount);
     const isInstallment = t.installmentTotal && t.installmentTotal > 1;
     const isFixed = t.fixedTransactionId || t.isFixed;
+    const isCreditCard = t.type === "credit_card_expense";
+
+    if (isCreditCard) {
+      monthlyData[t.competencyMonth].Cartão += amt;
+    } else {
+      monthlyData[t.competencyMonth].Conta += amt;
+    }
 
     if (isInstallment) {
       monthlyData[t.competencyMonth].Parcelas += amt;
@@ -973,6 +1003,11 @@ export async function getExpensesForecastData() {
       }
     } else {
       monthlyData[t.competencyMonth].Variáveis += amt;
+      if (isCreditCard) {
+        monthlyData[t.competencyMonth].varCartao += amt;
+      } else {
+        monthlyData[t.competencyMonth].varConta += amt;
+      }
     }
   });
 
@@ -982,7 +1017,13 @@ export async function getExpensesForecastData() {
         if (!materializedFixedIdsByMonth[m].has(ft.id)) {
           const ftMonthStr = ft.startDate.substring(0, 7);
           if (ftMonthStr <= m) {
-            monthlyData[m].Fixas += Number(ft.amount);
+            const amt = Number(ft.amount);
+            monthlyData[m].Fixas += amt;
+            if (ft.type === "credit_card_expense") {
+              monthlyData[m].Cartão += amt;
+            } else {
+              monthlyData[m].Conta += amt;
+            }
           }
         }
       });
@@ -993,15 +1034,26 @@ export async function getExpensesForecastData() {
     const m = monthKeys[i];
     if (m > currentMonth) {
       let sumVar = 0;
+      let sumVarCartao = 0;
+      let sumVarConta = 0;
       let count = 0;
       for (let j = 1; j <= 4; j++) {
         if (i - j >= 0) {
-          sumVar += monthlyData[monthKeys[i - j]].Variáveis;
+          const prev = monthlyData[monthKeys[i - j]];
+          sumVar += prev.Variáveis;
+          sumVarCartao += prev.varCartao;
+          sumVarConta += prev.varConta;
           count++;
         }
       }
       const avg = count > 0 ? sumVar / count : 0;
+      const avgCartao = count > 0 ? sumVarCartao / count : 0;
+      const avgConta = count > 0 ? sumVarConta / count : 0;
       monthlyData[m].Variáveis = avg;
+      monthlyData[m].varCartao = avgCartao;
+      monthlyData[m].varConta = avgConta;
+      monthlyData[m].Cartão += avgCartao;
+      monthlyData[m].Conta += avgConta;
     }
   }
 
@@ -1015,6 +1067,8 @@ export async function getExpensesForecastData() {
       Parcelas: monthlyData[m].Parcelas,
       Fixas: monthlyData[m].Fixas,
       Variáveis: monthlyData[m].Variáveis,
+      Cartão: Math.max(0, monthlyData[m].Cartão),
+      Conta: Math.max(0, monthlyData[m].Conta),
     };
   });
 
@@ -1200,5 +1254,328 @@ export async function getCategoryForecastData() {
   return {
     data: chartData,
     keys: sortedCategoryKeys,
+  };
+}
+
+export interface OpenInvoiceCategoryItem {
+  categoryId: number | null;
+  categoryName: string;
+  categoryIcon: string;
+  totalAmount: number;
+  installmentAmount: number;
+  fixedAmount: number;
+  variableAmount: number;
+  budgetLimit: number;
+  percentOfInvoice: number;
+  percentOfBudget: number;
+  transactionCount: number;
+}
+
+export interface OpenInvoiceCardSummary {
+  cardId: number;
+  cardName: string;
+  closingDay: number;
+  dueDay: number;
+  creditLimit: number;
+  openInvoiceMonth: string;
+  invoiceLabel: string;
+  closingDateLabel: string;
+  dueDateLabel: string;
+  daysUntilClosing: number;
+  elapsedDays: number;
+  totalAmount: number;
+  installmentAmount: number;
+  fixedAmount: number;
+  variableAmount: number;
+  dailyPace: number;
+  categories: OpenInvoiceCategoryItem[];
+}
+
+export interface OpenInvoicesAnalysisData {
+  cards: OpenInvoiceCardSummary[];
+  consolidated: {
+    totalAmount: number;
+    installmentAmount: number;
+    fixedAmount: number;
+    variableAmount: number;
+    totalLimit: number;
+    nearestClosingDays: number | null;
+    dailyPace: number;
+    categories: OpenInvoiceCategoryItem[];
+  };
+}
+
+function roundTwoDecimals(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+export async function getOpenInvoicesAnalysis(): Promise<OpenInvoicesAnalysisData> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
+  const [allCards, userCategories, userBudgets] = await Promise.all([
+    db.select().from(creditCards).where(eq(creditCards.userId, userId)),
+    db.select().from(categories).where(eq(categories.userId, userId)),
+    db.select().from(budgets).where(eq(budgets.userId, userId)),
+  ]);
+
+  if (allCards.length === 0) {
+    return {
+      cards: [],
+      consolidated: {
+        totalAmount: 0,
+        installmentAmount: 0,
+        fixedAmount: 0,
+        variableAmount: 0,
+        totalLimit: 0,
+        nearestClosingDays: null,
+        dailyPace: 0,
+        categories: [],
+      },
+    };
+  }
+
+  // Regra 6.3 de orçamentos: se há subcategorias orçadas, soma as subcategorias; caso contrário, usa o teto da categoria pai.
+  const categoryBudgetMap = new Map<number, number>();
+  const subBudgetsSumByCat = new Map<number, number>();
+  const parentBudgetByCat = new Map<number, number>();
+
+  for (const b of userBudgets) {
+    const amt = Number(b.amount);
+    if (b.subcategoryId !== null) {
+      subBudgetsSumByCat.set(b.categoryId, (subBudgetsSumByCat.get(b.categoryId) ?? 0) + amt);
+    } else {
+      parentBudgetByCat.set(b.categoryId, amt);
+    }
+  }
+
+  for (const cat of userCategories) {
+    const subSum = roundTwoDecimals(subBudgetsSumByCat.get(cat.id) ?? 0);
+    if (subSum > 0) {
+      categoryBudgetMap.set(cat.id, subSum);
+    } else {
+      categoryBudgetMap.set(cat.id, roundTwoDecimals(parentBudgetByCat.get(cat.id) ?? 0));
+    }
+  }
+
+  const categoryMetaMap = new Map<number, { name: string; icon: string }>();
+  for (const cat of userCategories) {
+    categoryMetaMap.set(cat.id, { name: cat.name, icon: cat.icon });
+  }
+
+  const today = getTodayInBrazil();
+
+  const cardCycleInfos = allCards.map((card) => {
+    const openInvoiceMonth = getDefaultCompetencyMonth(card.closingDay, today);
+    const openInvoiceDate = parseISO(`${openInvoiceMonth}-01`);
+    const clampedClosingDay = Math.min(card.closingDay, endOfMonth(openInvoiceDate).getDate());
+    const closingDate = new Date(
+      openInvoiceDate.getFullYear(),
+      openInvoiceDate.getMonth(),
+      clampedClosingDay,
+      12,
+      0,
+      0,
+    );
+    const daysUntilClosing = Math.max(0, differenceInCalendarDays(closingDate, today));
+
+    const prevInvoiceDate = subMonths(openInvoiceDate, 1);
+    const prevClosingDay = Math.min(card.closingDay, endOfMonth(prevInvoiceDate).getDate());
+    const cycleStartDate = addDays(
+      new Date(prevInvoiceDate.getFullYear(), prevInvoiceDate.getMonth(), prevClosingDay, 12, 0, 0),
+      1,
+    );
+    const elapsedDays = Math.max(1, differenceInCalendarDays(today, cycleStartDate) + 1);
+
+    const dueMonthDate = card.dueDay < card.closingDay ? addMonths(openInvoiceDate, 1) : openInvoiceDate;
+    const clampedDueDay = Math.min(card.dueDay, endOfMonth(dueMonthDate).getDate());
+    const dueDate = new Date(dueMonthDate.getFullYear(), dueMonthDate.getMonth(), clampedDueDay, 12, 0, 0);
+
+    const rawInvoiceLabel = format(openInvoiceDate, "MMM/yyyy", { locale: ptBR });
+    const invoiceLabel = rawInvoiceLabel.charAt(0).toUpperCase() + rawInvoiceLabel.slice(1);
+
+    return {
+      card,
+      openInvoiceMonth,
+      invoiceLabel,
+      closingDateLabel: format(closingDate, "dd/MM"),
+      dueDateLabel: format(dueDate, "dd/MM"),
+      daysUntilClosing,
+      elapsedDays,
+    };
+  });
+
+  const perCardConditions: SQL[] = cardCycleInfos.map(
+    (info) =>
+      and(
+        eq(transactions.creditCardId, info.card.id),
+        getInvoiceCondition(info.openInvoiceMonth, info.card.closingDay),
+      )!,
+  );
+
+  const openInvoiceTransactions = await db
+    .select({
+      id: transactions.id,
+      creditCardId: transactions.creditCardId,
+      categoryId: transactions.categoryId,
+      amount: transactions.amount,
+      installmentTotal: transactions.installmentTotal,
+      fixedTransactionId: transactions.fixedTransactionId,
+      isFixed: transactions.isFixed,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        eq(transactions.type, "credit_card_expense"),
+        ne(transactions.status, "ignored"),
+        or(...perCardConditions),
+      ),
+    );
+
+  type CatAccumulator = {
+    categoryId: number | null;
+    categoryName: string;
+    categoryIcon: string;
+    totalAmount: number;
+    installmentAmount: number;
+    fixedAmount: number;
+    variableAmount: number;
+    transactionCount: number;
+  };
+
+  const buildCategoryItems = (accMap: Map<string, CatAccumulator>, invoiceTotal: number): OpenInvoiceCategoryItem[] => {
+    return Array.from(accMap.values())
+      .map((item) => {
+        const budgetLimit = item.categoryId !== null ? (categoryBudgetMap.get(item.categoryId) ?? 0) : 0;
+        const totalAmount = roundTwoDecimals(item.totalAmount);
+        return {
+          categoryId: item.categoryId,
+          categoryName: item.categoryName,
+          categoryIcon: item.categoryIcon,
+          totalAmount,
+          installmentAmount: roundTwoDecimals(item.installmentAmount),
+          fixedAmount: roundTwoDecimals(item.fixedAmount),
+          variableAmount: roundTwoDecimals(item.variableAmount),
+          budgetLimit,
+          percentOfInvoice: invoiceTotal > 0 ? roundTwoDecimals((totalAmount / invoiceTotal) * 100) : 0,
+          percentOfBudget: budgetLimit > 0 ? roundTwoDecimals((totalAmount / budgetLimit) * 100) : 0,
+          transactionCount: item.transactionCount,
+        };
+      })
+      .sort((a, b) => b.totalAmount - a.totalAmount);
+  };
+
+  const consolidatedCatMap = new Map<string, CatAccumulator>();
+  let consolidatedTotal = 0;
+  let consolidatedInstallment = 0;
+  let consolidatedFixed = 0;
+  let consolidatedVariable = 0;
+  let consolidatedLimit = 0;
+  let consolidatedDailyPace = 0;
+
+  const cards: OpenInvoiceCardSummary[] = cardCycleInfos.map((info) => {
+    const cardTxs = openInvoiceTransactions.filter((t) => t.creditCardId === info.card.id);
+    const catMap = new Map<string, CatAccumulator>();
+
+    let totalAmount = 0;
+    let installmentAmount = 0;
+    let fixedAmount = 0;
+    let variableAmount = 0;
+
+    for (const tx of cardTxs) {
+      const amt = Number(tx.amount);
+      const isInstallment = Boolean(tx.installmentTotal && tx.installmentTotal > 1);
+      const isFixed = Boolean(tx.fixedTransactionId || tx.isFixed);
+
+      totalAmount += amt;
+      if (isInstallment) {
+        installmentAmount += amt;
+      } else if (isFixed) {
+        fixedAmount += amt;
+      } else {
+        variableAmount += amt;
+      }
+
+      const catKey = tx.categoryId !== null ? String(tx.categoryId) : "uncategorized";
+      const meta = tx.categoryId !== null ? categoryMetaMap.get(tx.categoryId) : undefined;
+      const catName = meta?.name ?? "Sem categoria";
+      const catIcon = meta?.icon ?? "Tag";
+
+      const updateAcc = (map: Map<string, CatAccumulator>) => {
+        const existing = map.get(catKey) ?? {
+          categoryId: tx.categoryId ?? null,
+          categoryName: catName,
+          categoryIcon: catIcon,
+          totalAmount: 0,
+          installmentAmount: 0,
+          fixedAmount: 0,
+          variableAmount: 0,
+          transactionCount: 0,
+        };
+        existing.totalAmount += amt;
+        if (isInstallment) {
+          existing.installmentAmount += amt;
+        } else if (isFixed) {
+          existing.fixedAmount += amt;
+        } else {
+          existing.variableAmount += amt;
+        }
+        existing.transactionCount += 1;
+        map.set(catKey, existing);
+      };
+
+      updateAcc(catMap);
+      updateAcc(consolidatedCatMap);
+    }
+
+    const roundedTotal = roundTwoDecimals(totalAmount);
+    const dailyPace = roundTwoDecimals(roundedTotal / info.elapsedDays);
+    const creditLimit = Number(info.card.creditLimit);
+
+    consolidatedTotal += roundedTotal;
+    consolidatedInstallment += installmentAmount;
+    consolidatedFixed += fixedAmount;
+    consolidatedVariable += variableAmount;
+    consolidatedLimit += creditLimit;
+    consolidatedDailyPace += dailyPace;
+
+    return {
+      cardId: info.card.id,
+      cardName: info.card.name,
+      closingDay: info.card.closingDay,
+      dueDay: info.card.dueDay,
+      creditLimit,
+      openInvoiceMonth: info.openInvoiceMonth,
+      invoiceLabel: info.invoiceLabel,
+      closingDateLabel: info.closingDateLabel,
+      dueDateLabel: info.dueDateLabel,
+      daysUntilClosing: info.daysUntilClosing,
+      elapsedDays: info.elapsedDays,
+      totalAmount: roundedTotal,
+      installmentAmount: roundTwoDecimals(installmentAmount),
+      fixedAmount: roundTwoDecimals(fixedAmount),
+      variableAmount: roundTwoDecimals(variableAmount),
+      dailyPace,
+      categories: buildCategoryItems(catMap, roundedTotal),
+    };
+  });
+
+  const roundedConsolidatedTotal = roundTwoDecimals(consolidatedTotal);
+  const nearestClosingDays = cards.length > 0 ? Math.min(...cards.map((c) => c.daysUntilClosing)) : null;
+
+  return {
+    cards,
+    consolidated: {
+      totalAmount: roundedConsolidatedTotal,
+      installmentAmount: roundTwoDecimals(consolidatedInstallment),
+      fixedAmount: roundTwoDecimals(consolidatedFixed),
+      variableAmount: roundTwoDecimals(consolidatedVariable),
+      totalLimit: roundTwoDecimals(consolidatedLimit),
+      nearestClosingDays,
+      dailyPace: roundTwoDecimals(consolidatedDailyPace),
+      categories: buildCategoryItems(consolidatedCatMap, roundedConsolidatedTotal),
+    },
   };
 }

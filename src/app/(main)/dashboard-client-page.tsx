@@ -16,6 +16,8 @@ import { GoalsStashBlock } from "@/components/goals-stash-block";
 import { InstallmentsStackedChart } from "@/components/installments-stacked-chart";
 import { MonthlyBalanceGrid } from "@/components/monthly-balance-grid";
 import { MonthlyFinancialHealth } from "@/components/monthly-financial-health";
+import { OpenInvoiceXrayChart } from "@/components/open-invoice-xray-chart";
+import { PaymentMethodComparison } from "@/components/payment-method-comparison";
 import {
   DASHBOARD_WIDGETS_META,
   getDashboardLayoutClientSnapshot,
@@ -442,53 +444,66 @@ export function DashboardClientPage({
       fetchAction={fetchAction}
       headerContent={<h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>}
       headerActions={
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          <div className="flex items-center rounded-full bg-secondary p-1 text-xs border border-white/5">
+        <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2.5">
+          <div
+            role="group"
+            aria-label="Modo de data"
+            className="h-10 inline-flex items-center rounded-full bg-white/[0.04] backdrop-blur-xl p-1 border border-white/[0.10] shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.18),0_4px_16px_rgba(0,0,0,0.35)]"
+          >
             <button
               type="button"
+              aria-pressed={dateMode === "due_date"}
               onClick={() => setDateMode("due_date")}
               className={cn(
-                "px-3 py-1 rounded-full font-medium transition-all text-xs cursor-pointer",
+                "h-8 px-3 rounded-full font-medium transition-all text-xs whitespace-nowrap cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
                 dateMode === "due_date"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? "bg-white/[0.14] text-foreground shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)] border border-white/[0.12]"
+                  : "text-muted-foreground hover:text-foreground border border-transparent",
               )}
             >
               Vencimento (Caixa)
             </button>
             <button
               type="button"
+              aria-pressed={dateMode === "launch_date"}
               onClick={() => setDateMode("launch_date")}
               className={cn(
-                "px-3 py-1 rounded-full font-medium transition-all text-xs cursor-pointer",
+                "h-8 px-3 rounded-full font-medium transition-all text-xs whitespace-nowrap cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
                 dateMode === "launch_date"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? "bg-white/[0.14] text-foreground shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)] border border-white/[0.12]"
+                  : "text-muted-foreground hover:text-foreground border border-transparent",
               )}
             >
               Lançamento (Consumo)
             </button>
           </div>
 
+          <span
+            role="separator"
+            aria-orientation="vertical"
+            className="hidden sm:block h-5 w-px bg-white/10 shrink-0"
+          />
+
           <button
             type="button"
+            aria-pressed={isEditMode}
             onClick={() => setIsEditMode((prev) => !prev)}
             className={cn(
-              "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer border shadow-sm",
+              "h-10 inline-flex items-center gap-1.5 px-4 rounded-full text-xs font-semibold transition-all cursor-pointer border whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70",
               isEditMode
                 ? "bg-primary text-primary-foreground border-primary shadow-md"
-                : "bg-secondary text-foreground hover:bg-secondary/80 border-white/5",
+                : "bg-white/[0.04] backdrop-blur-xl text-foreground hover:bg-white/[0.08] border-white/[0.10] shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.18),0_4px_16px_rgba(0,0,0,0.35)]",
             )}
             title="Arrastar, redimensionar e organizar os gráficos e componentes do Dashboard"
           >
             {isEditMode ? (
               <>
-                <Check className="w-3.5 h-3.5" />
+                <Check className="w-3.5 h-3.5" aria-hidden="true" />
                 <span>Concluir</span>
               </>
             ) : (
               <>
-                <LayoutGrid className="w-3.5 h-3.5 text-primary" />
+                <LayoutGrid className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
                 <span>Organizar</span>
                 {isCustomLayout && (
                   <span
@@ -633,6 +648,15 @@ export function DashboardClientPage({
                 />
               );
 
+            case "payment-method-comparison":
+              return (
+                <PaymentMethodComparison
+                  data={dashboard.forecastData}
+                  selectedMonth={selectedMonth}
+                  showBalance={showBalance}
+                />
+              );
+
             case "expenses-forecast":
               return (
                 <div className="bg-card/70 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] w-full min-w-0 h-full flex flex-col justify-between relative overflow-hidden">
@@ -686,6 +710,24 @@ export function DashboardClientPage({
                     </div>
                   </div>
                   <IncomeTreemap data={dashboard.incomeTreemapData} showBalance={showBalance} />
+                </div>
+              );
+
+            case "open-invoice-xray":
+              return (
+                <div className="bg-card/70 backdrop-blur-xl rounded-[1.5rem] sm:rounded-[2rem] px-4 py-6 sm:p-6 border border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.35)] w-full min-w-0 h-full flex flex-col justify-between relative overflow-hidden">
+                  {/* Specular top highlight */}
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                  <div className="flex flex-row items-center gap-2 mb-5">
+                    <CreditCardIcon className="h-5 w-5 text-primary shrink-0" />
+                    <div>
+                      <h2 className="text-xl font-bold">Raio-X da Fatura em Aberto</h2>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Controle os gastos da fatura atual (próxima competência) por categoria e orçamento
+                      </p>
+                    </div>
+                  </div>
+                  <OpenInvoiceXrayChart data={dashboard.openInvoicesAnalysis} showBalance={showBalance} />
                 </div>
               );
 

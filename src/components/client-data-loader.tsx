@@ -78,14 +78,22 @@ export function ClientDataLoader<T>({
           <div className="hidden md:block" />
         )}
         <div
+          role="toolbar"
+          aria-label="Filtros e ações da página"
           className={cn(
-            "flex items-center gap-2.5 w-full md:w-auto shrink-0 flex-wrap sm:flex-nowrap",
-            headerActions ? "justify-between md:justify-end" : "justify-center md:justify-end",
+            "flex flex-wrap items-center gap-2.5 w-full md:w-auto shrink-0",
+            headerActions ? "justify-center sm:justify-between md:justify-end" : "justify-center md:justify-end",
           )}
         >
-          <div className="rounded-full bg-white/[0.04] backdrop-blur-xl px-3 py-1 sm:py-1.5 flex items-center gap-1.5 border border-white/[0.10] shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.22),0_4px_16px_rgba(0,0,0,0.4)] justify-center shrink-0">
+          <div
+            role="group"
+            aria-label="Período de competência"
+            className="h-10 rounded-full bg-white/[0.04] backdrop-blur-xl px-2.5 flex items-center gap-1.5 border border-white/[0.10] shadow-[inset_0_1px_1px_0_rgba(255,255,255,0.22),0_4px_16px_rgba(0,0,0,0.4)] justify-center shrink-0"
+          >
             <CompetencyFilter closingDay={closingDay} value={selectedMonth} onChange={handleMonthChange} />
-            {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground shrink-0" />}
+            {isLoading && (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground shrink-0" aria-hidden="true" />
+            )}
           </div>
           {typeof headerActions === "function" ? headerActions(data, selectedMonth, isLoading) : headerActions}
         </div>

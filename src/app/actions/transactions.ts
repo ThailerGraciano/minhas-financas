@@ -10,7 +10,7 @@ import {
   getCompetencyMonth,
   getTargetInvoiceMonth,
 } from "@/lib/competency-utils";
-import { addMonths, endOfMonth, format, parseISO, subMonths } from "date-fns";
+import { addMonths, endOfMonth, format, getDaysInMonth, parseISO, subMonths } from "date-fns";
 import { and, eq, gte, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -1175,9 +1175,22 @@ export async function deleteTransaction(
   }
 }
 
+function applyDueDateDay(baseDateStr: string, targetDay: number): string {
+  const [yearStr, monthStr] = baseDateStr.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const maxDays = getDaysInMonth(new Date(year, month - 1, 1));
+  const day = Math.min(targetDay, maxDays);
+  return `${yearStr}-${monthStr}-${String(day).padStart(2, "0")}`;
+}
+
 export async function updateTransaction(
   id: number,
-  inputData: Partial<CreateTransactionInput> & { destinationAccountId?: number; updateFuture?: boolean },
+  inputData: Partial<CreateTransactionInput> & {
+    destinationAccountId?: number;
+    updateFuture?: boolean;
+    updateFutureDueDateMode?: "day_only" | "exact" | "keep";
+  },
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const session = await auth();
@@ -1216,7 +1229,7 @@ export async function updateTransaction(
         }
       }
 
-      const { destinationAccountId, updateFuture, date: legacyDate, ...data } = inputData;
+      const { destinationAccountId, updateFuture, updateFutureDueDateMode, date: legacyDate, ...data } = inputData;
       if (inputData.dueDate || legacyDate) {
         data.dueDate = inputData.dueDate || legacyDate;
       }
@@ -1361,6 +1374,10 @@ export async function updateTransaction(
         const userCards = await tx.select().from(creditCards).where(eq(creditCards.userId, userId));
         const cardMap = new Map(userCards.map((c) => [c.id, c]));
 
+        const dueDateChanged = data.dueDate !== undefined && data.dueDate !== oldTx.dueDate;
+        const dueDateMode = updateFutureDueDateMode ?? "day_only";
+        const targetDueDay = dueDateChanged && data.dueDate ? Number(data.dueDate.split("-")[2]) : null;
+
         for (const targetTx of futuresToUpdate) {
           await applyBalanceDelta(
             tx,
@@ -1390,27 +1407,47 @@ export async function updateTransaction(
             }
           }
 
+          let newDueDate = targetTx.dueDate;
+          if (dueDateChanged && data.dueDate) {
+            if (dueDateMode === "day_only" && targetDueDay !== null) {
+              newDueDate = applyDueDateDay(targetTx.dueDate, targetDueDay);
+            } else if (dueDateMode === "exact") {
+              newDueDate = data.dueDate;
+            }
+          }
+
           let newInvoiceMonth = targetTx.invoiceMonth;
           let newCompetencyMonth = targetTx.competencyMonth;
 
           if (newType === "credit_card_expense" && newCreditCardId) {
             const card = cardMap.get(newCreditCardId);
             if (card) {
-              newCompetencyMonth = getCompetencyMonth(parseISO(targetTx.dueDate), card.closingDay);
+              newCompetencyMonth = getCompetencyMonth(parseISO(newDueDate), card.closingDay);
               newInvoiceMonth = newCompetencyMonth;
             }
           } else if (newType === "expense" || newType === "income" || newType === "transfer") {
             newInvoiceMonth = null;
-            newCompetencyMonth = getCompetencyMonth(parseISO(targetTx.dueDate), closingDay);
+            newCompetencyMonth = getCompetencyMonth(parseISO(newDueDate), closingDay);
           }
 
           let newDescription = targetTx.description;
-          if (data.description !== undefined) {
-            const baseDesc = data.description.replace(/\s*\(Saída\)|\s*\(Entrada\)/g, "");
+          if (data.description !== undefined && data.description !== oldTx.description) {
+            const cleanBaseDesc = data.description
+              .replace(/\s*\(Saída\)|\s*\(Entrada\)/g, "")
+              .replace(/\s*\(\d+\/\d+\)/g, "")
+              .trim();
+            const installmentMatch = targetTx.description.match(/\s*\(\d+\/\d+\)/);
+            const installmentSuffix =
+              targetTx.installmentCurrent && targetTx.installmentTotal
+                ? ` (${targetTx.installmentCurrent}/${targetTx.installmentTotal})`
+                : installmentMatch
+                  ? installmentMatch[0]
+                  : "";
+            const descWithInstallment = `${cleanBaseDesc}${installmentSuffix}`;
             if (targetTx.type === "transfer") {
-              newDescription = isDestination ? `${baseDesc} (Entrada)` : `${baseDesc} (Saída)`;
+              newDescription = isDestination ? `${descWithInstallment} (Entrada)` : `${descWithInstallment} (Saída)`;
             } else {
-              newDescription = baseDesc;
+              newDescription = descWithInstallment;
             }
           }
 
@@ -1419,6 +1456,7 @@ export async function updateTransaction(
             .set({
               amount: data.amount !== undefined ? data.amount : targetTx.amount,
               description: newDescription,
+              dueDate: newDueDate,
               categoryId: data.categoryId !== undefined ? data.categoryId : targetTx.categoryId,
               subcategoryId: data.subcategoryId !== undefined ? data.subcategoryId : targetTx.subcategoryId,
               accountId: newAccountId,
@@ -1452,6 +1490,20 @@ export async function updateTransaction(
           if (data.creditCardId !== undefined) updateFixed.creditCardId = data.creditCardId;
           if (data.type !== undefined && data.type !== "transfer") updateFixed.type = data.type;
           if (destinationAccountId !== undefined) updateFixed.destinationAccountId = destinationAccountId;
+          if (dueDateChanged && data.dueDate && dueDateMode !== "keep") {
+            if (dueDateMode === "day_only" && targetDueDay !== null) {
+              const [existingFixed] = await tx
+                .select({ startDate: fixedTransactions.startDate })
+                .from(fixedTransactions)
+                .where(eq(fixedTransactions.id, oldTx.fixedTransactionId))
+                .limit(1);
+              if (existingFixed) {
+                updateFixed.startDate = applyDueDateDay(existingFixed.startDate, targetDueDay);
+              }
+            } else if (dueDateMode === "exact") {
+              updateFixed.startDate = data.dueDate;
+            }
+          }
 
           if (Object.keys(updateFixed).length > 0) {
             await tx

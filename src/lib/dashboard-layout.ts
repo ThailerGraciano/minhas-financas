@@ -6,9 +6,11 @@ export type DashboardWidgetId =
   | "accounts-carousel"
   | "balance-evolution"
   | "expense-composition"
+  | "payment-method-comparison"
   | "expenses-forecast"
   | "expense-treemap"
   | "income-treemap"
+  | "open-invoice-xray"
   | "open-invoices"
   | "installments-projection"
   | "goals-stash"
@@ -80,6 +82,12 @@ export const DASHBOARD_WIDGETS_META: readonly DashboardWidgetMeta[] = [
     defaultColSpan: 6,
   },
   {
+    id: "payment-method-comparison",
+    title: "Gastos: Cartão vs. Conta",
+    description: "Comparativo mensal entre despesas no cartão de crédito e em conta",
+    defaultColSpan: 6,
+  },
+  {
     id: "expenses-forecast",
     title: "Previsão de Gastos",
     description: "Projeção de despesas para os próximos 6 meses",
@@ -95,6 +103,12 @@ export const DASHBOARD_WIDGETS_META: readonly DashboardWidgetMeta[] = [
     id: "income-treemap",
     title: "Mapeamento de Receitas",
     description: "Distribuição proporcional de receitas por categoria no mês",
+    defaultColSpan: 6,
+  },
+  {
+    id: "open-invoice-xray",
+    title: "Raio-X da Fatura em Aberto",
+    description: "Gastos da fatura aberta atual por categoria vs. orçamento",
     defaultColSpan: 6,
   },
   {

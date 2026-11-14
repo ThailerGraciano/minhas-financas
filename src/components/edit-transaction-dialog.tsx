@@ -60,6 +60,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
   const [launchDate, setLaunchDate] = useState("");
   const [originalAmount, setOriginalAmount] = useState<number>(0);
   const [updateFuture, setUpdateFuture] = useState(false);
+  const [updateFutureDueDateMode, setUpdateFutureDueDateMode] = useState<"day_only" | "exact">("day_only");
 
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [selectedDestinationAccountId, setSelectedDestinationAccountId] = useState("");
@@ -87,6 +88,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
       setAmount(Number(transaction.amount));
       setOriginalAmount(Number(transaction.amount));
       setUpdateFuture(false);
+      setUpdateFutureDueDateMode("day_only");
       setSelectedAccountId("");
       setSelectedDestinationAccountId("");
 
@@ -170,6 +172,9 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
     launchDate,
     dueDate,
   ]);
+
+  const origDueDate = (fullTransaction?.dueDate || transaction?.dueDate || transaction?.date || "").substring(0, 10);
+  const dueDateChanged = Boolean(dueDate && origDueDate && dueDate !== origDueDate);
 
   const hasChanges = useMemo(() => {
     if (!transaction || !fullTransaction) return false;
@@ -255,6 +260,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
           ? Number(selectedDestinationAccountId)
           : undefined,
       updateFuture,
+      updateFutureDueDateMode: dueDateChanged ? updateFutureDueDateMode : ("keep" as const),
     };
 
     console.log("updateData => ", updateData, transaction.id);
@@ -395,18 +401,44 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
             </div>
 
             {(fullTransaction?.installmentTotal || fullTransaction?.fixedTransactionId) && hasChanges ? (
-              <div className="flex flex-row items-center justify-between rounded-lg border p-4 bg-background animate-in fade-in slide-in-from-bottom-2">
-                <div className="space-y-0.5">
-                  <Label className="text-sm cursor-pointer" onClick={() => setUpdateFuture(!updateFuture)}>
-                    Aplicar alterações às próximas também?
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    {fullTransaction.fixedTransactionId
-                      ? "As modificações serão refletidas em todas as ocorrências futuras."
-                      : "As modificações serão refletidas em todas as parcelas seguintes."}
-                  </p>
+              <div className="rounded-lg border p-4 bg-background space-y-3 animate-in fade-in slide-in-from-bottom-2">
+                <div className="flex flex-row items-center justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm cursor-pointer" onClick={() => setUpdateFuture(!updateFuture)}>
+                      Aplicar alterações às próximas também?
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {fullTransaction.fixedTransactionId
+                        ? "As modificações serão refletidas em todas as ocorrências futuras."
+                        : "As modificações serão refletidas em todas as parcelas seguintes."}
+                    </p>
+                  </div>
+                  <Switch checked={updateFuture} onCheckedChange={setUpdateFuture} />
                 </div>
-                <Switch checked={updateFuture} onCheckedChange={setUpdateFuture} />
+
+                {updateFuture && dueDateChanged ? (
+                  <div className="flex flex-row items-center justify-between gap-4 pt-3 border-t border-border/60 animate-in fade-in slide-in-from-top-1">
+                    <div className="space-y-0.5">
+                      <Label
+                        className="text-sm cursor-pointer"
+                        onClick={() =>
+                          setUpdateFutureDueDateMode((prev) => (prev === "day_only" ? "exact" : "day_only"))
+                        }
+                      >
+                        Considerar somente o dia do vencimento?
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        {updateFutureDueDateMode === "day_only"
+                          ? `As próximas ${fullTransaction.fixedTransactionId ? "ocorrências" : "parcelas"} vencerão todo dia ${Number(dueDate.split("-")[2])} de cada mês.`
+                          : `Todas as próximas ${fullTransaction.fixedTransactionId ? "ocorrências" : "parcelas"} terão exatamente o vencimento ${format(parseISO(dueDate), "dd/MM/yyyy")}.`}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={updateFutureDueDateMode === "day_only"}
+                      onCheckedChange={(checked) => setUpdateFutureDueDateMode(checked ? "day_only" : "exact")}
+                    />
+                  </div>
+                ) : null}
               </div>
             ) : null}
 

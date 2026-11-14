@@ -9,6 +9,7 @@ import {
   getExpensesForecastData,
   getIncomeTreemapData,
   getInstallmentsChartData,
+  getOpenInvoicesAnalysis,
 } from "./dashboard";
 
 export async function getDashboardFullData(month: string, dateMode: "due_date" | "launch_date" = "due_date") {
@@ -30,9 +31,10 @@ export async function getDashboardFullData(month: string, dateMode: "due_date" |
   ]);
 
   // Lote 3: Previsões e estimativas
-  const [forecastData, categoryForecastData] = await Promise.all([
+  const [forecastData, categoryForecastData, openInvoicesAnalysis] = await Promise.all([
     getExpensesForecastData(),
     getCategoryForecastData(),
+    getOpenInvoicesAnalysis(),
   ]);
 
   return {
@@ -44,5 +46,6 @@ export async function getDashboardFullData(month: string, dateMode: "due_date" |
     incomeTreemapData,
     forecastData,
     categoryForecastData,
+    openInvoicesAnalysis,
   };
 }

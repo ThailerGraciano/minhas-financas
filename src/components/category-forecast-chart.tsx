@@ -1,29 +1,20 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChartConfig, ChartContainer } from "@/components/ui/chart";
 import {
   ArrowDownRight,
   ArrowUpRight,
+  Award,
   CalendarRange,
   ChevronDown,
   ChevronUp,
-  Award,
   Filter,
   Grid3X3,
   Minus,
 } from "lucide-react";
 import * as React from "react";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ReferenceLine,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Area, AreaChart, CartesianGrid, ReferenceLine, Tooltip, XAxis, YAxis } from "recharts";
 
 const BASE_COLORS = [
   "hsl(262, 83%, 58%)", // Violeta (Base)
@@ -35,9 +26,9 @@ const BASE_COLORS = [
   "hsl(43, 100%, 50%)", // Âmbar
   "hsl(199, 89%, 48%)", // Sky Blue
   "hsl(283, 55%, 58%)", // Roxo
-  "hsl(0, 84%, 60%)",   // Vermelho
+  "hsl(0, 84%, 60%)", // Vermelho
   "hsl(100, 60%, 50%)", // Verde Limão
-  "hsl(15, 85%, 55%)",  // Coral Intenso
+  "hsl(15, 85%, 55%)", // Coral Intenso
   "hsl(230, 80%, 65%)", // Indigo
   "hsl(320, 70%, 55%)", // Fuchsia
 ];
@@ -80,13 +71,7 @@ function formatShortMonth(monthStr: string): string {
   return monthStr.replace(/\/(\d{2})(\d{2})$/, "/$2");
 }
 
-const CustomTooltip = ({
-  active,
-  payload,
-  label,
-  hoveredKey,
-  showBalance = true,
-}: CustomTooltipProps) => {
+const CustomTooltip = ({ active, payload, label, hoveredKey, showBalance = true }: CustomTooltipProps) => {
   const formatCurrency = (val: number) => {
     if (!showBalance) return "••••••";
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
@@ -115,72 +100,42 @@ const CustomTooltip = ({
     return null;
   }
 
-  // Invertemos para mostrar do topo da pilha visual até a base
-  const displayEntries = [...uniqueEntries].reverse();
   const totalVal = uniqueEntries.reduce((acc, curr) => acc + (Number(curr.value) || 0), 0);
   const isFuture = Boolean(payload[0]?.payload?.isFuture);
   const fullMonthLabel = String(payload[0]?.payload?.month ?? label ?? "");
+  const hoveredEntry = hoveredKey ? uniqueEntries.find((entry) => entry.dataKey === hoveredKey) : undefined;
+  const hoveredVal = hoveredEntry ? Number(hoveredEntry.value) || 0 : 0;
+  const hoveredPct = totalVal > 0 ? (hoveredVal / totalVal) * 100 : 0;
 
   return (
-    <div className="bg-popover/95 backdrop-blur-md border border-white/10 text-popover-foreground rounded-2xl shadow-2xl p-3 min-w-[225px] max-w-[300px] sm:max-w-[340px] space-y-2 z-50">
-      <div className="font-semibold text-xs border-b border-white/10 pb-1.5 flex justify-between items-center gap-2">
-        <span className="text-foreground">{fullMonthLabel}</span>
-        <Badge
-          variant="outline"
-          className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-            isFuture
-              ? "bg-primary/15 text-primary border-primary/25"
-              : "bg-muted text-muted-foreground border-white/10"
-          }`}
-        >
-          {isFuture ? "Previsão" : "Realizado"}
-        </Badge>
+    <div className="bg-popover/95 backdrop-blur-md border border-white/15 text-popover-foreground rounded-xl shadow-lg px-2.5 py-1.5 text-[11px] pointer-events-none space-y-1 z-40 max-w-[260px]">
+      <div className="flex items-center justify-between gap-2 whitespace-nowrap">
+        <div className="flex items-center gap-1.5">
+          <span className="font-semibold text-foreground">{fullMonthLabel}</span>
+          <span
+            className={`text-[9px] px-1.5 py-0.2 rounded-full font-medium ${
+              isFuture ? "bg-primary/15 text-primary border border-primary/25" : "bg-muted text-muted-foreground"
+            }`}
+          >
+            {isFuture ? "Previsão" : "Realizado"}
+          </span>
+        </div>
+        <span className="font-bold text-primary tabular-nums">{formatCurrency(totalVal)}</span>
       </div>
 
-      <div className="flex flex-col gap-1.5 max-h-[190px] overflow-y-auto pr-1">
-        {displayEntries.map((entry: ExtendedTooltipPayload) => {
-          const val = Number(entry.value) || 0;
-          const pct = totalVal > 0 ? (val / totalVal) * 100 : 0;
-          const isHovered = hoveredKey === entry.dataKey;
-          const isDimmed = Boolean(hoveredKey && !isHovered);
-
-          return (
+      {hoveredEntry && (
+        <div className="flex items-center justify-between gap-2 text-[10px] border-t border-white/10 pt-1">
+          <div className="flex items-center gap-1.5 min-w-0">
             <div
-              key={entry.dataKey}
-              className={`flex items-center justify-between text-xs transition-opacity duration-150 ${
-                isDimmed ? "opacity-35" : "opacity-100"
-              }`}
-            >
-              <div className="flex items-center gap-2 min-w-0 pr-2">
-                <div
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: entry.color || entry.fill }}
-                />
-                <span
-                  className={`font-medium truncate ${
-                    isHovered ? "text-foreground font-semibold" : "text-muted-foreground"
-                  }`}
-                >
-                  {entry.dataKey}
-                </span>
-                <span className="text-[10px] font-mono text-muted-foreground/80 shrink-0">
-                  {pct.toFixed(0)}%
-                </span>
-              </div>
-              <span className="font-bold ml-auto tabular-nums text-foreground shrink-0">
-                {formatCurrency(val)}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="border-t border-white/10 pt-1.5 flex justify-between items-center text-xs font-bold">
-        <span className="text-muted-foreground">
-          Total ({uniqueEntries.length} {uniqueEntries.length === 1 ? "categoria" : "categorias"}):
-        </span>
-        <span className="text-primary tabular-nums">{formatCurrency(totalVal)}</span>
-      </div>
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ backgroundColor: hoveredEntry.color || hoveredEntry.fill }}
+            />
+            <span className="truncate font-medium text-foreground">{hoveredEntry.dataKey}</span>
+            <span className="text-[9px] font-mono text-muted-foreground shrink-0">{hoveredPct.toFixed(0)}%</span>
+          </div>
+          <span className="font-bold tabular-nums text-foreground shrink-0">{formatCurrency(hoveredVal)}</span>
+        </div>
+      )}
     </div>
   );
 };
@@ -195,6 +150,8 @@ export function CategoryForecastChart({
   showBalance?: boolean;
 }) {
   const [hoveredKey, setHoveredKey] = React.useState<string | null>(null);
+  const [hoveredMonthIdx, setHoveredMonthIdx] = React.useState<number | null>(null);
+  const [pinnedMonthIdx, setPinnedMonthIdx] = React.useState<number | null>(null);
   const [hiddenKeys, setHiddenKeys] = React.useState<Set<string>>(new Set());
   const [showAllLegend, setShowAllLegend] = React.useState(false);
 
@@ -268,8 +225,7 @@ export function CategoryForecastChart({
           ? Number(data[currentMonthIdx][key])
           : 0;
 
-      const trendPercent =
-        historicalAvg > 0 ? ((futureAvg - historicalAvg) / historicalAvg) * 100 : 0;
+      const trendPercent = historicalAvg > 0 ? ((futureAvg - historicalAvg) / historicalAvg) * 100 : 0;
 
       return {
         key,
@@ -334,6 +290,44 @@ export function CategoryForecastChart({
     [sortedKeyMetas, hiddenKeys],
   );
 
+  const activeMonthIdx = React.useMemo(() => {
+    const candidate = hoveredMonthIdx ?? pinnedMonthIdx ?? currentMonthIdx;
+    if (candidate >= 0 && candidate < data.length) return candidate;
+    return currentMonthIdx;
+  }, [hoveredMonthIdx, pinnedMonthIdx, currentMonthIdx, data.length]);
+
+  const inspectedMonth = React.useMemo(() => {
+    const row = data[activeMonthIdx];
+    if (!row) return null;
+
+    const rawItems = [...visibleKeyMetas]
+      .reverse()
+      .map((meta) => {
+        const value = typeof row[meta.key] === "number" ? Number(row[meta.key]) : 0;
+        return {
+          key: meta.key,
+          color: meta.color,
+          value,
+        };
+      })
+      .filter((item) => item.value > 0);
+
+    const total = rawItems.reduce((acc, item) => acc + item.value, 0);
+    const items = rawItems.map((item) => ({
+      ...item,
+      pct: total > 0 ? (item.value / total) * 100 : 0,
+    }));
+
+    return {
+      index: activeMonthIdx,
+      month: String(row.month ?? ""),
+      isFuture: Boolean(row.isFuture),
+      isCurrent: activeMonthIdx === currentMonthIdx,
+      items,
+      total,
+    };
+  }, [data, activeMonthIdx, currentMonthIdx, visibleKeyMetas]);
+
   // Transforma os dados garantindo 0 nos meses sem gasto para não quebrar as faixas empilhadas
   // e dividindo entre realizado (_past) e previsão (_future)
   const transformedData = React.useMemo(() => {
@@ -388,9 +382,7 @@ export function CategoryForecastChart({
     });
 
     const overallTrendPercent =
-      visibleHistAvgSum > 0
-        ? ((visibleFutureAvgSum - visibleHistAvgSum) / visibleHistAvgSum) * 100
-        : 0;
+      visibleHistAvgSum > 0 ? ((visibleFutureAvgSum - visibleHistAvgSum) / visibleHistAvgSum) * 100 : 0;
 
     const topCategoryShare =
       topCategory && visibleFutureAvgSum > 0
@@ -509,8 +501,7 @@ export function CategoryForecastChart({
                 </span>
               </div>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25 tabular-nums shrink-0">
-                {formatCurrency(summaryStats.topCategory.futureAvg)}/mês (
-                {summaryStats.topCategoryShare.toFixed(0)}%)
+                {formatCurrency(summaryStats.topCategory.futureAvg)}/mês ({summaryStats.topCategoryShare.toFixed(0)}%)
               </span>
             </div>
           ) : (
@@ -544,7 +535,22 @@ export function CategoryForecastChart({
           <AreaChart
             accessibilityLayer
             data={transformedData}
-            margin={{ top: 10, right: 8, left: 0, bottom: 0 }}
+            margin={{ top: 28, right: 8, left: 0, bottom: 0 }}
+            onMouseMove={(state) => {
+              const rawIdx = state?.activeTooltipIndex;
+              const idx = typeof rawIdx === "number" ? rawIdx : Number(rawIdx);
+              if (Number.isInteger(idx) && idx >= 0 && idx < data.length) {
+                setHoveredMonthIdx(idx);
+              }
+            }}
+            onClick={(state) => {
+              const rawIdx = state?.activeTooltipIndex;
+              const idx = typeof rawIdx === "number" ? rawIdx : Number(rawIdx);
+              if (Number.isInteger(idx) && idx >= 0 && idx < data.length) {
+                setPinnedMonthIdx((prev) => (prev === idx ? null : idx));
+              }
+            }}
+            onMouseLeave={() => setHoveredMonthIdx(null)}
           >
             <defs>
               {sortedKeyMetas.map((meta, index) => (
@@ -571,14 +577,12 @@ export function CategoryForecastChart({
               width={56}
             />
             {boundaryShortMonth && (
-              <ReferenceLine
-                x={boundaryShortMonth}
-                stroke="rgba(255,255,255,0.22)"
-                strokeDasharray="3 3"
-              />
+              <ReferenceLine x={boundaryShortMonth} stroke="rgba(255,255,255,0.22)" strokeDasharray="3 3" />
             )}
             <Tooltip
-              cursor={{ stroke: "rgba(255,255,255,0.18)", strokeWidth: 1 }}
+              position={{ y: 2 }}
+              wrapperStyle={{ pointerEvents: "none", zIndex: 40 }}
+              cursor={{ stroke: "rgba(255,255,255,0.22)", strokeWidth: 1 }}
               content={<CustomTooltip hoveredKey={hoveredKey} showBalance={showBalance} />}
             />
 
@@ -619,14 +623,93 @@ export function CategoryForecastChart({
           </AreaChart>
         </ChartContainer>
 
+        {/* Painel de Detalhes do Mês (exibido abaixo do gráfico para não tampar as curvas) */}
+        {inspectedMonth && (
+          <div className="rounded-xl bg-white/[0.03] border border-white/[0.07] p-3 space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.07] pb-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-foreground">{inspectedMonth.month}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                    inspectedMonth.isFuture
+                      ? "bg-primary/15 text-primary border border-primary/25"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {inspectedMonth.isFuture ? "Previsão" : "Realizado"}
+                </span>
+                {inspectedMonth.isCurrent && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/[0.06] text-muted-foreground">
+                    Mês atual
+                  </span>
+                )}
+                {pinnedMonthIdx !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setPinnedMonthIdx(null)}
+                    className="text-[10px] text-primary hover:underline cursor-pointer"
+                  >
+                    Desafixar
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground">
+                  Total ({inspectedMonth.items.length} {inspectedMonth.items.length === 1 ? "categoria" : "categorias"}
+                  ):
+                </span>
+                <span className="font-bold text-primary tabular-nums">{formatCurrency(inspectedMonth.total)}</span>
+              </div>
+            </div>
+
+            {inspectedMonth.items.length > 0 ? (
+              <div className="grid grid-cols-1 @md:grid-cols-2 gap-x-4 gap-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                {inspectedMonth.items.map((item) => {
+                  const isItemHovered = hoveredKey === item.key;
+                  const isItemDimmed = Boolean(hoveredKey && !isItemHovered);
+
+                  return (
+                    <div
+                      key={item.key}
+                      onMouseEnter={() => setHoveredKey(item.key)}
+                      onMouseLeave={() => setHoveredKey(null)}
+                      className={`flex items-center justify-between gap-2 text-xs py-0.5 px-1.5 rounded-lg transition-opacity duration-150 ${
+                        isItemHovered ? "bg-white/[0.06]" : ""
+                      } ${isItemDimmed ? "opacity-35" : "opacity-100"}`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                        <span
+                          className={`truncate ${
+                            isItemHovered ? "text-foreground font-semibold" : "text-muted-foreground font-medium"
+                          }`}
+                        >
+                          {item.key}
+                        </span>
+                        <span className="text-[10px] font-mono text-muted-foreground/80 shrink-0">
+                          {item.pct.toFixed(0)}%
+                        </span>
+                      </div>
+                      <span className="font-bold tabular-nums text-foreground shrink-0">
+                        {formatCurrency(item.value)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">Nenhuma categoria ativa neste mês com os filtros atuais.</p>
+            )}
+          </div>
+        )}
+
         {/* 3. Painel de Categorias & Filtros Interativos */}
         <div className="pt-2.5 border-t border-white/[0.06] space-y-2.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium">
               <Filter className="w-3.5 h-3.5 text-primary shrink-0" />
               <span>
-                Categorias ({visibleKeyMetas.length}/{sortedKeyMetas.length} ativas) — toque para
-                filtrar
+                Categorias ({visibleKeyMetas.length}/{sortedKeyMetas.length} ativas) — toque para filtrar
               </span>
             </div>
 
@@ -673,11 +756,7 @@ export function CategoryForecastChart({
                   className="text-[11px] h-6 px-2 text-muted-foreground hover:text-foreground flex items-center gap-1"
                 >
                   <span>{showAllLegend ? "Recolher" : `Ver todas (${sortedKeyMetas.length})`}</span>
-                  {showAllLegend ? (
-                    <ChevronUp className="w-3 h-3" />
-                  ) : (
-                    <ChevronDown className="w-3 h-3" />
-                  )}
+                  {showAllLegend ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                 </Button>
               )}
             </div>
@@ -709,10 +788,7 @@ export function CategoryForecastChart({
                   {/* Linha 1: Nome da Categoria + Tag Base */}
                   <div className="flex items-center justify-between gap-1.5 min-w-0 w-full">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: meta.color }}
-                      />
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: meta.color }} />
                       <span
                         className={`text-xs font-semibold truncate ${
                           isHidden ? "line-through text-muted-foreground" : "text-foreground"
@@ -742,8 +818,7 @@ export function CategoryForecastChart({
                       </span>
                     ) : isRising ? (
                       <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-rose-400 bg-rose-500/15 px-1.5 py-0.5 rounded-full tabular-nums">
-                        <ArrowUpRight className="w-2.5 h-2.5" />
-                        +{meta.trendPercent.toFixed(0)}%
+                        <ArrowUpRight className="w-2.5 h-2.5" />+{meta.trendPercent.toFixed(0)}%
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground bg-white/[0.04] px-1.5 py-0.5 rounded-full">

@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 
 import { getTransactions } from '@/app/actions/transactions';
+import { groupPairedTransfers } from '@/lib/transfer-utils';
 import { TransactionList } from './transaction-list';
 import { TransactionSummaryCards } from './transaction-summary-cards';
 import { ClientDataLoader } from '@/components/client-data-loader';
@@ -41,7 +42,7 @@ export function TransactionsClientPage({
   };
 
   const renderHeader = (transactions: TransactionsData) => {
-    const totalCount = transactions.length;
+    const totalCount = groupPairedTransfers(transactions).length;
 
     return (
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 w-full">

@@ -5,8 +5,9 @@ import { payFullInvoice, revertInvoicePayment } from "@/app/actions/credit-cards
 import { deleteTransaction, toggleTransactionStatus } from "@/app/actions/transactions";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Check, Loader2, Minus } from "lucide-react";
+import { ArrowRight, ArrowRightLeft, Check, Filter, Loader2, Minus, Pencil, Trash } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { groupPairedTransfers } from "@/lib/transfer-utils";
 
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -27,7 +28,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Filter, Pencil, Trash } from "lucide-react";
 
 export type TransactionWithRelations = {
   id: number;
@@ -50,6 +50,9 @@ export type TransactionWithRelations = {
   categoryId?: number;
   subcategoryId?: number | null;
   isGroup?: boolean;
+  isTransferGroup?: boolean;
+  originAccount?: { id: number; name: string } | null;
+  destinationAccount?: { id: number; name: string } | null;
   account?: { id: number; name: string } | null;
   creditCard?: { id: number; name: string; dueDay: number; closingDay: number } | null;
   category?: { id: number; name: string; icon?: string | null } | null;
@@ -136,7 +139,9 @@ interface UnifiedTransactionStatusButtonProps {
 }
 
 function UnifiedTransactionStatusButton({ tx, isLoading, onToggle }: UnifiedTransactionStatusButtonProps) {
-  const isIncome = tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)"));
+  const isTransferGroup = Boolean(tx.isTransferGroup);
+  const isIncome =
+    !isTransferGroup && (tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)")));
   const isPaid = tx.status === "paid";
   const isPartial = tx.status === "partial";
 
@@ -186,13 +191,17 @@ function UnifiedTransactionStatusButton({ tx, isLoading, onToggle }: UnifiedTran
       }}
       disabled={isLoading}
       title={
-        isPaid
-          ? isIncome
-            ? "Desfazer recebimento"
-            : "Desfazer pagamento"
-          : isIncome
-            ? "Marcar como recebido"
-            : "Marcar como pago"
+        isTransferGroup
+          ? isPaid
+            ? "Desfazer transferência"
+            : "Marcar como transferido"
+          : isPaid
+            ? isIncome
+              ? "Desfazer recebimento"
+              : "Desfazer pagamento"
+            : isIncome
+              ? "Marcar como recebido"
+              : "Marcar como pago"
       }
       className="group/status w-[54px] sm:w-[62px] flex flex-col items-center justify-center gap-1.5 shrink-0 focus:outline-none transition-transform active:scale-95 cursor-pointer"
     >
@@ -209,9 +218,15 @@ function UnifiedTransactionStatusButton({ tx, isLoading, onToggle }: UnifiedTran
       </div>
 
       {isPaid ? (
-        <Badge className="w-full justify-center bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25 border border-emerald-500/30 uppercase font-bold text-[8px] sm:text-[9px] leading-none h-4 px-1 rounded-full">
-          {isIncome ? "Recebido" : "Pago"}
-        </Badge>
+        isTransferGroup ? (
+          <Badge className="w-full justify-center bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 border border-blue-500/30 uppercase font-bold text-[8px] sm:text-[9px] leading-none h-4 px-1 rounded-full">
+            Transferido
+          </Badge>
+        ) : (
+          <Badge className="w-full justify-center bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25 border border-emerald-500/30 uppercase font-bold text-[8px] sm:text-[9px] leading-none h-4 px-1 rounded-full">
+            {isIncome ? "Recebido" : "Pago"}
+          </Badge>
+        )
       ) : isPartial ? (
         <Badge
           variant="outline"
@@ -349,10 +364,12 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
 
   const [selectedCategory, setSelectedCategory] = useState<string>("Todas");
 
+  const normalizedTransactions = useMemo(() => groupPairedTransfers(transactions), [transactions]);
+
   const categoriesData = useMemo(() => {
     const map = new Map<string, number>();
     let total = 0;
-    transactions.forEach((tx) => {
+    normalizedTransactions.forEach((tx) => {
       const catName = tx.category?.name || "Sem Categoria";
       map.set(catName, (map.get(catName) || 0) + 1);
       total++;
@@ -361,10 +378,10 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
       total,
       list: Array.from(map.entries()).sort((a, b) => b[1] - a[1]),
     };
-  }, [transactions]);
+  }, [normalizedTransactions]);
 
   const displayedTransactions = useMemo(() => {
-    let filteredTxs = transactions;
+    let filteredTxs = normalizedTransactions;
 
     if (selectedCategory !== "Todas") {
       filteredTxs = filteredTxs.filter((tx) => (tx.category?.name || "Sem Categoria") === selectedCategory);
@@ -456,7 +473,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
       }
       return 0;
     });
-  }, [transactions, groupCreditCards, showOnlyPending, sortBy, selectedCategory]);
+  }, [normalizedTransactions, groupCreditCards, showOnlyPending, sortBy, selectedCategory]);
 
   const groupedTransactions = useMemo(() => {
     const groups: Record<string, TransactionWithRelations[]> = {};
@@ -631,16 +648,22 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
               </h3>
               <div className="flex flex-col gap-2">
                 {group.transactions.map((tx) => {
+                  const isTransferGroup = Boolean(tx.isTransferGroup);
                   const isIncome =
-                    tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)"));
-                  const formattedAmount = `${isIncome ? "+" : "-"}${formatCurrency(tx.amount)}`;
-                  const subtitleParts = [
-                    getSource(tx),
-                    tx.category?.name || "Geral",
+                    !isTransferGroup &&
+                    (tx.type === "income" || (tx.type === "transfer" && tx.description.includes("(Entrada)")));
+                  const formattedAmount = isTransferGroup
+                    ? formatCurrency(tx.amount)
+                    : `${isIncome ? "+" : "-"}${formatCurrency(tx.amount)}`;
+                  const launchDateLabel =
                     tx.launchDate && !tx.isGroup
                       ? `Lançado em ${format(parseISO(tx.launchDate.split("T")[0]), "dd/MM/yyyy")}`
-                      : null,
-                  ].filter((part): part is string => Boolean(part));
+                      : null;
+                  const subtitleParts = (
+                    isTransferGroup
+                      ? [launchDateLabel]
+                      : [getSource(tx), tx.category?.name || "Geral", launchDateLabel]
+                  ).filter((part): part is string => Boolean(part));
 
                   return (
                     <div
@@ -652,6 +675,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                       }}
                       className={cn(
                         "group relative flex items-center justify-between p-2.5 sm:p-4 rounded-2xl bg-card/85 backdrop-blur-md border border-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_16px_rgba(0,0,0,0.35)] transition-all duration-200 hover:bg-card/95 hover:border-white/15 gap-2.5 sm:gap-4 overflow-hidden",
+                        isTransferGroup && "border-blue-500/15 hover:border-blue-500/30",
                         !tx.isGroup && "cursor-pointer",
                       )}
                     >
@@ -662,21 +686,53 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                           isLoading={isPending && loadingId === tx.id}
                           onToggle={handleMarkAsPaid}
                         />
-                        <div className="flex flex-col min-w-0 flex-1 gap-0.5">
-                          <DynamicFitText
-                            text={tx.description}
-                            maxFontSizePx={15}
-                            minFontSizePx={8.5}
-                            allowWrapAtMin={true}
-                            className="font-semibold text-foreground tx-fluid-description"
-                          />
-                          <DynamicFitText
-                            text={subtitleParts.join(" • ")}
-                            maxFontSizePx={11.5}
-                            minFontSizePx={8}
-                            allowWrapAtMin={true}
-                            className="text-muted-foreground"
-                          />
+                        <div className="flex flex-col min-w-0 flex-1 gap-1">
+                          {isTransferGroup ? (
+                            <>
+                              <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                <span className="font-semibold text-sm sm:text-[15px] leading-tight text-foreground truncate">
+                                  {tx.description}
+                                </span>
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/25 shrink-0">
+                                  <ArrowRightLeft className="w-2.5 h-2.5" />
+                                  Transferência
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-medium min-w-0 flex-wrap">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-white/[0.05] border border-white/[0.08] text-foreground/90 truncate max-w-[130px] sm:max-w-[180px]">
+                                  {tx.originAccount?.name || "Conta Origem"}
+                                </span>
+                                <ArrowRight className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-300 truncate max-w-[130px] sm:max-w-[180px]">
+                                  {tx.destinationAccount?.name || "Conta Destino"}
+                                </span>
+                              </div>
+
+                              {subtitleParts.length > 0 && (
+                                <span className="text-[11px] text-muted-foreground leading-tight">
+                                  {subtitleParts.join(" • ")}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <DynamicFitText
+                                text={tx.description}
+                                maxFontSizePx={15}
+                                minFontSizePx={8.5}
+                                allowWrapAtMin={true}
+                                className="font-semibold text-foreground tx-fluid-description"
+                              />
+                              <DynamicFitText
+                                text={subtitleParts.join(" • ")}
+                                maxFontSizePx={11.5}
+                                minFontSizePx={8}
+                                allowWrapAtMin={true}
+                                className="text-muted-foreground"
+                              />
+                            </>
+                          )}
                         </div>
                       </div>
 
@@ -688,7 +744,7 @@ export function TransactionList({ transactions }: { transactions: TransactionWit
                           minFontSizePx={10.5}
                           maxWidthPx={96}
                           className={`font-semibold text-right tracking-tight ${
-                            isIncome ? "text-emerald-500" : "text-rose-500"
+                            isTransferGroup ? "text-blue-400" : isIncome ? "text-emerald-500" : "text-rose-500"
                           }`}
                         />
 

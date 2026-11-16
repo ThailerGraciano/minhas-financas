@@ -1,21 +1,81 @@
 import { format, parseISO } from "date-fns";
 
+export interface ExportableTransaction {
+  dueDate?: string;
+  launchDate?: string;
+  date?: string;
+  description: string | null;
+  amount: string | number;
+  type: string;
+  status: string;
+  invoiceMonth?: string | null;
+  category?: { name: string } | null;
+  subcategory?: { name: string } | null;
+  account?: { name: string } | null;
+  creditCard?: { name: string } | null;
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  income: "Receita",
+  expense: "Despesa",
+  transfer: "Transferência",
+  credit_card_expense: "Cartão de Crédito",
+};
+
+function escapeCSVField(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+function formatDateBR(rawDate: string): string {
+  if (!rawDate) return "";
+  try {
+    return format(parseISO(rawDate), "dd/MM/yyyy");
+  } catch {
+    return rawDate;
+  }
+}
+
+function formatAmountBR(amount: string | number, type: string): string {
+  const numeric = Number(amount || 0);
+  const isExpense = type === "expense" || type === "credit_card_expense";
+  const value = isExpense ? -Math.abs(numeric) : Math.abs(numeric);
+  return escapeCSVField(
+    value.toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }),
+  );
+}
+
+function formatStatusLabel(status: string): string {
+  if (status === "paid") return "Pago";
+  if (status === "pending") return "Pendente";
+  return status;
+}
+
+function downloadCSV(header: string[], rows: string[], filename: string) {
+  const csvContent = [header.join(","), ...rows].join("\n");
+  const csvWithBOM = "\uFEFF" + csvContent;
+  const blob = new Blob([csvWithBOM], { type: "text/csv;charset=utf-8;" });
+
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  link.style.visibility = "hidden";
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 export function exportTransactionsToCSV(
-  transactions: {
-    dueDate?: string;
-    launchDate?: string;
-    date?: string;
-    description: string | null;
-    amount: string | number;
-    type: string;
-    status: string;
-    category?: { name: string } | null;
-    subcategory?: { name: string } | null;
-  }[],
+  transactions: ExportableTransaction[],
   invoiceMonth: string,
   cardName: string,
 ) {
-  // Cabeçalho do CSV
   const header = [
     '"Vencimento"',
     '"Lançamento"',
@@ -24,73 +84,60 @@ export function exportTransactionsToCSV(
     '"Subcategoria"',
     '"Valor"',
     '"Status"',
-  ].join(",");
+  ];
 
-  // Linhas do CSV
   const rows = transactions.map((t) => {
-    // Formatar Datas (DD/MM/YYYY)
-    const rawDue = (t as { dueDate?: string; date?: string }).dueDate || (t as { date?: string }).date || "";
-    const rawLaunch = (t as { launchDate?: string }).launchDate || rawDue;
-    let formattedDueDate = "";
-    let formattedLaunchDate = "";
-    try {
-      formattedDueDate = rawDue ? format(parseISO(rawDue), "dd/MM/yyyy") : "";
-    } catch {
-      formattedDueDate = rawDue;
-    }
-    try {
-      formattedLaunchDate = rawLaunch ? format(parseISO(rawLaunch), "dd/MM/yyyy") : "";
-    } catch {
-      formattedLaunchDate = rawLaunch;
-    }
+    const rawDue = t.dueDate || t.date || "";
+    const rawLaunch = t.launchDate || rawDue;
 
-    // Escapar aspas na descrição e colocar entre aspas
-    const description = `"${(t.description || "").replace(/"/g, '""')}"`;
-
-    // Categoria e Subcategoria
-    const category = `"${t.category?.name || ""}"`;
-    const subcategory = `"${t.subcategory?.name || ""}"`;
-
-    // Formatar Valor (garantindo negativo para despesas)
-    const amount = Number(t.amount || 0);
-    const isExpense = t.type === "expense" || t.type === "credit_card_expense";
-    const value = isExpense ? -Math.abs(amount) : Math.abs(amount);
-
-    // Formato brasileiro: 1.234,56
-    const formattedValue = `"${value.toLocaleString("pt-BR", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}"`;
-
-    // Traduzir Status
-    let statusText = t.status;
-    if (t.status === "paid") statusText = "Pago";
-    if (t.status === "pending") statusText = "Pendente";
-    const status = `"${statusText}"`;
-
-    return [formattedDueDate, formattedLaunchDate, description, category, subcategory, formattedValue, status].join(
-      ",",
-    );
+    return [
+      formatDateBR(rawDue),
+      formatDateBR(rawLaunch),
+      escapeCSVField(t.description || ""),
+      escapeCSVField(t.category?.name || ""),
+      escapeCSVField(t.subcategory?.name || ""),
+      formatAmountBR(t.amount, t.type),
+      escapeCSVField(formatStatusLabel(t.status)),
+    ].join(",");
   });
 
-  // Unir cabeçalho e linhas
-  const csvContent = [header, ...rows].join("\n");
+  const filename = `fatura-${cardName.toLowerCase().replace(/\s+/g, "-")}-${invoiceMonth}.csv`;
+  downloadCSV(header, rows, filename);
+}
 
-  // Adicionar BOM (Byte Order Mark) para o Excel reconhecer UTF-8 (acentos, etc)
-  const csvWithBOM = "\uFEFF" + csvContent;
+export function exportPowerGridToCSV(transactions: ExportableTransaction[]) {
+  const header = [
+    '"Vencimento"',
+    '"Lançamento"',
+    '"Tipo"',
+    '"Descrição"',
+    '"Categoria"',
+    '"Subcategoria"',
+    '"Conta / Cartão"',
+    '"Fatura"',
+    '"Valor"',
+    '"Status"',
+  ];
 
-  // Criar Blob
-  const blob = new Blob([csvWithBOM], { type: "text/csv;charset=utf-8;" });
+  const rows = transactions.map((t) => {
+    const rawDue = t.dueDate || t.date || "";
+    const rawLaunch = t.launchDate || rawDue;
+    const origin = t.creditCard?.name || t.account?.name || "";
 
-  // Criar link temporário e disparar download
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
+    return [
+      formatDateBR(rawDue),
+      formatDateBR(rawLaunch),
+      escapeCSVField(TYPE_LABELS[t.type] || t.type),
+      escapeCSVField(t.description || ""),
+      escapeCSVField(t.category?.name || ""),
+      escapeCSVField(t.subcategory?.name || ""),
+      escapeCSVField(origin),
+      escapeCSVField(t.invoiceMonth || ""),
+      formatAmountBR(t.amount, t.type),
+      escapeCSVField(formatStatusLabel(t.status)),
+    ].join(",");
+  });
 
-  link.setAttribute("href", url);
-  link.setAttribute("download", `fatura-${cardName.toLowerCase().replace(/\s+/g, "-")}-${invoiceMonth}.csv`);
-  link.style.visibility = "hidden";
-
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  const timestamp = format(new Date(), "yyyy-MM-dd-HHmm");
+  downloadCSV(header, rows, `power-grid-${timestamp}.csv`);
 }

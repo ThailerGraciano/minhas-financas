@@ -5,6 +5,13 @@ import { db } from "@/db";
 import { accounts, budgets, categories, creditCards, fixedTransactions, settings, transactions } from "@/db/schema";
 import { buildGlobalCompetencyCondition, getInvoiceCondition } from "@/lib/competency-utils";
 import { getDefaultCompetencyMonth, getTodayInBrazil } from "@/lib/date-utils";
+import {
+  getFixedOverride,
+  getFixedOverridesMap,
+  getFixedOverridesMapSimple,
+  isFixedActiveForMonth,
+  resolveFixedOccurrence,
+} from "@/lib/fixed-transactions";
 import { addDays, addMonths, differenceInCalendarDays, endOfMonth, format, parseISO, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { and, eq, gt, gte, inArray, isNotNull, lte, ne, or, type SQL } from "drizzle-orm";
@@ -218,6 +225,11 @@ export async function getDashboardData(month?: string, dateMode: "due_date" | "l
         (ft.type === "transfer" && ft.accountId === reserveAccount.id),
     );
 
+    const reserveOverridesMap = await getFixedOverridesMapSimple(
+      userId,
+      [...reserveFixedInflows, ...reserveFixedOutflows].map((ft) => ft.id),
+    );
+
     let runningBalance = reserveBalance;
     const reversedPastPoints: ReserveSparklinePoint[] = [];
     for (let i = pastMonthsDates.length - 1; i >= 0; i--) {
@@ -254,15 +266,31 @@ export async function getDashboardData(month?: string, dateMode: "due_date" | "l
 
       for (const ft of reserveFixedInflows) {
         const ftStartMonth = ft.startDate.substring(0, 7);
-        if (mKey >= ftStartMonth && !materializedFixedByMonth.has(`${mKey}-${ft.id}`)) {
-          monthFutureDelta += Number(ft.amount);
+        if (
+          mKey >= ftStartMonth &&
+          isFixedActiveForMonth(ft, mKey) &&
+          !materializedFixedByMonth.has(`${mKey}-${ft.id}`)
+        ) {
+          const override = getFixedOverride(reserveOverridesMap, ft.id, mKey);
+          const resolved = resolveFixedOccurrence(ft, override);
+          if (resolved) {
+            monthFutureDelta += Number(resolved.amount);
+          }
         }
       }
 
       for (const ft of reserveFixedOutflows) {
         const ftStartMonth = ft.startDate.substring(0, 7);
-        if (mKey >= ftStartMonth && !materializedFixedByMonth.has(`${mKey}-${ft.id}`)) {
-          monthFutureDelta -= Number(ft.amount);
+        if (
+          mKey >= ftStartMonth &&
+          isFixedActiveForMonth(ft, mKey) &&
+          !materializedFixedByMonth.has(`${mKey}-${ft.id}`)
+        ) {
+          const override = getFixedOverride(reserveOverridesMap, ft.id, mKey);
+          const resolved = resolveFixedOccurrence(ft, override);
+          if (resolved) {
+            monthFutureDelta -= Number(resolved.amount);
+          }
         }
       }
 
@@ -473,6 +501,8 @@ export async function getBalanceEvolutionData(): Promise<BalanceEvolutionPoint[]
       type: fixedTransactions.type,
       amount: fixedTransactions.amount,
       startDate: fixedTransactions.startDate,
+      endMonth: fixedTransactions.endMonth,
+      active: fixedTransactions.active,
     })
     .from(fixedTransactions)
     .where(
@@ -482,6 +512,11 @@ export async function getBalanceEvolutionData(): Promise<BalanceEvolutionPoint[]
         eq(fixedTransactions.userId, userId),
       ),
     );
+
+  const balanceOverridesMap = await getFixedOverridesMapSimple(
+    userId,
+    activeFixed.map((ft) => ft.id),
+  );
 
   const materializedFixedIds = new Set<string>();
   if (activeFixed.length > 0) {
@@ -527,7 +562,13 @@ export async function getBalanceEvolutionData(): Promise<BalanceEvolutionPoint[]
         if (cursor < tomorrow) cursor.setMonth(cursor.getMonth() + 1);
 
         while (cursor <= lastDay) {
-          virtualRows.push({ type: ft.type, amount: ft.amount });
+          const mKey = format(cursor, "yyyy-MM");
+          if (isFixedActiveForMonth(ft, mKey)) {
+            const override = getFixedOverride(balanceOverridesMap, ft.id, mKey);
+            if (!override?.isIgnored) {
+              virtualRows.push({ type: ft.type, amount: override?.amount ?? ft.amount });
+            }
+          }
           cursor.setMonth(cursor.getMonth() + 1);
         }
       }
@@ -927,6 +968,8 @@ export async function getExpensesForecastData() {
       id: fixedTransactions.id,
       amount: fixedTransactions.amount,
       startDate: fixedTransactions.startDate,
+      endMonth: fixedTransactions.endMonth,
+      active: fixedTransactions.active,
       type: fixedTransactions.type,
     })
     .from(fixedTransactions)
@@ -937,6 +980,11 @@ export async function getExpensesForecastData() {
         eq(fixedTransactions.userId, userId),
       ),
     );
+
+  const typeChartOverridesMap = await getFixedOverridesMapSimple(
+    userId,
+    activeFixed.map((ft) => ft.id),
+  );
 
   const monthKeys: string[] = [];
   for (let i = -5; i <= 6; i++) {
@@ -1016,8 +1064,10 @@ export async function getExpensesForecastData() {
       activeFixed.forEach((ft) => {
         if (!materializedFixedIdsByMonth[m].has(ft.id)) {
           const ftMonthStr = ft.startDate.substring(0, 7);
-          if (ftMonthStr <= m) {
-            const amt = Number(ft.amount);
+          if (ftMonthStr <= m && isFixedActiveForMonth(ft, m)) {
+            const override = getFixedOverride(typeChartOverridesMap, ft.id, m);
+            if (override?.isIgnored) return;
+            const amt = Number(override?.amount ?? ft.amount);
             monthlyData[m].Fixas += amt;
             if (ft.type === "credit_card_expense") {
               monthlyData[m].Cartão += amt;
@@ -1113,6 +1163,11 @@ export async function getCategoryForecastData() {
     },
   });
 
+  const catChartOverridesMap = await getFixedOverridesMap(
+    userId,
+    activeFixed.map((ft) => ft.id),
+  );
+
   const monthKeys: string[] = [];
   for (let i = -5; i <= 6; i++) {
     monthKeys.push(
@@ -1172,11 +1227,13 @@ export async function getCategoryForecastData() {
       activeFixed.forEach((ft) => {
         if (!materializedFixedIdsByMonth[m].has(ft.id)) {
           const ftMonthStr = ft.startDate.substring(0, 7);
-          if (ftMonthStr <= m) {
-            const catName = getCatName(ft.category);
+          if (ftMonthStr <= m && isFixedActiveForMonth(ft, m)) {
+            const override = getFixedOverride(catChartOverridesMap, ft.id, m);
+            if (override?.isIgnored) return;
+            const catName = getCatName(override?.category ?? ft.category);
             categoryKeys.add(catName);
             if (!monthlyData[m][catName]) monthlyData[m][catName] = 0;
-            monthlyData[m][catName] = (monthlyData[m][catName] as number) + Number(ft.amount);
+            monthlyData[m][catName] = (monthlyData[m][catName] as number) + Number(override?.amount ?? ft.amount);
           }
         }
       });

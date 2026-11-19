@@ -176,14 +176,22 @@ export function InvoiceTransactionList({
     setSelectedSubcategory("all");
   };
 
-  const handleDelete = async (mode: "single" | "future" = "single") => {
+  const handleDelete = async (mode: "single" | "future" | "all" = "single") => {
     if (!transactionToDelete) return;
     setIsDeleting(true);
 
     const isVirtual = transactionToDelete.id < 0;
     const fixedId = transactionToDelete.fixedTransactionId ?? undefined;
+    const compMonth = transactionToDelete.competencyMonth;
 
-    const result = await deleteTransaction(transactionToDelete.id, mode, isVirtual, fixedId);
+    const result = await deleteTransaction(
+      transactionToDelete.id,
+      mode,
+      isVirtual,
+      fixedId,
+      isVirtual ? transactionToDelete.dueDate : undefined,
+      compMonth,
+    );
 
     if (result && !result.success && result.error) {
       alert(result.error);
@@ -516,16 +524,59 @@ export function InvoiceTransactionList({
       />
 
       <AlertDialog open={!!transactionToDelete} onOpenChange={(open) => !open && setTransactionToDelete(null)}>
-        <AlertDialogContent className="sm:max-w-[500px]">
-          {transactionToDelete &&
-          (transactionToDelete.fixedTransactionId ||
-            (transactionToDelete.installmentTotal && transactionToDelete.installmentTotal > 1)) ? (
+        <AlertDialogContent className="sm:max-w-[540px]">
+          {transactionToDelete && transactionToDelete.fixedTransactionId ? (
             <>
               <AlertDialogHeader>
-                <AlertDialogTitle>Excluir transação recorrente?</AlertDialogTitle>
+                <AlertDialogTitle>Excluir transação fixa?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Esta transação faz parte de uma série recorrente ou parcelada. Deseja excluir apenas esta parcela ou
-                  esta e todas as próximas?
+                  Esta é uma transação fixa recorrente. Escolha como deseja excluir: apenas este mês, desta competência
+                  em diante (preservando meses anteriores) ou todas as pendentes da recorrência.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="flex flex-col sm:flex-row gap-2 flex-wrap sm:justify-end">
+                <AlertDialogCancel disabled={isDeleting} className="cursor-pointer">
+                  Cancelar
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleDelete("single");
+                  }}
+                  disabled={isDeleting}
+                  className="border border-input bg-background hover:bg-accent hover:text-accent-foreground text-foreground cursor-pointer"
+                >
+                  Apenas esta
+                </AlertDialogAction>
+                <AlertDialogAction
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleDelete("future");
+                  }}
+                  disabled={isDeleting}
+                  className="border border-input bg-background hover:bg-accent hover:text-accent-foreground text-foreground cursor-pointer"
+                >
+                  Desta competência em diante
+                </AlertDialogAction>
+                <AlertDialogAction
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleDelete("all");
+                  }}
+                  disabled={isDeleting}
+                  className="bg-destructive hover:bg-destructive/90 text-destructive-foreground cursor-pointer"
+                >
+                  {isDeleting ? "Excluindo..." : "Todas (pendentes)"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          ) : transactionToDelete && transactionToDelete.installmentTotal && transactionToDelete.installmentTotal > 1 ? (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir transação parcelada?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta transação faz parte de um parcelamento. Deseja excluir apenas esta parcela ou esta e todas as
+                  próximas?
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter className="flex flex-col sm:flex-row gap-2 flex-wrap sm:justify-end">

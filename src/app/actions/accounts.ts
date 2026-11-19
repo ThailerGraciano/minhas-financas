@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { accounts, categories, fixedTransactions, transactions } from "@/db/schema";
+import { getFixedOverride, getFixedOverridesMapSimple, isFixedActiveForMonth } from "@/lib/fixed-transactions";
 import { endOfMonth, format, isValid, parse } from "date-fns";
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -207,6 +208,8 @@ export async function getHistoricalBalance(accountId: number, targetDate: Date):
       type: fixedTransactions.type,
       amount: fixedTransactions.amount,
       startDate: fixedTransactions.startDate,
+      endMonth: fixedTransactions.endMonth,
+      active: fixedTransactions.active,
       accountId: fixedTransactions.accountId,
     })
     .from(fixedTransactions)
@@ -218,6 +221,11 @@ export async function getHistoricalBalance(accountId: number, targetDate: Date):
         eq(fixedTransactions.userId, userId),
       ),
     );
+
+  const overridesMap = await getFixedOverridesMapSimple(
+    userId,
+    activeFixed.map((ft) => ft.id),
+  );
 
   const materializedFixedIds = new Set<string>();
   if (activeFixed.length > 0) {
@@ -253,7 +261,13 @@ export async function getHistoricalBalance(accountId: number, targetDate: Date):
     }
 
     while (cursor <= target) {
-      virtualRows.push({ type: ft.type, amount: ft.amount });
+      const mKey = format(cursor, "yyyy-MM");
+      if (isFixedActiveForMonth(ft, mKey)) {
+        const override = getFixedOverride(overridesMap, ft.id, mKey);
+        if (!override?.isIgnored) {
+          virtualRows.push({ type: ft.type, amount: override?.amount ?? ft.amount });
+        }
+      }
       cursor.setMonth(cursor.getMonth() + 1);
     }
   }

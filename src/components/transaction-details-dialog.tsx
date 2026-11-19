@@ -825,7 +825,7 @@ export function TransactionDetailsDialog({
         {/* Rodapé de Ações */}
         <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/60">
           <div className="flex items-center gap-2">
-            {onEdit && !isVirtualTx && (
+            {onEdit && (!isVirtualTx || Boolean(merged.isFixed)) && (
               <Button
                 type="button"
                 variant="outline"

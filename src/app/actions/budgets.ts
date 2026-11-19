@@ -18,6 +18,12 @@ import {
   type BudgetIncomeSource,
 } from "@/lib/budget-planner-utils";
 import { buildCategoryUsageOrderBy } from "@/lib/category-utils";
+import {
+  activeFixedCondition,
+  getFixedOverride,
+  getFixedOverridesMapSimple,
+  resolveFixedOccurrence,
+} from "@/lib/fixed-transactions";
 import { buildGlobalCompetencyCondition } from "@/lib/competency-utils";
 import { getDefaultCompetencyMonth } from "@/lib/date-utils";
 import { endOfMonth, format, parseISO, subMonths } from "date-fns";
@@ -110,9 +116,8 @@ async function fetchMonthAvailableIncomes(
       .from(fixedTransactions)
       .where(
         and(
-          eq(fixedTransactions.userId, userId),
+          activeFixedCondition(userId, month),
           eq(fixedTransactions.type, "income"),
-          eq(fixedTransactions.active, true),
           lte(fixedTransactions.startDate, lastDayStr),
         ),
       ),
@@ -122,6 +127,11 @@ async function fetchMonthAvailableIncomes(
 
   const accountMap = new Map(userAccounts.map((a) => [a.id, a.name]));
   const categoryMap = new Map(incomeCategories.map((c) => [c.id, c.name]));
+  const overridesMap = await getFixedOverridesMapSimple(
+    userId,
+    activeFixedIncomes.map((ft) => ft.id),
+    [month],
+  );
 
   const sources: BudgetIncomeSource[] = [];
   const handledFixedIds = new Set<string>();
@@ -130,20 +140,28 @@ async function fetchMonthAvailableIncomes(
   for (const ft of activeFixedIncomes) {
     handledFixedIds.add(ft.id);
     const materializedTxs = monthIncomeTxs.filter((t) => t.fixedTransactionId === ft.id);
+    const override = getFixedOverride(overridesMap, ft.id, month);
+    const resolved = resolveFixedOccurrence(ft, override);
+    if (!resolved && materializedTxs.length === 0) continue;
+
     const materializedAmount = materializedTxs.reduce((acc, t) => acc + Number(t.amount), 0);
     const primaryMat = materializedTxs[0];
 
+    const fallbackAmount = resolved ? Number(resolved.amount) : Number(ft.amount);
     const amount = roundCurrency(
-      materializedTxs.length > 0 ? materializedAmount : Number(ft.amount),
+      materializedTxs.length > 0 ? materializedAmount : fallbackAmount,
     );
     if (amount <= 0) continue;
 
+    const effectiveCategoryId = resolved?.categoryId ?? ft.categoryId;
+    const effectiveAccountId = resolved?.accountId ?? ft.accountId;
+
     sources.push({
       id: ft.id,
-      name: primaryMat?.description || ft.description,
+      name: primaryMat?.description || resolved?.description || ft.description,
       amount,
-      categoryName: categoryMap.get(ft.categoryId) || "Receita Fixa",
-      accountName: (ft.accountId ? accountMap.get(ft.accountId) : null) ?? null,
+      categoryName: categoryMap.get(effectiveCategoryId) || "Receita Fixa",
+      accountName: (effectiveAccountId ? accountMap.get(effectiveAccountId) : null) ?? null,
       isFixed: true,
       sourceType: "fixed_template",
     });

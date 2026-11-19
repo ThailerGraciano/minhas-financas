@@ -36,6 +36,7 @@ interface TransactionProp {
   creditCardId?: number | string | null;
   destinationAccountId?: number | string | null;
   competencyMonth?: string;
+  invoiceMonth?: string | null;
   fixedTransactionId?: string | null;
   installmentTotal?: number | null;
   installmentCurrent?: number | null;
@@ -261,6 +262,8 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
           : undefined,
       updateFuture,
       updateFutureDueDateMode: dueDateChanged ? updateFutureDueDateMode : ("keep" as const),
+      fixedTransactionId: transaction.fixedTransactionId ?? fullTransaction?.fixedTransactionId ?? null,
+      originalCompetencyMonth: transaction.invoiceMonth || transaction.competencyMonth || null,
     };
 
     console.log("updateData => ", updateData, transaction.id);

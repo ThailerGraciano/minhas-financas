@@ -92,9 +92,39 @@ export const fixedTransactions = pgTable("fixed_transactions", {
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   description: varchar("description", { length: 255 }).notNull(),
   startDate: date("start_date").notNull(),
+  endMonth: varchar("end_month", { length: 7 }), // YYYY-MM inclusive last competency month
   active: boolean("active").default(true).notNull(),
   destinationAccountId: integer("destination_account_id").references(() => accounts.id),
 });
+
+export const fixedTransactionOverrides = pgTable(
+  "fixed_transaction_overrides",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    fixedTransactionId: uuid("fixed_transaction_id")
+      .references(() => fixedTransactions.id, { onDelete: "cascade" })
+      .notNull(),
+    competencyMonth: varchar("competency_month", { length: 7 }).notNull(), // YYYY-MM
+    amount: numeric("amount", { precision: 12, scale: 2 }),
+    description: varchar("description", { length: 255 }),
+    dueDate: date("due_date"),
+    launchDate: date("launch_date"),
+    categoryId: integer("category_id").references(() => categories.id),
+    subcategoryId: integer("subcategory_id").references(() => subcategories.id),
+    accountId: integer("account_id").references(() => accounts.id),
+    creditCardId: integer("credit_card_id").references(() => creditCards.id),
+    destinationAccountId: integer("destination_account_id").references(() => accounts.id),
+    isIgnored: boolean("is_ignored").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("fixed_tx_overrides_fixed_id_comp_idx").on(table.fixedTransactionId, table.competencyMonth),
+  ],
+);
 
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
@@ -335,6 +365,38 @@ export const fixedTransactionsRelations = relations(fixedTransactions, ({ one, m
     references: [accounts.id],
   }),
   transactions: many(transactions),
+  overrides: many(fixedTransactionOverrides),
+}));
+
+export const fixedTransactionOverridesRelations = relations(fixedTransactionOverrides, ({ one }) => ({
+  user: one(users, {
+    fields: [fixedTransactionOverrides.userId],
+    references: [users.id],
+  }),
+  fixedTransaction: one(fixedTransactions, {
+    fields: [fixedTransactionOverrides.fixedTransactionId],
+    references: [fixedTransactions.id],
+  }),
+  account: one(accounts, {
+    fields: [fixedTransactionOverrides.accountId],
+    references: [accounts.id],
+  }),
+  creditCard: one(creditCards, {
+    fields: [fixedTransactionOverrides.creditCardId],
+    references: [creditCards.id],
+  }),
+  category: one(categories, {
+    fields: [fixedTransactionOverrides.categoryId],
+    references: [categories.id],
+  }),
+  subcategory: one(subcategories, {
+    fields: [fixedTransactionOverrides.subcategoryId],
+    references: [subcategories.id],
+  }),
+  destinationAccount: one(accounts, {
+    fields: [fixedTransactionOverrides.destinationAccountId],
+    references: [accounts.id],
+  }),
 }));
 
 export const categoriesRelations = relations(categories, ({ one, many }) => ({

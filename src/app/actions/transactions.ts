@@ -2,7 +2,7 @@
 
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { accounts, creditCards, fixedTransactions, settings, transactions } from "@/db/schema";
+import { accounts, creditCards, fixedTransactionOverrides, fixedTransactions, settings, transactions } from "@/db/schema";
 import { applyBalanceDelta } from "@/lib/balance-utils";
 import {
   buildGlobalCompetencyCondition,
@@ -10,6 +10,14 @@ import {
   getCompetencyMonth,
   getTargetInvoiceMonth,
 } from "@/lib/competency-utils";
+import {
+  activeFixedCondition,
+  getFixedOverride,
+  getFixedOverridesMap,
+  getPreviousCompetencyMonth,
+  resolveFixedOccurrence,
+  upsertFixedOverride,
+} from "@/lib/fixed-transactions";
 import { addMonths, endOfMonth, format, getDaysInMonth, parseISO, subMonths } from "date-fns";
 import { and, eq, gte, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -125,14 +133,10 @@ export async function getTransactions(
   const monthDate = parseISO(`${currentMonth}-01`);
   const lastDayOfMonth = format(endOfMonth(monthDate), "yyyy-MM-dd");
 
-  let fixedCondition = and(
-    eq(fixedTransactions.active, true),
+  const fixedCondition = and(
+    activeFixedCondition(userId, currentMonth),
     lte(fixedTransactions.startDate, lastDayOfMonth),
-    eq(fixedTransactions.userId, userId),
   );
-  if (accountId) {
-    fixedCondition = and(fixedCondition, eq(fixedTransactions.accountId, accountId)) as typeof fixedCondition;
-  }
 
   const activeFixedTxs = await db.query.fixedTransactions.findMany({
     where: fixedCondition,
@@ -149,20 +153,32 @@ export async function getTransactions(
     realTransactions.filter((t) => t.fixedTransactionId).map((t) => t.fixedTransactionId),
   );
 
+  const overridesMap = await getFixedOverridesMap(
+    userId,
+    activeFixedTxs.map((ft) => ft.id),
+    [currentMonth],
+  );
+
   const virtualTransactions = activeFixedTxs
     .filter((ft) => !materializedFixedIds.has(ft.id))
     .flatMap((ft) => {
+      const override = getFixedOverride(overridesMap, ft.id, currentMonth);
+      const resolved = resolveFixedOccurrence(ft, override);
+      if (!resolved) return [];
+      if (accountId && resolved.accountId !== accountId) return [];
+
       const dayStr = ft.startDate.split("-")[2];
       const dayNum = parseInt(dayStr, 10);
 
       let targetMonthDate = new Date(monthDate);
       let closingDayToUse = closingDay;
-      let targetInvoiceMonth = ft.type === "credit_card_expense" ? currentMonth : null;
+      let targetInvoiceMonth = resolved.type === "credit_card_expense" ? currentMonth : null;
 
-      if (ft.type === "credit_card_expense" && ft.creditCard) {
-        targetInvoiceMonth = getTargetInvoiceMonth(currentMonth, closingDay, ft.creditCard.dueDay);
+      const resolvedCard = override?.creditCard ?? ft.creditCard;
+      if (resolved.type === "credit_card_expense" && resolvedCard) {
+        targetInvoiceMonth = getTargetInvoiceMonth(currentMonth, closingDay, resolvedCard.dueDay);
         targetMonthDate = parseISO(`${targetInvoiceMonth}-01`);
-        closingDayToUse = ft.creditCard.closingDay;
+        closingDayToUse = resolvedCard.closingDay;
       }
 
       if (dayNum > closingDayToUse) {
@@ -171,24 +187,32 @@ export async function getTransactions(
 
       const targetDate = new Date(targetMonthDate.getFullYear(), targetMonthDate.getMonth(), dayNum);
       const finalDate = targetDate.getMonth() !== targetMonthDate.getMonth() ? endOfMonth(targetMonthDate) : targetDate;
-      const dateStr = format(finalDate, "yyyy-MM-dd");
+      const defaultDateStr = format(finalDate, "yyyy-MM-dd");
 
-      if (dateStr < ft.startDate) return [];
+      if (defaultDateStr < ft.startDate) return [];
+
+      const dueDateStr = resolved.overrideDueDate || defaultDateStr;
+      const launchDateStr = resolved.overrideLaunchDate || dueDateStr;
 
       const tempId = -Math.floor(Math.random() * 1000000) - 1;
+      const resolvedAccount = override?.account ?? ft.account;
+      const resolvedCategory = override?.category ?? ft.category;
+      const resolvedSubcategory =
+        override && override.subcategoryId !== undefined ? override.subcategory : ft.subcategory;
+      const resolvedDestAccount = override?.destinationAccount ?? ft.destinationAccount;
 
       const origin: (typeof realTransactions)[0] = {
         id: tempId,
         userId: userId,
-        type: ft.type,
-        accountId: ft.accountId,
-        creditCardId: ft.creditCardId,
-        categoryId: ft.categoryId,
-        subcategoryId: ft.subcategoryId,
-        amount: ft.amount,
-        description: ft.type === "transfer" ? `${ft.description} (Saída)` : ft.description,
-        dueDate: dateStr,
-        launchDate: dateStr,
+        type: resolved.type,
+        accountId: resolved.accountId,
+        creditCardId: resolved.creditCardId,
+        categoryId: resolved.categoryId,
+        subcategoryId: resolved.subcategoryId,
+        amount: resolved.amount,
+        description: resolved.type === "transfer" ? `${resolved.description} (Saída)` : resolved.description,
+        dueDate: dueDateStr,
+        launchDate: launchDateStr,
         competencyMonth: currentMonth,
         invoiceMonth: targetInvoiceMonth,
         status: "pending",
@@ -202,20 +226,20 @@ export async function getTransactions(
         paidAt: null,
         importHash: null,
         loanId: null,
-        account: ft.account,
-        category: ft.category,
-        subcategory: ft.subcategory,
-        creditCard: ft.creditCard,
+        account: resolvedAccount,
+        category: resolvedCategory,
+        subcategory: resolvedSubcategory,
+        creditCard: resolvedCard,
       };
 
-      if (ft.type === "transfer" && ft.destinationAccountId) {
+      if (resolved.type === "transfer" && resolved.destinationAccountId) {
         const dest: (typeof realTransactions)[0] = {
           ...origin,
           id: tempId - 1,
-          accountId: ft.destinationAccountId,
-          description: `${ft.description} (Entrada)`,
+          accountId: resolved.destinationAccountId,
+          description: `${resolved.description} (Entrada)`,
           parentTransactionId: origin.id,
-          account: ft.destinationAccount,
+          account: resolvedDestAccount,
         };
         return [origin, dest];
       }
@@ -763,72 +787,94 @@ export async function payVirtualTransaction(txData: VirtualTransactionInput) {
     if (!session?.user?.id) throw new Error("Unauthorized");
     const userId = session.user.id;
 
-    const dueDate = txData.dueDate || txData.date || format(new Date(), "yyyy-MM-dd");
-    const launchDate = txData.launchDate || dueDate;
+    const existingOverride = txData.fixedTransactionId
+      ? await db.query.fixedTransactionOverrides.findFirst({
+          where: and(
+            eq(fixedTransactionOverrides.fixedTransactionId, txData.fixedTransactionId),
+            eq(fixedTransactionOverrides.competencyMonth, txData.competencyMonth),
+            eq(fixedTransactionOverrides.userId, userId),
+          ),
+        })
+      : undefined;
+
+    const dueDate = existingOverride?.dueDate || txData.dueDate || txData.date || format(new Date(), "yyyy-MM-dd");
+    const launchDate = existingOverride?.launchDate || txData.launchDate || dueDate;
 
     if (txData.type === "transfer" && txData.fixedTransactionId) {
       const ft = await db.query.fixedTransactions.findFirst({
         where: and(eq(fixedTransactions.id, txData.fixedTransactionId), eq(fixedTransactions.userId, userId)),
       });
-      if (ft && ft.destinationAccountId) {
+      const resolvedFt = ft ? resolveFixedOccurrence(ft, existingOverride) : null;
+      if (resolvedFt && resolvedFt.destinationAccountId) {
         await db.transaction(async (tx) => {
           const [originTx] = await tx
             .insert(transactions)
             .values({
               userId,
               type: "transfer",
-              accountId: ft.accountId,
-              categoryId: ft.categoryId,
-              subcategoryId: ft.subcategoryId,
-              amount: ft.amount,
-              description: `${ft.description} (Saída)`,
+              accountId: resolvedFt.accountId,
+              categoryId: resolvedFt.categoryId,
+              subcategoryId: resolvedFt.subcategoryId,
+              amount: resolvedFt.amount,
+              description: `${resolvedFt.description} (Saída)`,
               dueDate,
               launchDate,
               competencyMonth: txData.competencyMonth,
               invoiceMonth: txData.invoiceMonth || null,
               status: "paid",
               paidAt: new Date(),
-              fixedTransactionId: ft.id,
+              fixedTransactionId: resolvedFt.id,
             })
             .returning();
 
-          await applyBalanceDelta(tx, ft.accountId, ft.amount, "transfer", "paid", null);
+          await applyBalanceDelta(tx, resolvedFt.accountId, resolvedFt.amount, "transfer", "paid", null);
 
-          const [destTx] = await tx
+          await tx
             .insert(transactions)
             .values({
               userId,
               type: "transfer",
-              accountId: ft.destinationAccountId,
-              categoryId: ft.categoryId,
-              subcategoryId: ft.subcategoryId,
-              amount: ft.amount,
-              description: `${ft.description} (Entrada)`,
+              accountId: resolvedFt.destinationAccountId,
+              categoryId: resolvedFt.categoryId,
+              subcategoryId: resolvedFt.subcategoryId,
+              amount: resolvedFt.amount,
+              description: `${resolvedFt.description} (Entrada)`,
               dueDate,
               launchDate,
               competencyMonth: txData.competencyMonth,
               invoiceMonth: txData.invoiceMonth || null,
               status: "paid",
               paidAt: new Date(),
-              fixedTransactionId: ft.id,
+              fixedTransactionId: resolvedFt.id,
               parentTransactionId: originTx.id,
-            })
-            .returning();
+            });
 
-          await applyBalanceDelta(tx, ft.destinationAccountId, ft.amount, "transfer", "paid", originTx.id);
+          await applyBalanceDelta(tx, resolvedFt.destinationAccountId, resolvedFt.amount, "transfer", "paid", originTx.id);
         });
       }
     } else {
       await db.transaction(async (tx) => {
+        const finalAccountId = existingOverride?.accountId ?? txData.accountId;
+        const finalCreditCardId = existingOverride?.creditCardId ?? txData.creditCardId;
+        const finalCategoryId = existingOverride?.categoryId ?? txData.categoryId;
+        const finalSubcategoryId =
+          existingOverride && existingOverride.subcategoryId !== undefined
+            ? existingOverride.subcategoryId
+            : txData.subcategoryId && txData.subcategoryId > 0
+              ? txData.subcategoryId
+              : null;
+        const finalAmount = existingOverride?.amount ?? txData.amount;
+        const finalDescription = existingOverride?.description ?? txData.description;
+
         await tx.insert(transactions).values({
           userId,
           type: txData.type,
-          accountId: txData.accountId,
-          creditCardId: txData.creditCardId,
-          categoryId: txData.categoryId,
-          subcategoryId: txData.subcategoryId && txData.subcategoryId > 0 ? txData.subcategoryId : null,
-          amount: txData.amount,
-          description: txData.description,
+          accountId: finalAccountId,
+          creditCardId: finalCreditCardId,
+          categoryId: finalCategoryId,
+          subcategoryId: finalSubcategoryId,
+          amount: finalAmount,
+          description: finalDescription,
           dueDate,
           launchDate,
           competencyMonth: txData.competencyMonth,
@@ -838,7 +884,7 @@ export async function payVirtualTransaction(txData: VirtualTransactionInput) {
           fixedTransactionId: txData.fixedTransactionId,
         });
 
-        await applyBalanceDelta(tx, txData.accountId, txData.amount, txData.type, "paid", null);
+        await applyBalanceDelta(tx, finalAccountId, finalAmount, txData.type, "paid", null);
       });
     }
 
@@ -896,7 +942,7 @@ export async function getCreditCardInvoiceMonths(creditCardId: number) {
 
 export async function deleteTransaction(
   id: number,
-  mode: "single" | "future" = "single",
+  mode: "single" | "future" | "all" = "single",
   isFixedVirtual: boolean = false,
   fixedTransactionId?: string,
   virtualDate?: string,
@@ -915,77 +961,66 @@ export async function deleteTransaction(
 
       if (!transactionItem) {
         if (isFixedVirtual && fixedTransactionId) {
-          if (mode === "future") {
+          if (mode === "all") {
             await tx
               .update(fixedTransactions)
               .set({ active: false })
-              .where(eq(fixedTransactions.id, fixedTransactionId));
+              .where(and(eq(fixedTransactions.id, fixedTransactionId), eq(fixedTransactions.userId, userId)));
             await tx
               .delete(transactions)
-              .where(and(eq(transactions.fixedTransactionId, fixedTransactionId), eq(transactions.status, "pending")));
+              .where(
+                and(
+                  eq(transactions.fixedTransactionId, fixedTransactionId),
+                  eq(transactions.status, "pending"),
+                  eq(transactions.userId, userId),
+                ),
+              );
+            await tx
+              .delete(fixedTransactionOverrides)
+              .where(
+                and(
+                  eq(fixedTransactionOverrides.fixedTransactionId, fixedTransactionId),
+                  eq(fixedTransactionOverrides.userId, userId),
+                ),
+              );
             return { success: true };
-          } else if (mode === "single" && virtualDate && virtualCompetencyMonth) {
-            // Se for single, pegamos os dados originais da fixed_transaction
-            const [ft] = await tx.select().from(fixedTransactions).where(eq(fixedTransactions.id, fixedTransactionId));
-            if (ft) {
-              if (ft.type === "transfer" && ft.destinationAccountId) {
-                // Insere Saída
-                const [outTx] = await tx
-                  .insert(transactions)
-                  .values({
-                    userId: ft.userId,
-                    type: ft.type,
-                    accountId: ft.accountId,
-                    creditCardId: ft.creditCardId,
-                    categoryId: ft.categoryId,
-                    subcategoryId: ft.subcategoryId,
-                    amount: ft.amount,
-                    description: `${ft.description} (Saída)`,
-                    dueDate: virtualDate,
-                    launchDate: virtualDate,
-                    competencyMonth: virtualCompetencyMonth,
-                    status: "ignored",
-                    fixedTransactionId: ft.id,
-                  })
-                  .returning();
-
-                // Insere Entrada
-                await tx.insert(transactions).values({
-                  userId: ft.userId,
-                  type: ft.type,
-                  accountId: ft.destinationAccountId,
-                  creditCardId: null,
-                  categoryId: ft.categoryId,
-                  subcategoryId: ft.subcategoryId,
-                  amount: ft.amount,
-                  description: `${ft.description} (Entrada)`,
-                  dueDate: virtualDate,
-                  launchDate: virtualDate,
-                  competencyMonth: virtualCompetencyMonth,
-                  status: "ignored",
-                  fixedTransactionId: ft.id,
-                  parentTransactionId: outTx.id,
-                });
-              } else {
-                await tx.insert(transactions).values({
-                  userId: ft.userId,
-                  type: ft.type,
-                  accountId: ft.accountId,
-                  creditCardId: ft.creditCardId,
-                  categoryId: ft.categoryId,
-                  subcategoryId: ft.subcategoryId,
-                  amount: ft.amount,
-                  description: ft.description,
-                  dueDate: virtualDate,
-                  launchDate: virtualDate,
-                  competencyMonth: virtualCompetencyMonth,
-                  status: "ignored",
-                  fixedTransactionId: ft.id,
-                });
-              }
-              return { success: true };
-            }
-            return { success: false, error: "Transação fixa não encontrada." };
+          } else if (mode === "future" && virtualCompetencyMonth) {
+            const prevMonth = getPreviousCompetencyMonth(virtualCompetencyMonth);
+            await tx
+              .update(fixedTransactions)
+              .set({ endMonth: prevMonth })
+              .where(and(eq(fixedTransactions.id, fixedTransactionId), eq(fixedTransactions.userId, userId)));
+            await tx
+              .delete(transactions)
+              .where(
+                and(
+                  eq(transactions.fixedTransactionId, fixedTransactionId),
+                  eq(transactions.status, "pending"),
+                  eq(transactions.userId, userId),
+                  or(
+                    gte(transactions.invoiceMonth, virtualCompetencyMonth),
+                    and(isNull(transactions.invoiceMonth), gte(transactions.competencyMonth, virtualCompetencyMonth)),
+                  ),
+                ),
+              );
+            await tx
+              .delete(fixedTransactionOverrides)
+              .where(
+                and(
+                  eq(fixedTransactionOverrides.fixedTransactionId, fixedTransactionId),
+                  eq(fixedTransactionOverrides.userId, userId),
+                  gte(fixedTransactionOverrides.competencyMonth, virtualCompetencyMonth),
+                ),
+              );
+            return { success: true };
+          } else if (mode === "single" && virtualCompetencyMonth) {
+            await upsertFixedOverride(tx, {
+              userId,
+              fixedTransactionId,
+              competencyMonth: virtualCompetencyMonth,
+              isIgnored: true,
+            });
+            return { success: true };
           }
         }
         return { success: true };
@@ -993,11 +1028,59 @@ export async function deleteTransaction(
 
       const targetFixedId = transactionItem.fixedTransactionId || fixedTransactionId;
       if (targetFixedId) {
-        if (mode === "future") {
-          await tx.update(fixedTransactions).set({ active: false }).where(eq(fixedTransactions.id, targetFixedId));
+        if (mode === "all") {
+          await tx
+            .update(fixedTransactions)
+            .set({ active: false })
+            .where(and(eq(fixedTransactions.id, targetFixedId), eq(fixedTransactions.userId, userId)));
           await tx
             .delete(transactions)
-            .where(and(eq(transactions.fixedTransactionId, targetFixedId), eq(transactions.status, "pending")));
+            .where(
+              and(
+                eq(transactions.fixedTransactionId, targetFixedId),
+                eq(transactions.status, "pending"),
+                eq(transactions.userId, userId),
+              ),
+            );
+          await tx
+            .delete(fixedTransactionOverrides)
+            .where(
+              and(
+                eq(fixedTransactionOverrides.fixedTransactionId, targetFixedId),
+                eq(fixedTransactionOverrides.userId, userId),
+              ),
+            );
+          return { success: true };
+        } else if (mode === "future") {
+          const targetMonth =
+            virtualCompetencyMonth || transactionItem.invoiceMonth || transactionItem.competencyMonth;
+          const prevMonth = getPreviousCompetencyMonth(targetMonth);
+          await tx
+            .update(fixedTransactions)
+            .set({ endMonth: prevMonth })
+            .where(and(eq(fixedTransactions.id, targetFixedId), eq(fixedTransactions.userId, userId)));
+          await tx
+            .delete(transactions)
+            .where(
+              and(
+                eq(transactions.fixedTransactionId, targetFixedId),
+                eq(transactions.status, "pending"),
+                eq(transactions.userId, userId),
+                or(
+                  gte(transactions.invoiceMonth, targetMonth),
+                  and(isNull(transactions.invoiceMonth), gte(transactions.competencyMonth, targetMonth)),
+                ),
+              ),
+            );
+          await tx
+            .delete(fixedTransactionOverrides)
+            .where(
+              and(
+                eq(fixedTransactionOverrides.fixedTransactionId, targetFixedId),
+                eq(fixedTransactionOverrides.userId, userId),
+                gte(fixedTransactionOverrides.competencyMonth, targetMonth),
+              ),
+            );
           return { success: true };
         } else if (isFixedVirtual) {
           return { success: false, error: "Não é possível excluir um único mês de uma projeção sem antes efetivá-la." };
@@ -1190,6 +1273,8 @@ export async function updateTransaction(
     destinationAccountId?: number;
     updateFuture?: boolean;
     updateFutureDueDateMode?: "day_only" | "exact" | "keep";
+    fixedTransactionId?: string | null;
+    originalCompetencyMonth?: string | null;
   },
 ): Promise<{ success: boolean; error?: string }> {
   try {
@@ -1206,9 +1291,110 @@ export async function updateTransaction(
         .from(transactions)
         .where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
       if (!oldTx) {
+        if (id < 0 && inputData.fixedTransactionId && inputData.originalCompetencyMonth) {
+          const [ft] = await tx
+            .select()
+            .from(fixedTransactions)
+            .where(and(eq(fixedTransactions.id, inputData.fixedTransactionId), eq(fixedTransactions.userId, userId)));
+          if (!ft) {
+            throw new Error("Transação fixa não encontrada");
+          }
+
+          const targetCompMonth = inputData.originalCompetencyMonth;
+          const cleanDescription = inputData.description
+            ? inputData.description.replace(/\s*\(Saída\)|\s*\(Entrada\)/g, "")
+            : undefined;
+          const targetDueDate = inputData.dueDate || inputData.date;
+
+          if (!inputData.updateFuture) {
+            await upsertFixedOverride(tx, {
+              userId,
+              fixedTransactionId: ft.id,
+              competencyMonth: targetCompMonth,
+              amount: inputData.amount !== undefined ? String(inputData.amount) : undefined,
+              description: cleanDescription,
+              dueDate: targetDueDate,
+              launchDate: inputData.launchDate || targetDueDate,
+              categoryId: inputData.categoryId,
+              subcategoryId: inputData.subcategoryId !== undefined ? inputData.subcategoryId : undefined,
+              accountId: inputData.accountId !== undefined ? inputData.accountId : undefined,
+              creditCardId: inputData.creditCardId !== undefined ? inputData.creditCardId : undefined,
+              destinationAccountId:
+                inputData.destinationAccountId !== undefined ? inputData.destinationAccountId : undefined,
+              isIgnored: false,
+            });
+            return { success: true };
+          } else {
+            const updateFixed: Partial<typeof fixedTransactions.$inferInsert> = {};
+            if (inputData.amount !== undefined) updateFixed.amount = String(inputData.amount);
+            if (cleanDescription !== undefined) updateFixed.description = cleanDescription;
+            if (inputData.categoryId !== undefined) updateFixed.categoryId = inputData.categoryId;
+            if (inputData.subcategoryId !== undefined) updateFixed.subcategoryId = inputData.subcategoryId;
+            if (inputData.accountId !== undefined) updateFixed.accountId = inputData.accountId;
+            if (inputData.creditCardId !== undefined) updateFixed.creditCardId = inputData.creditCardId;
+            if (inputData.destinationAccountId !== undefined)
+              updateFixed.destinationAccountId = inputData.destinationAccountId;
+
+            if (targetDueDate && inputData.updateFutureDueDateMode && inputData.updateFutureDueDateMode !== "keep") {
+              if (inputData.updateFutureDueDateMode === "day_only") {
+                const targetDay = Number(targetDueDate.split("-")[2]);
+                if (!Number.isNaN(targetDay)) {
+                  updateFixed.startDate = applyDueDateDay(ft.startDate, targetDay);
+                }
+              } else if (inputData.updateFutureDueDateMode === "exact") {
+                updateFixed.startDate = targetDueDate;
+              }
+            }
+
+            if (Object.keys(updateFixed).length > 0) {
+              await tx
+                .update(fixedTransactions)
+                .set(updateFixed)
+                .where(and(eq(fixedTransactions.id, ft.id), eq(fixedTransactions.userId, userId)));
+            }
+
+            await tx
+              .delete(fixedTransactionOverrides)
+              .where(
+                and(
+                  eq(fixedTransactionOverrides.fixedTransactionId, ft.id),
+                  eq(fixedTransactionOverrides.userId, userId),
+                  gte(fixedTransactionOverrides.competencyMonth, targetCompMonth),
+                ),
+              );
+
+            const updatePending: Partial<typeof transactions.$inferInsert> = {};
+            if (inputData.amount !== undefined) updatePending.amount = String(inputData.amount);
+            if (cleanDescription !== undefined && ft.type !== "transfer") updatePending.description = cleanDescription;
+            if (inputData.categoryId !== undefined) updatePending.categoryId = inputData.categoryId;
+            if (inputData.subcategoryId !== undefined) updatePending.subcategoryId = inputData.subcategoryId;
+            if (inputData.accountId !== undefined && ft.type !== "transfer")
+              updatePending.accountId = inputData.accountId;
+            if (inputData.creditCardId !== undefined) updatePending.creditCardId = inputData.creditCardId;
+
+            if (Object.keys(updatePending).length > 0) {
+              await tx
+                .update(transactions)
+                .set(updatePending)
+                .where(
+                  and(
+                    eq(transactions.fixedTransactionId, ft.id),
+                    eq(transactions.userId, userId),
+                    eq(transactions.status, "pending"),
+                    or(
+                      gte(transactions.invoiceMonth, targetCompMonth),
+                      and(isNull(transactions.invoiceMonth), gte(transactions.competencyMonth, targetCompMonth)),
+                    ),
+                  ),
+                );
+            }
+
+            return { success: true };
+          }
+        }
         if (id < 0) {
           throw new Error(
-            "Não é possível editar uma transação virtual futura. Confirme-a (marque como paga) primeiro para poder editá-la.",
+            "Não é possível editar uma transação virtual futura sem referência da recorrência.",
           );
         }
         throw new Error("Transação não encontrada");
@@ -1229,7 +1415,15 @@ export async function updateTransaction(
         }
       }
 
-      const { destinationAccountId, updateFuture, updateFutureDueDateMode, date: legacyDate, ...data } = inputData;
+      const {
+        destinationAccountId,
+        updateFuture,
+        updateFutureDueDateMode,
+        fixedTransactionId: _ignoredFixedId,
+        originalCompetencyMonth: _ignoredOrigComp,
+        date: legacyDate,
+        ...data
+      } = inputData;
       if (inputData.dueDate || legacyDate) {
         data.dueDate = inputData.dueDate || legacyDate;
       }

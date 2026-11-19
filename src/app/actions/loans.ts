@@ -5,6 +5,12 @@ import { db } from "@/db";
 import { accounts, categories, fixedTransactions, loans, settings, transactions } from "@/db/schema";
 import { applyBalanceDelta } from "@/lib/balance-utils";
 import { getCompetencyMonth } from "@/lib/competency-utils";
+import {
+  getFixedOverride,
+  getFixedOverridesMapSimple,
+  isFixedActiveForMonth,
+  resolveFixedOccurrence,
+} from "@/lib/fixed-transactions";
 import { addMonths, format, getDate, parseISO } from "date-fns";
 import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -506,6 +512,11 @@ export async function getLoansPageData() {
         ),
       );
 
+    const allFixedIds = Array.from(
+      new Set([...activeFixedInflows.map((f) => f.id), ...activeFixedOutflows.map((f) => f.id)]),
+    );
+    const fixedOverridesMap = await getFixedOverridesMapSimple(userId, allFixedIds);
+
     const today = new Date();
     const currentCompetencyMonth = getCompetencyMonth(today, closingDay);
 
@@ -590,13 +601,21 @@ export async function getLoansPageData() {
         for (const ft of activeFixedInflows) {
           if (ft.accountId === acc.id || ft.destinationAccountId === acc.id) {
             const ftStartMonth = ft.startDate.substring(0, 7);
-            if (monthStr >= ftStartMonth && !materializedFixed.has(`${monthStr}-${ft.id}`)) {
-              const amt = Number(ft.amount);
-              monthOtherIncomes += amt;
-              otherItems.push({
-                description: `${ft.description} (Fixo)`,
-                amount: amt,
-              });
+            if (
+              monthStr >= ftStartMonth &&
+              isFixedActiveForMonth(ft, monthStr) &&
+              !materializedFixed.has(`${monthStr}-${ft.id}`)
+            ) {
+              const override = getFixedOverride(fixedOverridesMap, ft.id, monthStr);
+              const resolved = resolveFixedOccurrence(ft, override);
+              if (resolved) {
+                const amt = Number(resolved.amount);
+                monthOtherIncomes += amt;
+                otherItems.push({
+                  description: `${resolved.description} (Fixo)`,
+                  amount: amt,
+                });
+              }
             }
           }
         }
@@ -620,13 +639,21 @@ export async function getLoansPageData() {
         for (const ft of activeFixedOutflows) {
           if (ft.accountId === acc.id) {
             const ftStartMonth = ft.startDate.substring(0, 7);
-            if (monthStr >= ftStartMonth && !materializedFixed.has(`${monthStr}-${ft.id}`)) {
-              const amt = Number(ft.amount);
-              monthOtherOutflows += amt;
-              otherItems.push({
-                description: `${ft.description} (Fixo)`,
-                amount: -amt,
-              });
+            if (
+              monthStr >= ftStartMonth &&
+              isFixedActiveForMonth(ft, monthStr) &&
+              !materializedFixed.has(`${monthStr}-${ft.id}`)
+            ) {
+              const override = getFixedOverride(fixedOverridesMap, ft.id, monthStr);
+              const resolved = resolveFixedOccurrence(ft, override);
+              if (resolved) {
+                const amt = Number(resolved.amount);
+                monthOtherOutflows += amt;
+                otherItems.push({
+                  description: `${resolved.description} (Fixo)`,
+                  amount: -amt,
+                });
+              }
             }
           }
         }

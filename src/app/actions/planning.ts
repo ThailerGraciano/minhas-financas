@@ -4,8 +4,14 @@ import { getHistoricalBalance } from "@/app/actions/accounts";
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { accounts, creditCards, fixedTransactions, settings, transactions } from "@/db/schema";
-import { getTargetInvoiceMonth } from "@/lib/competency-utils";
+import { getCompetencyMonth, getTargetInvoiceMonth } from "@/lib/competency-utils";
 import { getDefaultCompetencyMonth } from "@/lib/date-utils";
+import {
+  getFixedOverride,
+  getFixedOverridesMapSimple,
+  isFixedActiveForMonth,
+  resolveFixedOccurrence,
+} from "@/lib/fixed-transactions";
 import { addDays, addMonths, differenceInDays, format, lastDayOfMonth, parseISO } from "date-fns";
 import { and, asc, eq, gt, gte, inArray, isNotNull, lte, ne, or, sql, SQL } from "drizzle-orm";
 
@@ -200,6 +206,11 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
       ),
     );
 
+  const overridesMap = await getFixedOverridesMapSimple(
+    userId,
+    activeFixed.map((ft) => ft.id),
+  );
+
   type TransactionItem = (typeof allTxs)[0];
   const virtualTxs: TransactionItem[] = [];
   for (const ft of activeFixed) {
@@ -240,42 +251,49 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
         }
       }
 
-      virtualTxs.push({
-        id: -Math.floor(Math.random() * 1000000), // virtual id
-        type: ft.type,
-        amount: ft.amount,
-        dueDate: virtDateStr,
-        launchDate: virtDateStr,
-        description: ft.description + " (Projetada)",
-        accountId: ft.accountId,
-        creditCardId: ft.creditCardId,
-        categoryId: ft.categoryId,
-        subcategoryId: ft.subcategoryId,
-        userId: ft.userId,
-        status: "pending",
-        competencyMonth: format(cursor, "yyyy-MM"),
-        invoiceMonth: virtInvoiceMonth,
-        isFixed: false,
-        fixedTransactionId: ft.id,
-        installmentCurrent: null,
-        installmentTotal: null,
-        parentTransactionId: null,
-        installmentParentId: null,
-        observations: null,
-        paidAt: null,
-        importHash: null,
-        loanId: null,
-        category: {
-          id: ft.categoryId,
-          name: "Virtual",
-          userId: ft.userId,
-          type: ft.type,
-          icon: "virtual",
-          isPredictable: false,
-        },
-        account: null,
-        creditCard: null,
-      });
+      const virtCompMonth = virtInvoiceMonth || getCompetencyMonth(cursor, closingDay);
+      if (isFixedActiveForMonth(ft, virtCompMonth)) {
+        const override = getFixedOverride(overridesMap, ft.id, virtCompMonth);
+        const resolved = resolveFixedOccurrence(ft, override);
+        if (resolved) {
+          virtualTxs.push({
+            id: -Math.floor(Math.random() * 1000000), // virtual id
+            type: resolved.type,
+            amount: resolved.amount,
+            dueDate: resolved.overrideDueDate || virtDateStr,
+            launchDate: resolved.overrideLaunchDate || resolved.overrideDueDate || virtDateStr,
+            description: resolved.description + " (Projetada)",
+            accountId: resolved.accountId,
+            creditCardId: resolved.creditCardId,
+            categoryId: resolved.categoryId,
+            subcategoryId: resolved.subcategoryId,
+            userId: ft.userId,
+            status: "pending",
+            competencyMonth: virtCompMonth,
+            invoiceMonth: virtInvoiceMonth,
+            isFixed: false,
+            fixedTransactionId: ft.id,
+            installmentCurrent: null,
+            installmentTotal: null,
+            parentTransactionId: null,
+            installmentParentId: null,
+            observations: null,
+            paidAt: null,
+            importHash: null,
+            loanId: null,
+            category: {
+              id: resolved.categoryId,
+              name: "Virtual",
+              userId: ft.userId,
+              type: resolved.type,
+              icon: "virtual",
+              isPredictable: false,
+            },
+            account: null,
+            creditCard: null,
+          });
+        }
+      }
       cursor.setMonth(cursor.getMonth() + 1);
     }
   }

@@ -30,6 +30,7 @@ export function ClientDataLoader<T>({
   const [data, setData] = useState<T>(initialData);
   const [isLoading, setIsLoading] = useState(false);
   const [prevInitialData, setPrevInitialData] = useState(initialData);
+  const [refreshKey, setRefreshKey] = useState(0);
   const isFirstRender = useRef(true);
 
   // Sync state when server props change (e.g. after a Server Action)
@@ -37,6 +38,8 @@ export function ClientDataLoader<T>({
     setPrevInitialData(initialData);
     if (selectedMonth === currentMonth) {
       setData(initialData);
+    } else {
+      setRefreshKey((k) => k + 1);
     }
   }
 
@@ -61,7 +64,7 @@ export function ClientDataLoader<T>({
     return () => {
       active = false;
     };
-  }, [selectedMonth, fetchAction]);
+  }, [selectedMonth, fetchAction, refreshKey]);
 
   const handleMonthChange = (month: string) => {
     setSelectedMonth(month);

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { getDefaultCompetencyMonth } from "@/lib/date-utils";
-import { ArrowLeft, CalendarClock, CreditCard as CreditCardIcon } from "lucide-react";
+import { ArrowLeft, CalendarClock, CreditCard as CreditCardIcon, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdjustInvoiceDialog } from "./adjust-invoice-dialog";
@@ -157,9 +157,17 @@ export default async function CreditCardInvoicePage(props: {
 
       {/* Expenses Table */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2 px-4 sm:px-6">
+        <CardHeader className="flex flex-row items-center justify-between gap-2 px-4 sm:px-6 flex-wrap">
           <CardTitle className="text-sm md:text-lg shrink-0">Despesas da Fatura - {currentMonth}</CardTitle>
-          <ExportCSVButton transactions={summary.transactions} invoiceMonth={currentMonth} cardName={card.name} />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="h-8 text-xs sm:text-sm gap-2" asChild>
+              <Link href={`/credit-cards/${id}/reconcile?month=${currentMonth}`}>
+                <Sparkles className="w-4 h-4 text-purple-400" />
+                <span>Importar / Conciliar (IA)</span>
+              </Link>
+            </Button>
+            <ExportCSVButton transactions={summary.transactions} invoiceMonth={currentMonth} cardName={card.name} />
+          </div>
         </CardHeader>
         <CardContent className="px-2 sm:px-6">
           {summary.transactions.length === 0 ? (

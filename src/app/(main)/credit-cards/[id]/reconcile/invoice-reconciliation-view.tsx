@@ -90,6 +90,7 @@ export function InvoiceReconciliationView({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [bankTotal, setBankTotal] = useState<number>(0);
   const [appTotal, setAppTotal] = useState<number>(currentTotal);
@@ -113,24 +114,32 @@ export function InvoiceReconciliationView({
       file.type === "text/csv" || lowerName.endsWith(".csv") || file.type === "application/vnd.ms-excel";
 
     if (!isPdf && !isCsv) {
-      toast.error("Formato inválido. Selecione um arquivo .CSV ou .PDF.");
+      const msg = "Formato inválido. Selecione um arquivo .CSV ou .PDF.";
+      setErrorMessage(msg);
+      toast.error(msg);
       return;
     }
 
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      toast.error("O arquivo excede o limite máximo de 10 MB.");
+      const msg = "O arquivo excede o limite máximo de 10 MB.";
+      setErrorMessage(msg);
+      toast.error(msg);
       return;
     }
 
+    setErrorMessage(null);
     setSelectedFile(file);
   };
 
   const handleAnalyze = async () => {
     if (!selectedFile) {
-      toast.error("Selecione um arquivo CSV ou PDF da fatura.");
+      const msg = "Selecione um arquivo CSV ou PDF da fatura.";
+      setErrorMessage(msg);
+      toast.error(msg);
       return;
     }
 
+    setErrorMessage(null);
     setStep("analyzing");
     try {
       const isPdf =
@@ -147,6 +156,7 @@ export function InvoiceReconciliationView({
       });
 
       if (!response.success) {
+        setErrorMessage(response.error);
         toast.error(response.error);
         setStep("upload");
         return;
@@ -160,7 +170,12 @@ export function InvoiceReconciliationView({
       setStep("review");
     } catch (error) {
       console.error(error);
-      toast.error("Erro inesperado ao processar o arquivo.");
+      const msg =
+        error instanceof Error && error.message
+          ? `Erro ao processar o arquivo: ${error.message}`
+          : "Erro inesperado ao processar o arquivo.";
+      setErrorMessage(msg);
+      toast.error(msg);
       setStep("upload");
     }
   };
@@ -363,6 +378,16 @@ export function InvoiceReconciliationView({
               </div>
             )}
           </div>
+
+          {errorMessage && (
+            <div
+              role="alert"
+              className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            >
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
             <p className="text-xs text-muted-foreground">

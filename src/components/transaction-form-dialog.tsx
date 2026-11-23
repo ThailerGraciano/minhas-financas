@@ -104,7 +104,7 @@ export function TransactionFormDialog({
     const date = parseISO(launchDate);
     const defaultMonth = date.getDate() >= card.closingDay ? addMonths(date, 1) : date;
     const base = new Date(defaultMonth.getFullYear(), defaultMonth.getMonth(), 1);
-    return [0, 1, 2, 3].map((offset) => addMonths(base, offset));
+    return [-1, 0, 1, 2].map((offset) => addMonths(base, offset));
   }, [card, launchDate]);
 
   const effectiveDueDate = useMemo(() => {

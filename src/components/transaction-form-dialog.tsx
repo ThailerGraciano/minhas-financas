@@ -15,6 +15,8 @@ import {
   type Category,
   type FormData,
   type RecurrenceKind,
+  type TransactionFormErrors,
+  type TransactionFormField,
 } from "@/components/transaction-form";
 import {
   getTransactionAccent,
@@ -25,10 +27,25 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } 
 import { orderByMostUsedCategory } from "@/lib/category-utils";
 import { addMonths, format, parseISO } from "date-fns";
 import { useRouter } from "next/navigation";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 const today = () => format(new Date(), "yyyy-MM-dd");
+
+const FIELD_ORDER: readonly TransactionFormField[] = [
+  "amount",
+  "description",
+  "categoryId",
+  "subcategoryId",
+  "originId",
+  "destinationId",
+  "accountId",
+  "incomeAccountId",
+  "cardId",
+  "invoiceMonth",
+  "installment",
+  "totalInstallments",
+];
 
 export interface TransactionFormDialogProps {
   trigger?: React.ReactNode;
@@ -66,13 +83,28 @@ export function TransactionFormDialog({
   const [pending, setPending] = useState(false);
   const [closedInvoice, setClosedInvoice] = useState(false);
   const [closeAfterSave, setCloseAfterSave] = useState(true);
+  const [errors, setErrors] = useState<TransactionFormErrors>({});
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
 
   useEffect(() => {
-    if (open && !data) {
-      getTransactionFormData().then(setData);
-    }
-  }, [open, data]);
+    if (!open) return;
+
+    let cancelled = false;
+    getTransactionFormData()
+      .then((freshData) => {
+        if (!cancelled) {
+          setData(freshData);
+        }
+      })
+      .catch((error: unknown) => {
+        console.error("Erro ao carregar dados do formulário:", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   const accent: AccentColorConfig = useMemo(() => getTransactionAccent(tab), [tab]);
 
@@ -124,6 +156,18 @@ export function TransactionFormDialog({
     [amount, isTotalAmount, totalInstallments],
   );
 
+  const clearFieldErrors = useCallback((...fields: TransactionFormField[]) => {
+    setErrors((prev) => {
+      const hasAny = fields.some((field) => prev[field] !== undefined);
+      if (!hasAny) return prev;
+      const next: TransactionFormErrors = { ...prev };
+      for (const field of fields) {
+        delete next[field];
+      }
+      return next;
+    });
+  }, []);
+
   const reset = useCallback((nextTab = tab) => {
     setTab(nextTab);
     setAmount(undefined);
@@ -145,6 +189,7 @@ export function TransactionFormDialog({
     setTotalInstallments("2");
     setIsTotalAmount(true);
     setIsPaid(true);
+    setErrors({});
   }, [tab]);
 
   const changeTab = useCallback((next: TransactionTab) => {
@@ -155,13 +200,79 @@ export function TransactionFormDialog({
     setAccountId("");
     setCardId("");
     setInvoiceMonth("");
+    setErrors({});
   }, []);
+
+  const handleAmountChange = useCallback(
+    (value: number | undefined) => {
+      setAmount(value);
+      clearFieldErrors("amount");
+    },
+    [clearFieldErrors],
+  );
+
+  const handleDescriptionChange = useCallback(
+    (value: string) => {
+      setDescription(value);
+      clearFieldErrors("description");
+    },
+    [clearFieldErrors],
+  );
 
   const chooseCategory = useCallback((value: string) => {
     setCategoryId(value);
     const first = data?.categories.find((item: Category) => item.id === Number(value))?.subcategories?.[0];
     setSubcategoryId(first ? String(first.id) : "");
-  }, [data?.categories]);
+    clearFieldErrors("categoryId", "subcategoryId");
+  }, [data?.categories, clearFieldErrors]);
+
+  const handleSubcategoryChange = useCallback(
+    (value: string) => {
+      setSubcategoryId(value);
+      clearFieldErrors("subcategoryId");
+    },
+    [clearFieldErrors],
+  );
+
+  const handleOriginChange = useCallback(
+    (value: string) => {
+      setOriginId(value);
+      clearFieldErrors("originId", "destinationId");
+    },
+    [clearFieldErrors],
+  );
+
+  const handleDestinationChange = useCallback(
+    (value: string) => {
+      setDestinationId(value);
+      clearFieldErrors("destinationId");
+    },
+    [clearFieldErrors],
+  );
+
+  const handlePaymentChange = useCallback(
+    (value: "account" | "credit_card") => {
+      setPayment(value);
+      clearFieldErrors("accountId", "cardId", "invoiceMonth");
+    },
+    [clearFieldErrors],
+  );
+
+  const handleAccountIdChange = useCallback(
+    (value: string) => {
+      setAccountId(value);
+      clearFieldErrors("accountId");
+    },
+    [clearFieldErrors],
+  );
+
+  const handleIncomeAccountIdChange = useCallback(
+    (value: string) => {
+      setIncomeAccountId(value);
+      clearFieldErrors("incomeAccountId");
+    },
+    [clearFieldErrors],
+  );
 
   const handleCard = useCallback((value: string) => {
     setCardId(value);
@@ -171,7 +282,40 @@ export function TransactionFormDialog({
       const month = date.getDate() >= next.closingDay ? addMonths(date, 1) : date;
       setInvoiceMonth(format(month, "yyyy-MM"));
     }
-  }, [data?.creditCards, launchDate]);
+    clearFieldErrors("cardId", "invoiceMonth");
+  }, [data?.creditCards, launchDate, clearFieldErrors]);
+
+  const handleInvoiceMonthChange = useCallback(
+    (value: string) => {
+      setInvoiceMonth(value);
+      clearFieldErrors("invoiceMonth");
+    },
+    [clearFieldErrors],
+  );
+
+  const handleKindChange = useCallback(
+    (value: RecurrenceKind) => {
+      setKind(value);
+      clearFieldErrors("installment", "totalInstallments");
+    },
+    [clearFieldErrors],
+  );
+
+  const handleInstallmentChange = useCallback(
+    (value: string) => {
+      setInstallment(value);
+      clearFieldErrors("installment", "totalInstallments");
+    },
+    [clearFieldErrors],
+  );
+
+  const handleTotalInstallmentsChange = useCallback(
+    (value: string) => {
+      setTotalInstallments(value);
+      clearFieldErrors("installment", "totalInstallments");
+    },
+    [clearFieldErrors],
+  );
 
   const handleLaunchDate = useCallback((value: string) => {
     setLaunchDate(value);
@@ -200,27 +344,76 @@ export function TransactionFormDialog({
     setData(nextData);
     setCategoryId(newCategoryId);
     setSubcategoryId(newSubcategoryId);
-  }, []);
+    clearFieldErrors("categoryId", "subcategoryId");
+  }, [clearFieldErrors]);
 
   const save = useCallback(async (close: boolean, confirmed = false) => {
-    if (!amount || !description.trim()) {
-      return toast.error("Informe descrição e valor.");
+    const nextErrors: TransactionFormErrors = {};
+
+    if (!amount || amount <= 0) {
+      nextErrors.amount = "Informe um valor maior que zero.";
     }
-    if (tab !== "transfer" && !categoryId) {
-      return toast.error("Selecione uma categoria.");
+    if (!description.trim()) {
+      nextErrors.description = "Informe uma descrição.";
     }
-    if (tab === "transfer" && (!originId || !destinationId || originId === destinationId)) {
-      return toast.error("Escolha contas diferentes para origem e destino.");
+    if (tab !== "transfer") {
+      if (!categoryId) {
+        nextErrors.categoryId = "Selecione uma categoria.";
+      } else if (!subcategoryId) {
+        nextErrors.subcategoryId =
+          subcategories.length === 0
+            ? "Crie uma subcategoria usando o botão +."
+            : "Selecione uma subcategoria.";
+      }
+    } else {
+      if (!originId) {
+        nextErrors.originId = "Selecione a conta de origem.";
+      }
+      if (!destinationId) {
+        nextErrors.destinationId = "Selecione a conta de destino.";
+      } else if (originId && originId === destinationId) {
+        nextErrors.destinationId = "A conta de destino deve ser diferente da origem.";
+      }
     }
+
     if (tab === "expense" && payment === "account" && !accountId) {
-      return toast.error("Selecione a conta para a despesa.");
+      nextErrors.accountId = "Selecione a conta para a despesa.";
     }
-    if (tab === "expense" && payment === "credit_card" && (!cardId || !invoiceMonth)) {
-      return toast.error("Selecione o cartão e a fatura.");
+    if (tab === "expense" && payment === "credit_card") {
+      if (!cardId) {
+        nextErrors.cardId = "Selecione um cartão de crédito.";
+      }
+      if (cardId && !invoiceMonth) {
+        nextErrors.invoiceMonth = "Selecione a fatura de lançamento.";
+      }
     }
     if (tab === "income" && !incomeAccountId) {
-      return toast.error("Selecione a conta de destino.");
+      nextErrors.incomeAccountId = "Selecione a conta de destino.";
     }
+
+    if (kind === "installment") {
+      const parsedTotal = Number(totalInstallments);
+      const parsedInstallment = Number(installment);
+      if (!Number.isInteger(parsedTotal) || parsedTotal < 2) {
+        nextErrors.totalInstallments = "Informe pelo menos 2 parcelas.";
+      }
+      if (!Number.isInteger(parsedInstallment) || parsedInstallment < 1) {
+        nextErrors.installment = "A parcela inicial deve ser no mínimo 1.";
+      } else if (Number.isInteger(parsedTotal) && parsedTotal >= 2 && parsedInstallment > parsedTotal) {
+        nextErrors.installment = "A parcela inicial não pode ser maior que o total.";
+      }
+    }
+
+    const firstInvalidField = FIELD_ORDER.find((field) => Boolean(nextErrors[field]));
+    if (firstInvalidField) {
+      setErrors(nextErrors);
+      toast.error(nextErrors[firstInvalidField] ?? "Verifique os campos obrigatórios.");
+      const target = scrollContainerRef.current?.querySelector<HTMLElement>(`[data-field="${firstInvalidField}"]`);
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
+    setErrors({});
 
     if (tab === "expense" && payment === "credit_card" && card && !confirmed) {
       const closeDate = `${invoiceMonth}-${String(card.closingDay).padStart(2, "0")}`;
@@ -231,52 +424,70 @@ export function TransactionFormDialog({
     }
 
     setPending(true);
-    const result = await createTransaction({
-      description,
-      amount: String(amount),
-      dueDate: effectiveDueDate,
-      launchDate,
-      competencyMonth: effectiveDueDate.slice(0, 7),
-      categoryId: categoryId ? Number(categoryId) : undefined,
-      subcategoryId: subcategoryId ? Number(subcategoryId) : undefined,
-      status: isPaid && effectiveDueDate <= today() ? "paid" : "pending",
-      type: tab === "expense" ? (payment === "credit_card" ? "credit_card_expense" : "expense") : tab,
-      accountId:
-        tab === "expense"
-          ? payment === "account"
-            ? Number(accountId)
-            : undefined
-          : tab === "income"
-            ? Number(incomeAccountId)
-            : Number(originId),
-      creditCardId: tab === "expense" && payment === "credit_card" ? Number(cardId) : undefined,
-      invoiceMonth: payment === "credit_card" ? invoiceMonth : undefined,
-      isFixed: kind === "fixed",
-      installmentTotal: kind === "installment" ? Number(totalInstallments) : undefined,
-      current_installment: kind === "installment" ? Number(installment) : undefined,
-      isTotalAmount: kind === "installment" ? isTotalAmount : undefined,
-      destinationAccountId: tab === "transfer" ? Number(destinationId) : undefined,
-    });
-    setPending(false);
+    try {
+      const result = await createTransaction({
+        description,
+        amount: String(amount),
+        dueDate: effectiveDueDate,
+        launchDate,
+        competencyMonth: effectiveDueDate.slice(0, 7),
+        categoryId: categoryId ? Number(categoryId) : undefined,
+        subcategoryId: subcategoryId ? Number(subcategoryId) : undefined,
+        status: isPaid && effectiveDueDate <= today() ? "paid" : "pending",
+        type: tab === "expense" ? (payment === "credit_card" ? "credit_card_expense" : "expense") : tab,
+        accountId:
+          tab === "expense"
+            ? payment === "account"
+              ? Number(accountId)
+              : undefined
+            : tab === "income"
+              ? Number(incomeAccountId)
+              : Number(originId),
+        creditCardId: tab === "expense" && payment === "credit_card" ? Number(cardId) : undefined,
+        invoiceMonth: payment === "credit_card" ? invoiceMonth : undefined,
+        isFixed: kind === "fixed",
+        installmentTotal: kind === "installment" ? Number(totalInstallments) : undefined,
+        current_installment: kind === "installment" ? Number(installment) : undefined,
+        isTotalAmount: kind === "installment" ? isTotalAmount : undefined,
+        destinationAccountId: tab === "transfer" ? Number(destinationId) : undefined,
+      });
 
-    if (!result.success) {
-      return toast.error(result.error || "Não foi possível salvar a transação.");
-    }
+      if (!result.success) {
+        toast.error(result.error || "Não foi possível salvar a transação.");
+        return;
+      }
 
-    toast.success("Transação salva com sucesso!");
-    if (close) {
-      setOpen(false);
-      reset(initialTab);
-    } else {
-      reset(tab);
+      toast.success("Transação salva com sucesso!");
+      if (close) {
+        setOpen(false);
+        reset(initialTab);
+      } else {
+        reset(tab);
+        getTransactionFormData()
+          .then(setData)
+          .catch((error: unknown) => {
+            console.error("Erro ao atualizar dados do formulário:", error);
+          });
+      }
+      onSuccess?.();
+      router.refresh();
+    } catch (error) {
+      console.error("Erro ao salvar transação:", error);
+      toast.error(
+        error instanceof Error && error.message
+          ? error.message
+          : "Erro inesperado ao salvar a transação. Tente novamente.",
+      );
+    } finally {
+      setPending(false);
     }
-    onSuccess?.();
-    router.refresh();
   }, [
     amount,
     description,
     tab,
     categoryId,
+    subcategoryId,
+    subcategories.length,
     originId,
     destinationId,
     payment,
@@ -287,7 +498,6 @@ export function TransactionFormDialog({
     card,
     effectiveDueDate,
     launchDate,
-    subcategoryId,
     isPaid,
     kind,
     totalInstallments,
@@ -307,6 +517,8 @@ export function TransactionFormDialog({
           setOpen(value);
           if (value) {
             setTab(initialTab);
+          } else {
+            setErrors({});
           }
         }}
       >
@@ -337,36 +549,41 @@ export function TransactionFormDialog({
           <FormHeader tab={tab} accent={accent} onTabChange={changeTab} />
 
           {/* Scrollable Form Body */}
-          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-4.5 scrollbar-thin">
+          <div
+            ref={scrollContainerRef}
+            className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-4.5 scrollbar-thin"
+          >
             {/* 1. Value and Status */}
             <AmountCard
               amount={amount}
-              onAmountChange={setAmount}
+              onAmountChange={handleAmountChange}
               tab={tab}
               accent={accent}
               canShowStatus={canShowStatus}
               isPaid={isPaid}
               onToggleStatus={handleToggleStatus}
+              error={errors.amount}
             />
 
             {/* 2. Description, Category, Subcategory or Transfer Accounts */}
             <DetailsCard
               tab={tab}
               description={description}
-              onDescriptionChange={setDescription}
+              onDescriptionChange={handleDescriptionChange}
               categoryId={categoryId}
               onCategoryChange={chooseCategory}
               categories={categories}
               selectedCategory={selectedCategory}
               subcategoryId={subcategoryId}
-              onSubcategoryChange={setSubcategoryId}
+              onSubcategoryChange={handleSubcategoryChange}
               subcategories={subcategories}
               accounts={data?.accounts ?? []}
               originId={originId}
-              onOriginChange={setOriginId}
+              onOriginChange={handleOriginChange}
               destinationId={destinationId}
-              onDestinationChange={setDestinationId}
+              onDestinationChange={handleDestinationChange}
               onQuickCategoryCreated={handleQuickCategoryCreated}
+              errors={errors}
             />
 
             {/* 3. Liquidation / Payment */}
@@ -374,11 +591,11 @@ export function TransactionFormDialog({
               tab={tab}
               accent={accent}
               payment={payment}
-              onPaymentChange={setPayment}
+              onPaymentChange={handlePaymentChange}
               accountId={accountId}
-              onAccountIdChange={setAccountId}
+              onAccountIdChange={handleAccountIdChange}
               incomeAccountId={incomeAccountId}
-              onIncomeAccountIdChange={setIncomeAccountId}
+              onIncomeAccountIdChange={handleIncomeAccountIdChange}
               accounts={data?.accounts ?? []}
               cardId={cardId}
               onCardChange={handleCard}
@@ -386,7 +603,8 @@ export function TransactionFormDialog({
               card={card}
               invoiceOptions={invoiceOptions}
               invoiceMonth={invoiceMonth}
-              onInvoiceMonthChange={setInvoiceMonth}
+              onInvoiceMonthChange={handleInvoiceMonthChange}
+              errors={errors}
             />
 
             {/* 4. Dates */}
@@ -402,14 +620,15 @@ export function TransactionFormDialog({
             <RecurrenceCard
               accent={accent}
               kind={kind}
-              onKindChange={setKind}
+              onKindChange={handleKindChange}
               installment={installment}
-              onInstallmentChange={setInstallment}
+              onInstallmentChange={handleInstallmentChange}
               totalInstallments={totalInstallments}
-              onTotalInstallmentsChange={setTotalInstallments}
+              onTotalInstallmentsChange={handleTotalInstallmentsChange}
               isTotalAmount={isTotalAmount}
               onIsTotalAmountChange={setIsTotalAmount}
               monthlyAmount={monthlyAmount}
+              errors={errors}
             />
           </div>
 

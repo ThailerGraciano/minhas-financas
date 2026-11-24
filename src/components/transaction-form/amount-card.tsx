@@ -13,6 +13,7 @@ export interface AmountCardProps {
   canShowStatus: boolean;
   isPaid: boolean;
   onToggleStatus: () => void;
+  error?: string;
 }
 
 export const AmountCard = React.memo(function AmountCard({
@@ -23,12 +24,25 @@ export const AmountCard = React.memo(function AmountCard({
   canShowStatus,
   isPaid,
   onToggleStatus,
+  error,
 }: AmountCardProps) {
   return (
-    <GlassCard elevated>
+    <GlassCard
+      elevated
+      data-field="amount"
+      className={cn(error && "border-destructive/80 ring-1 ring-destructive/40")}
+    >
       <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <span
+          className={cn(
+            "text-xs font-semibold uppercase tracking-wider",
+            error ? "text-destructive" : "text-muted-foreground",
+          )}
+        >
           Valor da transação
+          <span className="text-destructive ml-0.5" aria-hidden="true">
+            *
+          </span>
         </span>
         {canShowStatus && (
           <button
@@ -47,9 +61,9 @@ export const AmountCard = React.memo(function AmountCard({
         )}
       </div>
 
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-2.5 min-w-0">
         <span
-          className="text-3xl sm:text-4xl font-bold tabular-nums transition-colors duration-300"
+          className="text-3xl sm:text-4xl font-bold tabular-nums transition-colors duration-300 shrink-0"
           style={{ color: accent.primary }}
         >
           R$
@@ -58,11 +72,19 @@ export const AmountCard = React.memo(function AmountCard({
           name="amount"
           value={amount}
           onValueChange={onAmountChange}
-          className="h-12 min-w-0 text-3xl sm:text-4xl font-bold tabular-nums bg-transparent border-0 p-0 text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0 focus-visible:outline-none"
+          hidePrefix
+          aria-invalid={Boolean(error) || undefined}
+          className="h-12 min-w-0 text-3xl sm:text-4xl md:text-4xl font-bold tabular-nums bg-transparent dark:bg-transparent border-0 p-0 text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-0 focus-visible:outline-none"
           placeholder="0,00"
           autoFocus
         />
       </div>
+
+      {error ? (
+        <p role="alert" className="mt-2 text-xs font-medium text-destructive">
+          {error}
+        </p>
+      ) : null}
     </GlassCard>
   );
 });

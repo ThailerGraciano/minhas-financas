@@ -22,8 +22,13 @@ export async function createAccount(data: Omit<typeof accounts.$inferInsert, "us
   try {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
-    await db.insert(accounts).values({ ...data, userId: session.user.id });
+    const currentBalance =
+      data.currentBalance === undefined || data.currentBalance.trim() === "" ? "0.00" : data.currentBalance;
+    await db.insert(accounts).values({ ...data, currentBalance, userId: session.user.id });
     revalidatePath("/accounts");
+    revalidatePath("/");
+    revalidatePath("/transactions");
+    revalidatePath("/planning");
     return { success: true };
   } catch (error) {
     console.error("Error creating account:", error);
@@ -35,11 +40,18 @@ export async function updateAccount(id: number, data: Partial<typeof accounts.$i
   try {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
+    const updateData: Partial<typeof accounts.$inferInsert> =
+      data.currentBalance !== undefined && data.currentBalance.trim() === ""
+        ? { ...data, currentBalance: "0.00" }
+        : data;
     await db
       .update(accounts)
-      .set(data)
+      .set(updateData)
       .where(and(eq(accounts.id, id), eq(accounts.userId, session.user.id)));
     revalidatePath("/accounts");
+    revalidatePath("/");
+    revalidatePath("/transactions");
+    revalidatePath("/planning");
     return { success: true };
   } catch (error) {
     console.error("Error updating account:", error);

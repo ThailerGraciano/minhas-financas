@@ -33,6 +33,8 @@ export default async function ReconcileInvoicePage(props: {
     getCategories(),
   ]);
 
+  const netInvoiceTotal = summary.transactions.reduce((acc, tx) => acc + Number(tx.amount), 0);
+
   return (
     <div className="container mx-auto px-0 py-2 sm:py-4 md:p-8 space-y-6 max-w-7xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -57,7 +59,7 @@ export default async function ReconcileInvoicePage(props: {
       <InvoiceReconciliationView
         creditCardId={id}
         competencyMonth={currentMonth}
-        currentTotal={summary.total_amount}
+        currentTotal={netInvoiceTotal}
         isInvoicePaid={summary.total_amount > 0 && summary.pending_amount <= 0}
         categories={categories}
       />

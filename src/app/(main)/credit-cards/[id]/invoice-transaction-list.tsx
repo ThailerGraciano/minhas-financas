@@ -254,8 +254,7 @@ export function InvoiceTransactionList({
 
   const filteredTotalAmount = useMemo(() => {
     return filteredTransactions.reduce((acc, tx) => {
-      const amount = Number(tx.amount);
-      return amount > 0 ? acc + amount : acc;
+      return acc + Number(tx.amount);
     }, 0);
   }, [filteredTransactions]);
 

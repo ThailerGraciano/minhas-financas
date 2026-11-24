@@ -71,10 +71,23 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
   const router = useRouter();
 
   useEffect(() => {
-    if (open && !formData) {
-      getTransactionFormData().then(setFormData);
-    }
-  }, [open, formData]);
+    if (!open) return;
+
+    let cancelled = false;
+    getTransactionFormData()
+      .then((freshData) => {
+        if (!cancelled) {
+          setFormData(freshData);
+        }
+      })
+      .catch((error: unknown) => {
+        console.error("Erro ao carregar dados do formulário:", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (open && transaction) {

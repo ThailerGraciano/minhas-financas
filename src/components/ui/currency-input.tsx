@@ -15,6 +15,8 @@ interface CurrencyInputProps extends Omit<
   defaultValue?: number | string;
   /** Called with the new decimal value on every keystroke */
   onValueChange?: (value: number) => void;
+  /** Hide the "R$ " prefix in the formatted display value */
+  hidePrefix?: boolean;
 }
 
 /**
@@ -31,6 +33,7 @@ function CurrencyInput({
   value: controlledValue,
   defaultValue,
   onValueChange,
+  hidePrefix = false,
   className,
   id,
   required,
@@ -60,7 +63,7 @@ function CurrencyInput({
 
   const decimalValue = currentCents / 100;
 
-  const displayValue = formatBRL(currentCents);
+  const displayValue = formatBRL(currentCents, hidePrefix);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (props.onKeyDown) {
@@ -159,9 +162,15 @@ function CurrencyInput({
   );
 }
 
-/** Format cents integer to BRL display string (e.g. 123 → "R$ 1,23") */
-function formatBRL(cents: number): string {
+/** Format cents integer to BRL display string (e.g. 123 → "R$ 1,23" or "1,23") */
+function formatBRL(cents: number, hidePrefix = false): string {
   const value = cents / 100;
+  if (hidePrefix) {
+    return value.toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
   return value.toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL",

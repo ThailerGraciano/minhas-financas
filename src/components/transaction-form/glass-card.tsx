@@ -1,6 +1,7 @@
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import React from "react";
+import { type TransactionFormField } from "./types";
 
 export interface GlassCardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
@@ -33,17 +34,44 @@ export interface FieldProps {
   label: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  error?: string;
+  required?: boolean;
+  fieldName?: TransactionFormField;
 }
 
 export const Field = React.memo(function Field({
   label,
   children,
   className,
+  error,
+  required,
+  fieldName,
 }: FieldProps) {
+  const renderedLabel =
+    typeof label === "string" ? (
+      <span>
+        {label}
+        {required ? (
+          <span className="text-destructive ml-0.5" aria-hidden="true">
+            *
+          </span>
+        ) : null}
+      </span>
+    ) : (
+      label
+    );
+
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+    <div data-field={fieldName} className={cn("flex flex-col gap-2", className)}>
+      <Label className={cn("text-xs font-medium", error ? "text-destructive" : "text-muted-foreground")}>
+        {renderedLabel}
+      </Label>
       {children}
+      {error ? (
+        <p role="alert" className="text-xs font-medium text-destructive">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 });

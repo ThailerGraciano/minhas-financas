@@ -299,7 +299,7 @@ const VariationChartTooltip = ({
         <div className="pt-1.5 border-t border-white/10 space-y-1">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-rose-400 flex items-center gap-1">
             <ArrowUpRight className="w-3 h-3" />
-            <span>Parcelas que entram / aumentam</span>
+            <span>Novas parcelas neste mês</span>
           </div>
           <div className="space-y-1 max-h-[110px] overflow-y-auto pr-1">
             {point.startingItems.map((item) => (
@@ -589,7 +589,7 @@ export function InstallmentsStackedChart({
       }, 0);
     };
 
-    const currentTotal = getMonthTotal(data[currentMonthIdx]);
+    let runningCumulativeDelta = 0;
     const points: SixMonthVariationPoint[] = [];
 
     for (let offset = 1; offset <= 6; offset++) {
@@ -624,20 +624,30 @@ export function InstallmentsStackedChart({
                 : undefined,
           });
         } else if (diff > 0.005) {
-          increaseAmount += diff;
-          startingItems.push({
-            name: key,
-            amount: diff,
-            installment:
-              typeof currRow[`${key}_installment`] === "string"
-                ? String(currRow[`${key}_installment`])
-                : undefined,
-          });
+          const installmentLabel =
+            typeof currRow[`${key}_installment`] === "string"
+              ? String(currRow[`${key}_installment`])
+              : undefined;
+          const isFirstInstallment =
+            currRow[`${key}_is_first`] === true ||
+            (installmentLabel !== undefined && installmentLabel.startsWith("1/"));
+
+          if (isFirstInstallment) {
+            increaseAmount += diff;
+            startingItems.push({
+              name: key,
+              amount: diff,
+              installment: installmentLabel,
+            });
+          }
         }
       });
 
       endingItems.sort((a, b) => b.amount - a.amount);
       startingItems.sort((a, b) => b.amount - a.amount);
+
+      const monthlyDelta = Math.round((increaseAmount - reliefAmount) * 100) / 100;
+      runningCumulativeDelta = Math.round((runningCumulativeDelta + monthlyDelta) * 100) / 100;
 
       const monthStr = String(currRow.month);
       points.push({
@@ -645,8 +655,8 @@ export function InstallmentsStackedChart({
         shortMonth: formatShortMonth(monthStr),
         total,
         prevTotal,
-        monthlyDelta: total - prevTotal,
-        cumulativeDelta: total - currentTotal,
+        monthlyDelta,
+        cumulativeDelta: runningCumulativeDelta,
         reliefAmount,
         increaseAmount,
         endingItems,
@@ -728,8 +738,11 @@ export function InstallmentsStackedChart({
 
   const displayedLegendMetas = showAllLegend ? sortedKeyMetas : sortedKeyMetas.slice(0, 8);
   const sixMonthNetDelta = summaryStats.sixthMonthPoint?.cumulativeDelta ?? 0;
+  const sixMonthEffectiveBase = summaryStats.sixthMonthPoint
+    ? summaryStats.sixthMonthPoint.total - sixMonthNetDelta
+    : summaryStats.currentTotal;
   const sixMonthNetPercent =
-    summaryStats.currentTotal > 0 ? (sixMonthNetDelta / summaryStats.currentTotal) * 100 : 0;
+    sixMonthEffectiveBase > 0 ? (sixMonthNetDelta / sixMonthEffectiveBase) * 100 : 0;
 
   const variationBarConfig: ChartConfig = {
     delta: {
@@ -790,23 +803,23 @@ export function InstallmentsStackedChart({
         <div className="col-span-2 @xl:col-span-1 rounded-2xl bg-emerald-500/[0.08] border border-emerald-500/20 p-3 sm:p-3.5 flex flex-col justify-between min-w-0">
           <div className="flex items-center justify-between gap-1.5 text-[11px] text-emerald-300/90">
             <span className="truncate font-semibold">
-              {sixMonthNetDelta <= 0 ? "Alívio Previsto em 6 Meses" : "Variação Prevista em 6 Meses"}
+              {sixMonthNetDelta <= 0.005 ? "Alívio Previsto em 6 Meses" : "Variação Prevista em 6 Meses"}
             </span>
             <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
           </div>
           <div className="mt-1.5 flex items-center justify-between gap-2 flex-wrap">
             <span
               className={`text-sm sm:text-base font-extrabold tabular-nums ${
-                sixMonthNetDelta < 0
+                sixMonthNetDelta < -0.005
                   ? "text-emerald-400"
-                  : sixMonthNetDelta > 0
+                  : sixMonthNetDelta > 0.005
                     ? "text-rose-400"
                     : "text-foreground"
               }`}
             >
-              {sixMonthNetDelta < 0
+              {sixMonthNetDelta < -0.005
                 ? `-${formatCurrency(Math.abs(sixMonthNetDelta))}/mês`
-                : sixMonthNetDelta > 0
+                : sixMonthNetDelta > 0.005
                   ? `+${formatCurrency(sixMonthNetDelta)}/mês`
                   : "Estável"}
             </span>

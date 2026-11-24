@@ -2,12 +2,13 @@
 
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Loader2, Percent, PiggyBank } from "lucide-react";
+import { Loader2, Percent, PiggyBank, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { updateInstallmentDate } from "@/app/actions/loans";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -66,6 +67,10 @@ export type LoanDetails = {
   remaining: number;
   progressPercent: number;
   installmentList: LoanInstallment[];
+  hasPaidTransactions: boolean;
+  hasInitialDisbursementPaid: boolean;
+  paidInstallmentsCount: number;
+  pendingInstallmentsCount: number;
   originAccount?: {
     id: number;
     name: string;
@@ -81,9 +86,16 @@ type LoanDetailsDialogProps = {
   onOpenChange: (open: boolean) => void;
   loan: LoanDetails | null;
   closingDay: number;
+  onRequestDelete?: (loan: LoanDetails) => void;
 };
 
-export function LoanDetailsDialog({ open, onOpenChange, loan, closingDay }: LoanDetailsDialogProps) {
+export function LoanDetailsDialog({
+  open,
+  onOpenChange,
+  loan,
+  closingDay,
+  onRequestDelete,
+}: LoanDetailsDialogProps) {
   const [isUpdating, setIsUpdating] = useState<number | null>(null);
 
   if (!loan) return null;
@@ -109,14 +121,28 @@ export function LoanDetailsDialog({ open, onOpenChange, loan, closingDay }: Loan
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl w-[95vw] max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <div className="flex items-center justify-between pr-6">
-            <DialogTitle className="text-xl">{loan.name}</DialogTitle>
-            <Badge
-              variant={loan.type === "bank" ? "destructive" : "default"}
-              className={loan.type === "personal" ? "bg-orange-500 hover:bg-orange-600" : ""}
-            >
-              {loan.type === "bank" ? "Financeira" : "Pessoal"}
-            </Badge>
+          <div className="flex items-center justify-between gap-2 pr-8">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <DialogTitle className="text-xl truncate">{loan.name}</DialogTitle>
+              <Badge
+                variant={loan.type === "bank" ? "destructive" : "default"}
+                className={loan.type === "personal" ? "bg-orange-500 hover:bg-orange-600 shrink-0" : "shrink-0"}
+              >
+                {loan.type === "bank" ? "Financeira" : "Pessoal"}
+              </Badge>
+            </div>
+            {onRequestDelete && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onRequestDelete(loan)}
+                className="text-red-500 border-red-500/20 hover:bg-red-500/10 hover:text-red-400 gap-1.5 shrink-0"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Excluir</span>
+              </Button>
+            )}
           </div>
         </DialogHeader>
 

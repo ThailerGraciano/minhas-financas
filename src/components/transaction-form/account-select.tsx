@@ -1,5 +1,6 @@
 import { type Account } from "./types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import React from "react";
 
 const money = (value: number) =>
@@ -10,6 +11,7 @@ export interface AccountSelectProps {
   onChange: (value: string) => void;
   accounts: Account[];
   placeholder?: string;
+  invalid?: boolean;
 }
 
 export const AccountSelect = React.memo(function AccountSelect({
@@ -17,11 +19,16 @@ export const AccountSelect = React.memo(function AccountSelect({
   onChange,
   accounts,
   placeholder = "Selecionar conta",
+  invalid = false,
 }: AccountSelectProps) {
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger
-        className="w-full !h-11 rounded-xl px-3.5 bg-input/90 hover:bg-input border-border hover:border-white/20 text-foreground transition-all duration-200"
+        aria-invalid={invalid || undefined}
+        className={cn(
+          "w-full !h-11 rounded-xl px-3.5 bg-input/90 hover:bg-input border-border hover:border-white/20 text-foreground transition-all duration-200",
+          invalid && "border-destructive/80 ring-1 ring-destructive/40 hover:border-destructive",
+        )}
         style={{
           boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.04)",
         }}

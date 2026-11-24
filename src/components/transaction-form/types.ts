@@ -8,6 +8,22 @@ export type Account = FormData["accounts"][number];
 export type Card = FormData["creditCards"][number];
 export type RecurrenceKind = "single" | "fixed" | "installment";
 
+export type TransactionFormField =
+  | "amount"
+  | "description"
+  | "categoryId"
+  | "subcategoryId"
+  | "originId"
+  | "destinationId"
+  | "accountId"
+  | "incomeAccountId"
+  | "cardId"
+  | "invoiceMonth"
+  | "installment"
+  | "totalInstallments";
+
+export type TransactionFormErrors = Partial<Record<TransactionFormField, string>>;
+
 export interface TransactionFormPropsContext {
   tab: TransactionTab;
   accent: AccentColorConfig;

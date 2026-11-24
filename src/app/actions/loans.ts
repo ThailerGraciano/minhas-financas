@@ -2,7 +2,15 @@
 
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { accounts, categories, fixedTransactions, loans, settings, transactions } from "@/db/schema";
+import {
+  accounts,
+  categories,
+  fixedTransactions,
+  loans,
+  marketReceiptTransactions,
+  settings,
+  transactions,
+} from "@/db/schema";
 import { applyBalanceDelta } from "@/lib/balance-utils";
 import { getCompetencyMonth } from "@/lib/competency-utils";
 import {
@@ -279,6 +287,136 @@ export async function createLoan(input: CreateLoanInput) {
         }
       }
     }
+  });
+
+  revalidatePath("/");
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+  revalidatePath("/loans");
+}
+
+export type DeleteLoanPaidAction = "revert_and_delete" | "keep";
+
+export async function deleteLoan(loanId: string, paidAction: DeleteLoanPaidAction = "revert_and_delete") {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
+  await db.transaction(async (tx) => {
+    const [existingLoan] = await tx
+      .select()
+      .from(loans)
+      .where(and(eq(loans.id, loanId), eq(loans.userId, userId)))
+      .limit(1);
+
+    if (!existingLoan) {
+      throw new Error("Empréstimo não encontrado");
+    }
+
+    const loanTxs = await tx
+      .select()
+      .from(transactions)
+      .where(and(eq(transactions.loanId, loanId), eq(transactions.userId, userId)));
+
+    if (loanTxs.length > 0) {
+      if (paidAction === "revert_and_delete") {
+        // 1. Estornar o saldo de todas as transações pagas vinculadas ao empréstimo
+        for (const item of loanTxs) {
+          if (item.status === "paid") {
+            await applyBalanceDelta(
+              tx,
+              item.accountId,
+              item.amount,
+              item.type,
+              item.status,
+              item.parentTransactionId,
+              true,
+              userId,
+            );
+          }
+        }
+
+        const allIds = loanTxs.map((t) => t.id);
+
+        // 2. Remover auto-referências (parentTransactionId / installmentParentId) antes de excluir
+        await tx
+          .update(transactions)
+          .set({ parentTransactionId: null, installmentParentId: null })
+          .where(and(eq(transactions.userId, userId), inArray(transactions.id, allIds)));
+
+        await tx
+          .update(transactions)
+          .set({ installmentParentId: null })
+          .where(and(eq(transactions.userId, userId), inArray(transactions.installmentParentId, allIds)));
+
+        await tx
+          .update(transactions)
+          .set({ parentTransactionId: null })
+          .where(and(eq(transactions.userId, userId), inArray(transactions.parentTransactionId, allIds)));
+
+        await tx
+          .delete(marketReceiptTransactions)
+          .where(inArray(marketReceiptTransactions.transactionId, allIds));
+
+        // 3. Excluir todas as transações do empréstimo
+        await tx
+          .delete(transactions)
+          .where(and(eq(transactions.userId, userId), inArray(transactions.id, allIds)));
+      } else {
+        // paidAction === "keep"
+        // Transações pagas (e pares de transferências pagas) são mantidas
+        const initialPaidIds = new Set(loanTxs.filter((t) => t.status === "paid").map((t) => t.id));
+        for (const t of loanTxs) {
+          if (initialPaidIds.has(t.id) && t.parentTransactionId) {
+            initialPaidIds.add(t.parentTransactionId);
+          }
+          if (t.parentTransactionId && initialPaidIds.has(t.parentTransactionId)) {
+            initialPaidIds.add(t.id);
+          }
+        }
+
+        const keptIds = Array.from(initialPaidIds);
+        const deleteIds = loanTxs.filter((t) => !initialPaidIds.has(t.id)).map((t) => t.id);
+
+        // 1. Desvincular transações pagas do loanId ANTES de deletar o loan (devido ao onDelete: cascade)
+        if (keptIds.length > 0) {
+          await tx
+            .update(transactions)
+            .set({ loanId: null })
+            .where(and(eq(transactions.userId, userId), inArray(transactions.id, keptIds)));
+        }
+
+        // 2. Limpar referências de transações que apontem para as que serão excluídas
+        if (deleteIds.length > 0) {
+          await tx
+            .update(transactions)
+            .set({ parentTransactionId: null, installmentParentId: null })
+            .where(and(eq(transactions.userId, userId), inArray(transactions.id, deleteIds)));
+
+          await tx
+            .update(transactions)
+            .set({ installmentParentId: null })
+            .where(and(eq(transactions.userId, userId), inArray(transactions.installmentParentId, deleteIds)));
+
+          await tx
+            .update(transactions)
+            .set({ parentTransactionId: null })
+            .where(and(eq(transactions.userId, userId), inArray(transactions.parentTransactionId, deleteIds)));
+
+          await tx
+            .delete(marketReceiptTransactions)
+            .where(inArray(marketReceiptTransactions.transactionId, deleteIds));
+
+          // 3. Excluir apenas as transações não pagas
+          await tx
+            .delete(transactions)
+            .where(and(eq(transactions.userId, userId), inArray(transactions.id, deleteIds)));
+        }
+      }
+    }
+
+    // 4. Excluir o contrato do empréstimo
+    await tx.delete(loans).where(and(eq(loans.id, loanId), eq(loans.userId, userId)));
   });
 
   revalidatePath("/");
@@ -728,6 +866,12 @@ export async function getLoansPageData() {
       personalDebtTotal += remaining;
     }
 
+    const loanAllTxs = allLoanTransactions.filter((t) => t.loanId === loan.id);
+    const hasPaidTransactions = loanAllTxs.some((t) => t.status === "paid");
+    const hasInitialDisbursementPaid = loanAllTxs.some((t) => t.installmentTotal === null && t.status === "paid");
+    const paidInstallmentsCount = data.installments.filter((i) => i.status === "paid").length;
+    const pendingInstallmentsCount = data.installments.filter((i) => i.status !== "paid").length;
+
     return {
       id: loan.id,
       name: loan.name,
@@ -742,6 +886,10 @@ export async function getLoansPageData() {
       progressPercent,
       installmentList: data.installments,
       originAccount: loanOriginSummaryMap.get(loan.id) ?? null,
+      hasPaidTransactions,
+      hasInitialDisbursementPaid,
+      paidInstallmentsCount,
+      pendingInstallmentsCount,
     };
   });
 

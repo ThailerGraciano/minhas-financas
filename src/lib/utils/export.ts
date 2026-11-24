@@ -38,7 +38,7 @@ function formatDateBR(rawDate: string): string {
 function formatAmountBR(amount: string | number, type: string): string {
   const numeric = Number(amount || 0);
   const isExpense = type === "expense" || type === "credit_card_expense";
-  const value = isExpense ? -Math.abs(numeric) : Math.abs(numeric);
+  const value = isExpense ? -numeric : numeric;
   return escapeCSVField(
     value.toLocaleString("pt-BR", {
       minimumFractionDigits: 2,

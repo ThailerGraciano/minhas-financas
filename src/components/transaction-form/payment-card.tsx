@@ -1,10 +1,11 @@
 import { AccountSelect } from "./account-select";
 import { Field, GlassCard } from "./glass-card";
-import { type Account, type Card } from "./types";
+import { type Account, type Card, type TransactionFormErrors } from "./types";
 import { type AccentColorConfig, type TransactionTab } from "@/components/transaction-theme";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SelectableCard } from "@/components/ui/selectable-card";
+import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CreditCard, Landmark } from "lucide-react";
@@ -30,6 +31,7 @@ export interface PaymentCardProps {
   invoiceOptions: Date[];
   invoiceMonth: string;
   onInvoiceMonthChange: (value: string) => void;
+  errors?: TransactionFormErrors;
 }
 
 export const PaymentCard = React.memo(function PaymentCard({
@@ -49,6 +51,7 @@ export const PaymentCard = React.memo(function PaymentCard({
   invoiceOptions,
   invoiceMonth,
   onInvoiceMonthChange,
+  errors,
 }: PaymentCardProps) {
   if (tab === "transfer") return null;
 
@@ -81,19 +84,28 @@ export const PaymentCard = React.memo(function PaymentCard({
           </div>
 
           {payment === "account" ? (
-            <Field label="Selecione a conta">
+            <Field label="Selecione a conta" required fieldName="accountId" error={errors?.accountId}>
               <AccountSelect
                 value={accountId}
                 onChange={onAccountIdChange}
                 accounts={accounts}
+                invalid={Boolean(errors?.accountId)}
               />
             </Field>
           ) : (
             <div className="flex flex-col gap-3">
               <Field
+                required
+                fieldName="cardId"
+                error={errors?.cardId}
                 label={
                   <span className="flex items-center justify-between w-full">
-                    <span>Cartão de crédito</span>
+                    <span>
+                      Cartão de crédito
+                      <span className="text-destructive ml-0.5" aria-hidden="true">
+                        *
+                      </span>
+                    </span>
                     {card && (
                       <span className="font-medium text-success">
                         Limite: {money(Number(card.creditLimit))}
@@ -104,7 +116,11 @@ export const PaymentCard = React.memo(function PaymentCard({
               >
                 <Select value={cardId} onValueChange={onCardChange}>
                   <SelectTrigger
-                    className="w-full !h-11 rounded-xl px-3.5 bg-input/90 hover:bg-input border-border hover:border-white/20 text-foreground transition-all duration-200"
+                    aria-invalid={Boolean(errors?.cardId) || undefined}
+                    className={cn(
+                      "w-full !h-11 rounded-xl px-3.5 bg-input/90 hover:bg-input border-border hover:border-white/20 text-foreground transition-all duration-200",
+                      errors?.cardId && "border-destructive/80 ring-1 ring-destructive/40 hover:border-destructive",
+                    )}
                     style={{
                       boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.04)",
                     }}
@@ -131,9 +147,19 @@ export const PaymentCard = React.memo(function PaymentCard({
               </Field>
 
               {card && (
-                <div>
-                  <div className="flex justify-between text-xs text-muted-foreground mb-2 font-medium">
-                    <span>Fatura de lançamento</span>
+                <div data-field="invoiceMonth">
+                  <div
+                    className={cn(
+                      "flex justify-between text-xs mb-2 font-medium",
+                      errors?.invoiceMonth ? "text-destructive" : "text-muted-foreground",
+                    )}
+                  >
+                    <span>
+                      Fatura de lançamento
+                      <span className="text-destructive ml-0.5" aria-hidden="true">
+                        *
+                      </span>
+                    </span>
                     <span className="text-muted-foreground/80">Fecha dia {card.closingDay}</span>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -155,7 +181,9 @@ export const PaymentCard = React.memo(function PaymentCard({
                                   boxShadow: `inset 0 1px 1px 0 rgba(255, 255, 255, 0.28), 0 6px 20px -2px ${accent.subtleGlow}`,
                                 }
                               : {
-                                  borderColor: "rgba(255, 255, 255, 0.08)",
+                                  borderColor: errors?.invoiceMonth
+                                    ? "rgba(255, 77, 109, 0.65)"
+                                    : "rgba(255, 255, 255, 0.08)",
                                   background: "linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%), var(--card)",
                                   color: "var(--muted-foreground)",
                                   boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.08)",
@@ -172,6 +200,11 @@ export const PaymentCard = React.memo(function PaymentCard({
                       );
                     })}
                   </div>
+                  {errors?.invoiceMonth ? (
+                    <p role="alert" className="mt-2 text-xs font-medium text-destructive">
+                      {errors.invoiceMonth}
+                    </p>
+                  ) : null}
                 </div>
               )}
             </div>
@@ -180,11 +213,12 @@ export const PaymentCard = React.memo(function PaymentCard({
       )}
 
       {tab === "income" && (
-        <Field label="Depositar na conta">
+        <Field label="Depositar na conta" required fieldName="incomeAccountId" error={errors?.incomeAccountId}>
           <AccountSelect
             value={incomeAccountId}
             onChange={onIncomeAccountIdChange}
             accounts={accounts}
+            invalid={Boolean(errors?.incomeAccountId)}
           />
         </Field>
       )}

@@ -1,10 +1,11 @@
 import { Field, GlassCard } from "./glass-card";
-import { type RecurrenceKind } from "./types";
+import { type RecurrenceKind, type TransactionFormErrors } from "./types";
 import { type AccentColorConfig } from "@/components/transaction-theme";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectableCard } from "@/components/ui/selectable-card";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 import { Calendar, RefreshCw, Zap } from "lucide-react";
 import React from "react";
 
@@ -22,6 +23,7 @@ export interface RecurrenceCardProps {
   isTotalAmount: boolean;
   onIsTotalAmountChange: (value: boolean) => void;
   monthlyAmount: number;
+  errors?: TransactionFormErrors;
 }
 
 export const RecurrenceCard = React.memo(function RecurrenceCard({
@@ -35,6 +37,7 @@ export const RecurrenceCard = React.memo(function RecurrenceCard({
   isTotalAmount,
   onIsTotalAmountChange,
   monthlyAmount,
+  errors,
 }: RecurrenceCardProps) {
   return (
     <GlassCard className="space-y-4">
@@ -73,22 +76,30 @@ export const RecurrenceCard = React.memo(function RecurrenceCard({
       {kind === "installment" && (
         <div className="rounded-xl p-3.5 flex flex-col gap-3 transition-all duration-200 bg-[var(--card)]/90 border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Parcela inicial">
+            <Field label="Parcela inicial" fieldName="installment" error={errors?.installment}>
               <Input
                 type="number"
                 min={1}
                 value={installment}
                 onChange={(e) => onInstallmentChange(e.target.value)}
-                className="h-10 rounded-xl bg-background/80 border-border text-foreground"
+                aria-invalid={Boolean(errors?.installment) || undefined}
+                className={cn(
+                  "h-10 rounded-xl bg-background/80 border-border text-foreground",
+                  errors?.installment && "border-destructive/80 ring-1 ring-destructive/40",
+                )}
               />
             </Field>
-            <Field label="Total de parcelas">
+            <Field label="Total de parcelas" fieldName="totalInstallments" error={errors?.totalInstallments}>
               <Input
                 type="number"
                 min={2}
                 value={totalInstallments}
                 onChange={(e) => onTotalInstallmentsChange(e.target.value)}
-                className="h-10 rounded-xl bg-background/80 border-border text-foreground"
+                aria-invalid={Boolean(errors?.totalInstallments) || undefined}
+                className={cn(
+                  "h-10 rounded-xl bg-background/80 border-border text-foreground",
+                  errors?.totalInstallments && "border-destructive/80 ring-1 ring-destructive/40",
+                )}
               />
             </Field>
           </div>

@@ -679,6 +679,9 @@ export async function getInstallmentsChartData() {
 
     if (t.installmentCurrent && t.installmentTotal) {
       dataByMonth[t.competencyMonth][`${key}_installment`] = `${t.installmentCurrent}/${t.installmentTotal}`;
+      if (t.installmentCurrent === 1) {
+        dataByMonth[t.competencyMonth][`${key}_is_first`] = true;
+      }
     }
   });
 

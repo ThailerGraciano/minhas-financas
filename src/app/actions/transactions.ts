@@ -2136,3 +2136,155 @@ function cleanBaseDescCompare(candidateDesc: string, targetBaseDesc: string): bo
   if (!targetBaseDesc) return false;
   return cleanBaseInstallmentDescription(candidateDesc) === targetBaseDesc;
 }
+
+export async function getRecentRegisteredTransactions(limit: number = 40) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
+  const recentRows = await db.query.transactions.findMany({
+    where: (t, { eq, and, ne }) => and(eq(t.userId, userId), ne(t.status, "ignored")),
+    with: {
+      account: true,
+      category: true,
+      subcategory: true,
+      creditCard: true,
+    },
+    orderBy: (t, { desc }) => [desc(t.id)],
+    limit: limit * 4,
+  });
+
+  const byId = new Map<number, (typeof recentRows)[0]>();
+  for (const row of recentRows) {
+    byId.set(row.id, row);
+  }
+
+  // Identify paired transfer destinations when origin is in the batch
+  const transferDestByOriginId = new Map<number, (typeof recentRows)[0]>();
+  const skipIds = new Set<number>();
+
+  for (const row of recentRows) {
+    if (row.type === "transfer" && row.parentTransactionId && byId.has(row.parentTransactionId)) {
+      transferDestByOriginId.set(row.parentTransactionId, row);
+      skipIds.add(row.id);
+    }
+  }
+
+  // Group fixed and installment batches that were registered together so the list shows the earliest parcel/occurrence
+  // while still sorting by the batch creation ID (highest or parent ID)
+  const seenFixedBatch = new Set<string>();
+  const seenInstallmentBatch = new Set<number>();
+
+  // Pre-collect earliest parcel for installment batches and fixed batches present in recentRows
+  const earliestByFixedId = new Map<string, { tx: (typeof recentRows)[0]; count: number; maxId: number }>();
+  const earliestByInstallmentParentId = new Map<number, { tx: (typeof recentRows)[0]; count: number; maxId: number }>();
+
+  for (const row of recentRows) {
+    if (skipIds.has(row.id)) continue;
+
+    if (row.fixedTransactionId) {
+      const existing = earliestByFixedId.get(row.fixedTransactionId);
+      if (!existing) {
+        earliestByFixedId.set(row.fixedTransactionId, { tx: row, count: 1, maxId: row.id });
+      } else {
+        existing.count += 1;
+        if (row.id > existing.maxId) existing.maxId = row.id;
+        if (row.dueDate < existing.tx.dueDate || (row.dueDate === existing.tx.dueDate && row.id < existing.tx.id)) {
+          existing.tx = row;
+        }
+      }
+    } else if (row.installmentTotal && row.installmentTotal > 1) {
+      const groupKey = row.installmentParentId || row.id;
+      const existing = earliestByInstallmentParentId.get(groupKey);
+      if (!existing) {
+        earliestByInstallmentParentId.set(groupKey, { tx: row, count: 1, maxId: row.id });
+      } else {
+        existing.count += 1;
+        if (row.id > existing.maxId) existing.maxId = row.id;
+        const rowCurr = row.installmentCurrent ?? 999;
+        const exCurr = existing.tx.installmentCurrent ?? 999;
+        if (rowCurr < exCurr || (rowCurr === exCurr && row.id < existing.tx.id)) {
+          existing.tx = row;
+        }
+      }
+    }
+  }
+
+  const results = [];
+
+  for (const row of recentRows) {
+    if (skipIds.has(row.id)) continue;
+
+    let targetTx = row;
+    let batchCount = 1;
+
+    if (row.fixedTransactionId) {
+      if (seenFixedBatch.has(row.fixedTransactionId)) continue;
+      seenFixedBatch.add(row.fixedTransactionId);
+      const group = earliestByFixedId.get(row.fixedTransactionId);
+      if (group) {
+        targetTx = group.tx;
+        batchCount = group.count;
+      }
+    } else if (row.installmentTotal && row.installmentTotal > 1) {
+      const groupKey = row.installmentParentId || row.id;
+      if (seenInstallmentBatch.has(groupKey)) continue;
+      seenInstallmentBatch.add(groupKey);
+      const group = earliestByInstallmentParentId.get(groupKey);
+      if (group) {
+        targetTx = group.tx;
+        batchCount = group.count;
+      }
+    }
+
+    const transferDest = targetTx.type === "transfer" ? transferDestByOriginId.get(targetTx.id) : undefined;
+    const cleanDescription =
+      targetTx.type === "transfer"
+        ? targetTx.description.replace(/\s*\((Saída|Entrada)\)/gi, "").trim()
+        : targetTx.description;
+
+    results.push({
+      id: targetTx.id,
+      type: targetTx.type,
+      description: cleanDescription,
+      amount: targetTx.amount,
+      dueDate: targetTx.dueDate,
+      launchDate: targetTx.launchDate,
+      competencyMonth: targetTx.competencyMonth,
+      invoiceMonth: targetTx.invoiceMonth,
+      status: targetTx.status,
+      isFixed: targetTx.isFixed || Boolean(targetTx.fixedTransactionId),
+      fixedTransactionId: targetTx.fixedTransactionId,
+      installmentCurrent: targetTx.installmentCurrent,
+      installmentTotal: targetTx.installmentTotal,
+      parentTransactionId: targetTx.parentTransactionId,
+      installmentParentId: targetTx.installmentParentId,
+      accountId: targetTx.accountId,
+      creditCardId: targetTx.creditCardId,
+      categoryId: targetTx.categoryId,
+      subcategoryId: targetTx.subcategoryId,
+      isTransferGroup: Boolean(transferDest),
+      originAccount: transferDest && targetTx.account ? { id: targetTx.account.id, name: targetTx.account.name } : null,
+      destinationAccount:
+        transferDest && transferDest.account ? { id: transferDest.account.id, name: transferDest.account.name } : null,
+      account: targetTx.account ? { id: targetTx.account.id, name: targetTx.account.name } : null,
+      creditCard: targetTx.creditCard
+        ? {
+            id: targetTx.creditCard.id,
+            name: targetTx.creditCard.name,
+            dueDay: targetTx.creditCard.dueDay,
+            closingDay: targetTx.creditCard.closingDay,
+          }
+        : null,
+      category: targetTx.category
+        ? { id: targetTx.category.id, name: targetTx.category.name, icon: targetTx.category.icon }
+        : null,
+      subcategory: targetTx.subcategory ? { id: targetTx.subcategory.id, name: targetTx.subcategory.name } : null,
+      batchCount,
+    });
+
+    if (results.length >= limit) break;
+  }
+
+  return results;
+}

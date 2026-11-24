@@ -216,10 +216,7 @@ export async function analyzeInvoiceReconciliation(
 
     let appTotal = 0;
     for (const tx of currentTransactions) {
-      const val = Number(tx.amount);
-      if (val > 0) {
-        appTotal += val;
-      }
+      appTotal += Number(tx.amount);
     }
 
     const contextPayload = {

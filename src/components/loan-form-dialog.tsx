@@ -85,10 +85,23 @@ export function LoanFormDialog({ trigger }: { trigger?: React.ReactNode }) {
   const [isFirstInstallmentCustom, setIsFirstInstallmentCustom] = useState(false);
 
   useEffect(() => {
-    if (open && !formDataCache) {
-      getTransactionFormData().then(setFormDataCache);
-    }
-  }, [open, formDataCache]);
+    if (!open) return;
+
+    let cancelled = false;
+    getTransactionFormData()
+      .then((freshData) => {
+        if (!cancelled) {
+          setFormDataCache(freshData);
+        }
+      })
+      .catch((error: unknown) => {
+        console.error("Erro ao carregar dados do formulário:", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   const initialConcessionDate = format(new Date(), 'yyyy-MM-dd');
 

@@ -1,13 +1,15 @@
 "use client";
 
-import { HandCoins, Landmark, Percent, PiggyBank, TrendingDown } from "lucide-react";
+import { HandCoins, Landmark, Percent, PiggyBank, Trash2, TrendingDown } from "lucide-react";
 import { useState } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { getLoansPageData } from "@/app/actions/loans";
+import { LoanDeleteDialog } from "@/components/loan-delete-dialog";
 import { LoanDetailsDialog } from "@/components/loan-details-dialog";
 import { LoanFormDialog } from "@/components/loan-form-dialog";
 import { LoanOriginAccountCard } from "@/components/loan-origin-account-card";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip } from "@/components/ui/chart";
 import { Progress } from "@/components/ui/progress";
@@ -65,8 +67,10 @@ const AmortizationTooltip = ({ active, payload, label }: CustomTooltipProps) => 
 export function LoansClientPage({ data }: { data: LoansPageData }) {
   const { loans, bankDebtTotal, personalDebtTotal, amortizationData, closingDay, originAccounts } = data;
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
+  const [loanToDeleteId, setLoanToDeleteId] = useState<string | null>(null);
 
   const selectedLoan = loans.find((l) => l.id === selectedLoanId) || null;
+  const loanToDelete = loans.find((l) => l.id === loanToDeleteId) || null;
 
   const hasLoans = loans.length > 0;
 
@@ -124,15 +128,30 @@ export function LoansClientPage({ data }: { data: LoansPageData }) {
                 onClick={() => setSelectedLoanId(loan.id)}
               >
                 <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <CardTitle className="text-base font-semibold truncate">{loan.name}</CardTitle>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        loan.type === "bank" ? "bg-red-500/10 text-red-500" : "bg-orange-500/10 text-orange-500"
-                      }`}
-                    >
-                      {loan.type === "bank" ? "Financeira" : "Pessoal"}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          loan.type === "bank" ? "bg-red-500/10 text-red-500" : "bg-orange-500/10 text-orange-500"
+                        }`}
+                      >
+                        {loan.type === "bank" ? "Financeira" : "Pessoal"}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-full"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLoanToDeleteId(loan.id);
+                        }}
+                        title="Excluir empréstimo"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -257,6 +276,19 @@ export function LoansClientPage({ data }: { data: LoansPageData }) {
         onOpenChange={(open) => !open && setSelectedLoanId(null)}
         loan={selectedLoan}
         closingDay={closingDay}
+        onRequestDelete={(loan) => setLoanToDeleteId(loan.id)}
+      />
+
+      <LoanDeleteDialog
+        open={!!loanToDelete}
+        onOpenChange={(open) => !open && setLoanToDeleteId(null)}
+        loan={loanToDelete}
+        onDeleted={() => {
+          if (selectedLoanId === loanToDeleteId) {
+            setSelectedLoanId(null);
+          }
+          setLoanToDeleteId(null);
+        }}
       />
     </div>
   );

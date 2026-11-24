@@ -77,7 +77,9 @@ export function AccountFormDialog({
     const formData = new FormData(e.currentTarget);
     const name = formData.get("name") as string;
     const type = formData.get("type") as string;
-    const currentBalance = formData.get("currentBalance") as string;
+    const rawBalance = formData.get("currentBalance");
+    const currentBalance =
+      typeof rawBalance === "string" && rawBalance.trim() !== "" ? rawBalance : "0.00";
     const targetAmountValue = targetAmount > 0 ? targetAmount.toString() : null;
 
     const result = accountToEdit
@@ -158,7 +160,6 @@ export function AccountFormDialog({
               <CurrencyInput
                 id="currentBalance"
                 name="currentBalance"
-                required
                 value={balance}
                 onValueChange={setBalance}
               />

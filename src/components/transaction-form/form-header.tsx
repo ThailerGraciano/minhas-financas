@@ -1,10 +1,11 @@
+import { RecentTransactionsSheet } from "@/components/recent-transactions-sheet";
 import {
   TRANSACTION_ACCENTS,
   type AccentColorConfig,
   type TransactionTab,
 } from "@/components/transaction-theme";
 import { DialogClose, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { X } from "lucide-react";
+import { History, X } from "lucide-react";
 import React from "react";
 
 export interface FormHeaderProps {
@@ -47,15 +48,30 @@ export const FormHeader = React.memo(function FormHeader({
           </span>
         </div>
 
-        <DialogClose asChild>
-          <button
-            type="button"
-            className="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground bg-white/[0.04] hover:bg-white/[0.10] border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all cursor-pointer"
-            aria-label="Fechar"
-          >
-            <X className="size-4" />
-          </button>
-        </DialogClose>
+        <div className="flex items-center gap-1.5">
+          <RecentTransactionsSheet
+            trigger={
+              <button
+                type="button"
+                title="Ver últimos cadastros"
+                className="h-8 px-2.5 rounded-full flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-white/[0.04] hover:bg-white/[0.10] border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all cursor-pointer"
+              >
+                <History className="size-3.5 text-primary" />
+                <span>Recentes</span>
+              </button>
+            }
+          />
+
+          <DialogClose asChild>
+            <button
+              type="button"
+              className="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground bg-white/[0.04] hover:bg-white/[0.10] border border-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all cursor-pointer"
+              aria-label="Fechar"
+            >
+              <X className="size-4" />
+            </button>
+          </DialogClose>
+        </div>
       </div>
 
       {/* Segmented control for Type (Apple Liquid Glass pill) */}

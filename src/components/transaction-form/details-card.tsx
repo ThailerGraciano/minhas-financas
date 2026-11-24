@@ -3,11 +3,12 @@ import { type TransactionTab } from "@/components/transaction-theme";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { orderByMostUsedCategory } from "@/lib/category-utils";
+import { cn } from "@/lib/utils";
 import { ReceiptText } from "lucide-react";
 import React from "react";
 import { AccountSelect } from "./account-select";
 import { Field, GlassCard } from "./glass-card";
-import { type Account, type Category, type Subcategory } from "./types";
+import { type Account, type Category, type Subcategory, type TransactionFormErrors } from "./types";
 
 export interface DetailsCardProps {
   tab: TransactionTab;
@@ -26,6 +27,7 @@ export interface DetailsCardProps {
   destinationId: string;
   onDestinationChange: (value: string) => void;
   onQuickCategoryCreated: (categoryId: string, subcategoryId: string) => void;
+  errors?: TransactionFormErrors;
 }
 
 export const DetailsCard = React.memo(function DetailsCard({
@@ -45,17 +47,19 @@ export const DetailsCard = React.memo(function DetailsCard({
   destinationId,
   onDestinationChange,
   onQuickCategoryCreated,
+  errors,
 }: DetailsCardProps) {
   const orderedCategories = React.useMemo(() => orderByMostUsedCategory(categories), [categories]);
 
   return (
     <GlassCard className="space-y-4">
-      <Field label="Descrição">
+      <Field label="Descrição" required fieldName="description" error={errors?.description}>
         <div className="relative">
           <ReceiptText className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             value={description}
             onChange={(e) => onDescriptionChange(e.target.value)}
+            aria-invalid={Boolean(errors?.description) || undefined}
             placeholder={
               tab === "expense"
                 ? "Ex: Supermercado, Almoço..."
@@ -63,7 +67,10 @@ export const DetailsCard = React.memo(function DetailsCard({
                   ? "Ex: Salário, Rendimentos..."
                   : "Ex: PIX entre contas..."
             }
-            className="h-11 pl-10 rounded-xl bg-input/90 hover:bg-input border-border hover:border-white/20 text-foreground placeholder:text-muted-foreground transition-all duration-200"
+            className={cn(
+              "h-11 pl-10 rounded-xl bg-input/90 hover:bg-input border-border hover:border-white/20 text-foreground placeholder:text-muted-foreground transition-all duration-200",
+              errors?.description && "border-destructive/80 ring-1 ring-destructive/40 hover:border-destructive",
+            )}
             style={{
               boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.04)",
             }}
@@ -73,11 +80,15 @@ export const DetailsCard = React.memo(function DetailsCard({
 
       {tab !== "transfer" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Categoria">
+          <Field label="Categoria" required fieldName="categoryId" error={errors?.categoryId}>
             <div className="flex items-center gap-2">
               <Select value={categoryId} onValueChange={onCategoryChange}>
                 <SelectTrigger
-                  className="w-full flex-1 !h-11 rounded-xl px-3.5 bg-input/90 hover:bg-input border-border hover:border-white/20 text-foreground transition-all duration-200"
+                  aria-invalid={Boolean(errors?.categoryId) || undefined}
+                  className={cn(
+                    "w-full flex-1 !h-11 rounded-xl px-3.5 bg-input/90 hover:bg-input border-border hover:border-white/20 text-foreground transition-all duration-200",
+                    errors?.categoryId && "border-destructive/80 ring-1 ring-destructive/40 hover:border-destructive",
+                  )}
                   style={{
                     boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.04)",
                   }}
@@ -104,11 +115,15 @@ export const DetailsCard = React.memo(function DetailsCard({
             </div>
           </Field>
 
-          <Field label="Subcategoria">
+          <Field label="Subcategoria" required fieldName="subcategoryId" error={errors?.subcategoryId}>
             <div className="flex items-center gap-2">
               <Select value={subcategoryId} onValueChange={onSubcategoryChange} disabled={!categoryId}>
                 <SelectTrigger
-                  className="w-full flex-1 !h-11 rounded-xl px-3.5 bg-input/90 hover:bg-input border-border hover:border-white/20 text-foreground transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-invalid={Boolean(errors?.subcategoryId) || undefined}
+                  className={cn(
+                    "w-full flex-1 !h-11 rounded-xl px-3.5 bg-input/90 hover:bg-input border-border hover:border-white/20 text-foreground transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed",
+                    errors?.subcategoryId && "border-destructive/80 ring-1 ring-destructive/40 hover:border-destructive",
+                  )}
                   style={{
                     boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.04)",
                   }}
@@ -142,11 +157,21 @@ export const DetailsCard = React.memo(function DetailsCard({
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Conta de origem (Sai)">
-            <AccountSelect value={originId} onChange={onOriginChange} accounts={accounts} />
+          <Field label="Conta de origem (Sai)" required fieldName="originId" error={errors?.originId}>
+            <AccountSelect
+              value={originId}
+              onChange={onOriginChange}
+              accounts={accounts}
+              invalid={Boolean(errors?.originId)}
+            />
           </Field>
-          <Field label="Conta de destino (Entra)">
-            <AccountSelect value={destinationId} onChange={onDestinationChange} accounts={accounts} />
+          <Field label="Conta de destino (Entra)" required fieldName="destinationId" error={errors?.destinationId}>
+            <AccountSelect
+              value={destinationId}
+              onChange={onDestinationChange}
+              accounts={accounts}
+              invalid={Boolean(errors?.destinationId)}
+            />
           </Field>
         </div>
       )}

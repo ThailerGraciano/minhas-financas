@@ -1,7 +1,6 @@
 "use client";
 
 import { updateClosingDay } from "@/app/actions/settings";
-import { backfillInvoiceMonths, fixAllCompetencies } from "@/app/actions/transactions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,8 +10,6 @@ import { toast } from "sonner";
 
 export function SettingsForm({ initialClosingDay }: { initialClosingDay: number }) {
   const [isPending, setIsPending] = useState(false);
-  const [isFixing, setIsFixing] = useState(false);
-  const [isBackfilling, setIsBackfilling] = useState(false);
   const [message, setMessage] = useState("");
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -36,37 +33,11 @@ export function SettingsForm({ initialClosingDay }: { initialClosingDay: number 
     setIsPending(false);
   };
 
-  const handleFixFaturas = async () => {
-    setIsFixing(true);
-    try {
-      const res = await fixAllCompetencies();
-      if (res.success) {
-        toast.success(`${res.count} faturas antigas foram corrigidas.`);
-      }
-    } catch (e) {
-      toast.error("Erro ao corrigir faturas.");
-    }
-    setIsFixing(false);
-  };
-
-  const handleBackfillInvoice = async () => {
-    setIsBackfilling(true);
-    try {
-      const res = await backfillInvoiceMonths();
-      if (res.success) {
-        toast.success(`${res.count} transações antigas de cartão foram preenchidas com invoice_month.`);
-      }
-    } catch (e) {
-      toast.error("Erro ao preencher meses de fatura.");
-    }
-    setIsBackfilling(false);
-  };
-
   return (
     <div className="space-y-6">
-      <Card className="w-full max-w-md mt-8">
+      <Card className="w-full max-w-lg">
         <CardHeader>
-          <CardTitle>Configurações</CardTitle>
+          <CardTitle>Preferências de Competência</CardTitle>
           <CardDescription>Gerencie suas preferências do sistema.</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>

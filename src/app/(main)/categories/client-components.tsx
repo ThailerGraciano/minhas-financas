@@ -11,24 +11,31 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import { CATEGORY_ICONS_LIST } from '@/components/category-icon';
+import { NATURE_META, SELECTABLE_NATURES } from '@/components/consumption-intelligence/constants';
+import { isDefaultConsumptionNature, type DefaultConsumptionNature } from '@/lib/consumption-types';
 
 export function AddCategoryDialog() {
   const [open, setOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [selectedIcon, setSelectedIcon] = useState('Tag');
+  const [selectedType, setSelectedType] = useState<'income' | 'expense'>('expense');
+  const [selectedNature, setSelectedNature] = useState<string>('__none__');
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsPending(true);
     const form = new FormData(e.currentTarget);
     const name = form.get('name') as string;
-    const type = form.get('type') as 'income' | 'expense';
+    const nature: DefaultConsumptionNature | null =
+      selectedType === 'expense' && isDefaultConsumptionNature(selectedNature) ? selectedNature : null;
 
-    const res = await createCategory(name, type, selectedIcon);
+    const res = await createCategory(name, selectedType, selectedIcon, nature);
     setIsPending(false);
     if (res.success) {
       setOpen(false);
       setSelectedIcon('Tag');
+      setSelectedType('expense');
+      setSelectedNature('__none__');
     } else {
       alert("Erro ao criar categoria");
     }
@@ -50,7 +57,12 @@ export function AddCategoryDialog() {
           </div>
           <div className="grid gap-2">
             <Label htmlFor="type">Tipo</Label>
-            <Select name="type" defaultValue="expense" required>
+            <Select
+              name="type"
+              value={selectedType}
+              onValueChange={(val) => setSelectedType(val === 'income' ? 'income' : 'expense')}
+              required
+            >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Selecione o tipo" />
               </SelectTrigger>
@@ -60,6 +72,25 @@ export function AddCategoryDialog() {
               </SelectContent>
             </Select>
           </div>
+
+          {selectedType === 'expense' && (
+            <div className="grid gap-2">
+              <Label>Natureza de Consumo (Padrão)</Label>
+              <Select value={selectedNature} onValueChange={setSelectedNature}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Não definido</SelectItem>
+                  {SELECTABLE_NATURES.map((nat) => (
+                    <SelectItem key={nat} value={nat}>
+                      {NATURE_META[nat].label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           
           <div className="grid gap-2">
             <Label>Ícone</Label>

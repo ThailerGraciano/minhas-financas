@@ -226,6 +226,9 @@ export async function getTransactions(
         paidAt: null,
         importHash: null,
         loanId: null,
+        consumptionNature: null,
+        consumptionNatureSource: null,
+        consumptionClassifiedAt: null,
         account: resolvedAccount,
         category: resolvedCategory,
         subcategory: resolvedSubcategory,
@@ -445,6 +448,10 @@ export async function createTransaction(
         let originParentId: number | null = null;
         let destParentId: number | null = null;
         let finalReturnId: number | undefined = undefined;
+        const explicitNature = txData.consumptionNature ?? null;
+        const rootNatureSource = explicitNature ? (txData.consumptionNatureSource ?? "manual") : null;
+        const inheritedNatureSource = explicitNature ? "inherited_installment" : null;
+        const classifiedAt = explicitNature ? new Date() : null;
 
         if (isTransfer) {
           const [originTx] = await tx
@@ -455,6 +462,9 @@ export async function createTransaction(
               userId,
               amount: currentInstallment === totalInstallments ? lastParcelAmount : baseParcelAmount,
               installmentCurrent: currentInstallment,
+              consumptionNature: explicitNature,
+              consumptionNatureSource: rootNatureSource,
+              consumptionClassifiedAt: classifiedAt,
             })
             .returning();
           originParentId = originTx.id;
@@ -478,6 +488,9 @@ export async function createTransaction(
               amount: currentInstallment === totalInstallments ? lastParcelAmount : baseParcelAmount,
               installmentCurrent: currentInstallment,
               parentTransactionId: originTx.id,
+              consumptionNature: explicitNature,
+              consumptionNatureSource: inheritedNatureSource,
+              consumptionClassifiedAt: classifiedAt,
             })
             .returning();
           destParentId = destTx.id;
@@ -498,6 +511,9 @@ export async function createTransaction(
               userId,
               amount: currentInstallment === totalInstallments ? lastParcelAmount : baseParcelAmount,
               installmentCurrent: currentInstallment,
+              consumptionNature: explicitNature,
+              consumptionNatureSource: rootNatureSource,
+              consumptionClassifiedAt: classifiedAt,
             })
             .returning();
           originParentId = parentTx.id;
@@ -539,6 +555,9 @@ export async function createTransaction(
                 status: "pending",
                 installmentCurrent: i,
                 installmentParentId: originParentId,
+                consumptionNature: explicitNature,
+                consumptionNatureSource: inheritedNatureSource,
+                consumptionClassifiedAt: classifiedAt,
               })
               .returning();
 
@@ -556,6 +575,9 @@ export async function createTransaction(
               installmentCurrent: i,
               parentTransactionId: originTx.id,
               installmentParentId: destParentId,
+              consumptionNature: explicitNature,
+              consumptionNatureSource: inheritedNatureSource,
+              consumptionClassifiedAt: classifiedAt,
             });
           } else {
             await tx.insert(transactions).values({
@@ -570,6 +592,9 @@ export async function createTransaction(
               status: "pending",
               installmentCurrent: i,
               installmentParentId: originParentId,
+              consumptionNature: explicitNature,
+              consumptionNatureSource: inheritedNatureSource,
+              consumptionClassifiedAt: classifiedAt,
             });
           }
         }
@@ -1890,6 +1915,8 @@ export type TransactionFullDetails = {
   subcategory: { id: number; name: string } | null;
   fixedTransaction: { id: string; startDate: string; active: boolean } | null;
   loan: { id: string; name: string; type: string; installments: number } | null;
+  consumptionNature: string | null;
+  consumptionNatureSource: string | null;
   installments: TransactionInstallmentItem[];
 };
 
@@ -2128,6 +2155,8 @@ export async function getTransactionFullDetails(id: number): Promise<Transaction
           installments: tx.loan.installments,
         }
       : null,
+    consumptionNature: tx.consumptionNature ?? null,
+    consumptionNatureSource: tx.consumptionNatureSource ?? null,
     installments: installmentsList,
   };
 }

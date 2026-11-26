@@ -9,6 +9,15 @@ import {
 } from "../dashboard-layout";
 
 describe("dashboard-layout utils", () => {
+  it("places consumption-intelligence first with full width by default", () => {
+    const def = getDefaultDashboardLayout();
+    expect(def.widgets[0]).toEqual({
+      id: "consumption-intelligence",
+      colSpan: 6,
+      visible: true,
+    });
+  });
+
   it("returns default layout when raw JSON is null or invalid", () => {
     const def = getDefaultDashboardLayout();
     expect(parseDashboardLayout(null)).toEqual(def);
@@ -19,10 +28,10 @@ describe("dashboard-layout utils", () => {
 
   it("reorders widgets by id and detects custom layout", () => {
     const def = getDefaultDashboardLayout();
-    const reordered = reorderWidgetsById(def.widgets, "open-invoices", "health-summary");
+    const reordered = reorderWidgetsById(def.widgets, "open-invoices", "consumption-intelligence");
 
     expect(reordered[0].id).toBe("open-invoices");
-    expect(reordered[1].id).toBe("health-summary");
+    expect(reordered[1].id).toBe("consumption-intelligence");
     expect(reordered.length).toBe(DASHBOARD_WIDGETS_META.length);
 
     const customState = { ...def, widgets: reordered };

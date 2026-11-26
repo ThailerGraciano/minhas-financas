@@ -1,4 +1,5 @@
 import { getCategories } from "@/app/actions/categories";
+import { isDefaultConsumptionNature } from "@/lib/consumption-types";
 import { AddCategoryDialog } from "./client-components";
 import { CategoryTree, Category } from "./category-tree";
 
@@ -13,11 +14,17 @@ export default async function CategoriesPage() {
     icon: c.icon,
     type: c.type,
     isPredictable: c.isPredictable ?? false,
+    defaultConsumptionNature: isDefaultConsumptionNature(c.defaultConsumptionNature)
+      ? c.defaultConsumptionNature
+      : null,
     subcategories: c.subcategories.map((s) => ({
       id: s.id,
       name: s.name,
       isPredictable: s.isPredictable ?? false,
-    }))
+      defaultConsumptionNature: isDefaultConsumptionNature(s.defaultConsumptionNature)
+        ? s.defaultConsumptionNature
+        : null,
+    })),
   }));
 
   const expenseCategories = mappedCategories.filter((c) => c.type === "expense");

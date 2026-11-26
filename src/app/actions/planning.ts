@@ -281,6 +281,9 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
             paidAt: null,
             importHash: null,
             loanId: null,
+            consumptionNature: null,
+            consumptionNatureSource: null,
+            consumptionClassifiedAt: null,
             category: {
               id: resolved.categoryId,
               name: "Virtual",
@@ -288,6 +291,7 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
               type: resolved.type,
               icon: "virtual",
               isPredictable: false,
+              defaultConsumptionNature: null,
             },
             account: null,
             creditCard: null,
@@ -417,6 +421,9 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
           paidAt: null,
           importHash: null,
           loanId: null,
+          consumptionNature: null,
+          consumptionNatureSource: null,
+          consumptionClassifiedAt: null,
           category: {
             id: 0,
             name: "Fatura",
@@ -424,6 +431,7 @@ export async function getProjectedCashFlow(accountId?: string, reqCompetencyMont
             type: "expense",
             icon: "credit-card",
             isPredictable: false,
+            defaultConsumptionNature: null,
           },
         });
       }

@@ -1,20 +1,29 @@
 "use client";
 
+import { updateTransactionConsumptionNature } from "@/app/actions/consumption-intelligence";
 import {
   getTransactionFullDetails,
   type TransactionFullDetails,
   type TransactionInstallmentItem,
 } from "@/app/actions/transactions";
 import { CategoryIcon } from "@/components/category-icon";
+import { ALL_NATURE_OPTIONS, NATURE_META, SOURCE_LABELS } from "@/components/consumption-intelligence/constants";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  isClassificationSource,
+  isConsumptionNature,
+  type ConsumptionNature,
+} from "@/lib/consumption-types";
 import { cn } from "@/lib/utils";
 import { addMonths, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
+  Activity,
   ArrowDownCircle,
   ArrowRight,
   ArrowRightLeft,
@@ -37,7 +46,9 @@ import {
   Tag,
   Trash,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 export interface TransactionSummaryProp {
   id: number | string;
@@ -144,8 +155,10 @@ export function TransactionDetailsDialog({
   onEdit,
   onDelete,
 }: TransactionDetailsDialogProps) {
+  const router = useRouter();
   const [details, setDetails] = useState<TransactionFullDetails | null>(null);
   const [loading, setLoading] = useState(false);
+  const [savingNature, setSavingNature] = useState(false);
   const currentRowRef = useRef<HTMLTableRowElement | null>(null);
 
   useEffect(() => {
@@ -280,6 +293,8 @@ export function TransactionDetailsDialog({
       fixedTransaction: details?.fixedTransaction ?? null,
       loan: details?.loan ?? null,
       parentTransactionId: details?.parentTransactionId ?? transaction.parentTransactionId ?? null,
+      consumptionNature: details?.consumptionNature ?? null,
+      consumptionNatureSource: details?.consumptionNatureSource ?? null,
       installments,
     };
   }, [transaction, details]);
@@ -287,6 +302,50 @@ export function TransactionDetailsDialog({
   if (!merged) return null;
 
   const isVirtualTx = typeof merged.id === "number" && merged.id < 0;
+  const numericTxId = Number(merged.id);
+  const canEditConsumptionNature = !isVirtualTx && !isNaN(numericTxId) && numericTxId > 0 && merged.type !== "income";
+  const persistedNature: ConsumptionNature | null = isConsumptionNature(merged.consumptionNature)
+    ? merged.consumptionNature
+    : null;
+  const persistedSource = isClassificationSource(merged.consumptionNatureSource)
+    ? merged.consumptionNatureSource
+    : null;
+
+  const handleNatureChange = async (nextValue: string) => {
+    if (!isConsumptionNature(nextValue) || !canEditConsumptionNature) return;
+    setSavingNature(true);
+    try {
+      const res = await updateTransactionConsumptionNature({
+        transactionId: numericTxId,
+        nature: nextValue,
+      });
+      if (!res.success) {
+        toast.error(res.error || "Falha ao atualizar natureza de consumo.");
+        return;
+      }
+      setDetails((prev) =>
+        prev
+          ? {
+              ...prev,
+              consumptionNature: nextValue,
+              consumptionNatureSource: "manual",
+            }
+          : prev,
+      );
+      if (res.updatedCount && res.updatedCount > 1) {
+        toast.success(
+          `"${NATURE_META[nextValue].label}" aplicada a todas as ${res.updatedCount} parcelas vinculadas.`,
+        );
+      } else {
+        toast.success(`Natureza de consumo definida como "${NATURE_META[nextValue].label}".`);
+      }
+      router.refresh();
+    } catch {
+      toast.error("Erro ao atualizar natureza de consumo.");
+    } finally {
+      setSavingNature(false);
+    }
+  };
   const isIncome =
     merged.type === "income" ||
     (merged.type === "transfer" && (Boolean(merged.parentTransactionId) || merged.description.includes("(Entrada)")));
@@ -662,6 +721,55 @@ export function TransactionDetailsDialog({
                 <p className="text-xs sm:text-sm text-foreground/90 whitespace-pre-wrap break-words mt-0.5">
                   {merged.observations}
                 </p>
+              </div>
+            </div>
+          )}
+
+          {/* Natureza de Consumo (Inteligência Semanal) */}
+          {canEditConsumptionNature && (
+            <div className="sm:col-span-2 rounded-2xl border border-white/[0.08] bg-card/85 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
+                  <Activity className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs text-muted-foreground block">
+                    Natureza de Consumo (Inteligência Semanal)
+                  </span>
+                  <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                    <span className="text-xs font-medium text-foreground">
+                      {persistedNature ? NATURE_META[persistedNature].label : "Classificação automática na leitura"}
+                    </span>
+                    {persistedSource && (
+                      <Badge variant="outline" className="text-[10px] border-white/10 px-1.5 py-0">
+                        {SOURCE_LABELS[persistedSource]}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {savingNature && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />}
+                <Select
+                  value={persistedNature ?? ""}
+                  onValueChange={handleNatureChange}
+                  disabled={savingNature}
+                >
+                  <SelectTrigger
+                    aria-label="Definir natureza de consumo"
+                    className="h-8 w-[195px] text-xs bg-white/[0.04] border-white/[0.10]"
+                  >
+                    <SelectValue placeholder="Definir manualmente..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ALL_NATURE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt} value={opt} className="text-xs">
+                        {NATURE_META[opt].label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           )}

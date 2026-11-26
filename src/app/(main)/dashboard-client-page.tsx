@@ -8,6 +8,7 @@ import { CategoryForecastChart } from "@/components/category-forecast-chart";
 import { ExpenseTreemap } from "@/components/charts/ExpenseTreemap";
 import { IncomeTreemap } from "@/components/charts/IncomeTreemap";
 import { ClientDataLoader } from "@/components/client-data-loader";
+import { ConsumptionIntelligenceCard } from "@/components/consumption-intelligence";
 import { CreditCardInvoicesList } from "@/components/credit-card-invoices-list";
 import { EmergencyReserveCard } from "@/components/emergency-reserve-card";
 import { ExpenseTypeComparison } from "@/components/expense-type-comparison";
@@ -546,6 +547,15 @@ export function DashboardClientPage({
 
         const renderWidgetContent = (widgetId: DashboardWidgetId): ReactNode => {
           switch (widgetId) {
+            case "consumption-intelligence":
+              return (
+                <ConsumptionIntelligenceCard
+                  initialData={dashboard.consumptionIntelligence}
+                  selectedMonth={selectedMonth}
+                  showBalance={showBalance}
+                />
+              );
+
             case "health-summary":
               return (
                 <MonthlyFinancialHealth

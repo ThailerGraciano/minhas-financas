@@ -3,6 +3,7 @@
 import { db } from '@/db';
 import { categories, subcategories, transactions } from '@/db/schema';
 import { buildCategoryUsageOrderBy } from '@/lib/category-utils';
+import { isDefaultConsumptionNature, type DefaultConsumptionNature } from '@/lib/consumption-types';
 import { eq, and } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/auth';
@@ -35,16 +36,31 @@ export async function getCategories(options?: { orderBy?: 'name' | 'usage' }) {
   });
 }
 
-export async function createCategory(name: string, type: 'income' | 'expense', icon?: string) {
+export async function createCategory(
+  name: string,
+  type: 'income' | 'expense',
+  icon?: string,
+  defaultConsumptionNature?: DefaultConsumptionNature | null,
+) {
   try {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
     const userId = session.user.id;
+    const validDefaultNature =
+      type === 'expense' && isDefaultConsumptionNature(defaultConsumptionNature)
+        ? defaultConsumptionNature
+        : null;
 
     const result = await db.transaction(async (tx) => {
       const [category] = await tx
         .insert(categories)
-        .values({ userId, name, type, icon: icon || 'Tag' })
+        .values({
+          userId,
+          name,
+          type,
+          icon: icon || 'Tag',
+          defaultConsumptionNature: validDefaultNature,
+        })
         .returning();
 
       // Toda categoria nasce com a subcategoria padrão "Geral"

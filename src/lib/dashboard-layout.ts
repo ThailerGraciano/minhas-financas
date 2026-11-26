@@ -1,4 +1,5 @@
 export type DashboardWidgetId =
+  | "consumption-intelligence"
   | "health-summary"
   | "balance-summary"
   | "emergency-reserve"
@@ -36,9 +37,16 @@ export interface DashboardLayoutState {
   widgets: DashboardWidgetConfig[];
 }
 
-export const DASHBOARD_LAYOUT_STORAGE_KEY = "minhas-financas:dashboard-layout:v1";
+export const LEGACY_DASHBOARD_LAYOUT_STORAGE_KEY = "minhas-financas:dashboard-layout:v1";
+export const DASHBOARD_LAYOUT_STORAGE_KEY = "minhas-financas:dashboard-layout:v2";
 
 export const DASHBOARD_WIDGETS_META: readonly DashboardWidgetMeta[] = [
+  {
+    id: "consumption-intelligence",
+    title: "Inteligência de Consumo",
+    description: "Análise semanal de consumo recorrente, desvios históricos e previsão de fechamento",
+    defaultColSpan: 6,
+  },
   {
     id: "health-summary",
     title: "Saúde do Mês",
@@ -256,12 +264,34 @@ export function getDashboardLayoutClientSnapshot(): DashboardLayoutState {
   }
   try {
     const raw = window.localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY);
-    if (raw === cachedRawLayout) {
+    if (raw !== null) {
+      if (raw === cachedRawLayout) {
+        return cachedParsedLayout;
+      }
+      cachedRawLayout = raw;
+      cachedParsedLayout = parseDashboardLayout(raw);
       return cachedParsedLayout;
     }
-    cachedRawLayout = raw;
-    cachedParsedLayout = raw ? parseDashboardLayout(raw) : DEFAULT_LAYOUT_SNAPSHOT;
-    return cachedParsedLayout;
+
+    // Migração automática do layout v1: preserva ordem existente colocando Inteligência de Consumo em 1º lugar
+    const legacyRaw = window.localStorage.getItem(LEGACY_DASHBOARD_LAYOUT_STORAGE_KEY);
+    if (legacyRaw) {
+      const legacyParsed = parseDashboardLayout(legacyRaw);
+      const filtered = legacyParsed.widgets.filter((w) => w.id !== "consumption-intelligence");
+      const migrated: DashboardLayoutState = {
+        version: 1,
+        widgets: [{ id: "consumption-intelligence", colSpan: 6, visible: true }, ...filtered],
+      };
+      const serialized = JSON.stringify(migrated);
+      window.localStorage.setItem(DASHBOARD_LAYOUT_STORAGE_KEY, serialized);
+      cachedRawLayout = serialized;
+      cachedParsedLayout = migrated;
+      return cachedParsedLayout;
+    }
+
+    cachedRawLayout = null;
+    cachedParsedLayout = DEFAULT_LAYOUT_SNAPSHOT;
+    return DEFAULT_LAYOUT_SNAPSHOT;
   } catch {
     return DEFAULT_LAYOUT_SNAPSHOT;
   }

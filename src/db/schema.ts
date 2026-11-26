@@ -3,6 +3,7 @@ import {
   AnyPgColumn,
   boolean,
   date,
+  index,
   integer,
   jsonb,
   numeric,
@@ -52,6 +53,7 @@ export const categories = pgTable("categories", {
   type: varchar("type", { length: 50 }).notNull().default("expense"), // income, expense
   icon: varchar("icon", { length: 50 }).notNull().default("Tag"),
   isPredictable: boolean("is_predictable").default(false).notNull(),
+  defaultConsumptionNature: varchar("default_consumption_nature", { length: 32 }),
 });
 
 export const subcategories = pgTable("subcategories", {
@@ -64,6 +66,7 @@ export const subcategories = pgTable("subcategories", {
     .notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   isPredictable: boolean("is_predictable").default(false).notNull(),
+  defaultConsumptionNature: varchar("default_consumption_nature", { length: 32 }),
 });
 
 export const creditCards = pgTable("credit_cards", {
@@ -126,36 +129,53 @@ export const fixedTransactionOverrides = pgTable(
   ],
 );
 
-export const transactions = pgTable("transactions", {
-  id: serial("id").primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id)
-    .notNull(),
-  type: varchar("type", { length: 50 }).notNull(), // income, expense, transfer, credit_card_expense
-  accountId: integer("account_id").references(() => accounts.id),
-  creditCardId: integer("credit_card_id").references(() => creditCards.id),
-  categoryId: integer("category_id")
-    .references(() => categories.id)
-    .notNull(),
-  subcategoryId: integer("subcategory_id").references(() => subcategories.id),
-  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
-  description: varchar("description", { length: 255 }).notNull(),
-  dueDate: date("due_date").notNull(),
-  launchDate: date("launch_date").notNull(),
-  competencyMonth: varchar("competency_month", { length: 7 }).notNull(), // YYYY-MM
-  status: varchar("status", { length: 50 }).notNull(), // pending, paid, ignored
-  isFixed: boolean("is_fixed").default(false).notNull(), // deprecated
-  fixedTransactionId: uuid("fixed_transaction_id").references(() => fixedTransactions.id),
-  installmentCurrent: integer("installment_current"),
-  installmentTotal: integer("installment_total"),
-  parentTransactionId: integer("parent_transaction_id").references((): AnyPgColumn => transactions.id),
-  installmentParentId: integer("installment_parent_id").references((): AnyPgColumn => transactions.id),
-  observations: varchar("observations", { length: 500 }),
-  paidAt: timestamp("paid_at"),
-  importHash: varchar("import_hash", { length: 255 }).unique(),
-  invoiceMonth: varchar("invoice_month", { length: 7 }),
-  loanId: uuid("loan_id").references(() => loans.id, { onDelete: "cascade" }),
-});
+export const transactions = pgTable(
+  "transactions",
+  {
+    id: serial("id").primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    type: varchar("type", { length: 50 }).notNull(), // income, expense, transfer, credit_card_expense
+    accountId: integer("account_id").references(() => accounts.id),
+    creditCardId: integer("credit_card_id").references(() => creditCards.id),
+    categoryId: integer("category_id")
+      .references(() => categories.id)
+      .notNull(),
+    subcategoryId: integer("subcategory_id").references(() => subcategories.id),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    description: varchar("description", { length: 255 }).notNull(),
+    dueDate: date("due_date").notNull(),
+    launchDate: date("launch_date").notNull(),
+    competencyMonth: varchar("competency_month", { length: 7 }).notNull(), // YYYY-MM
+    status: varchar("status", { length: 50 }).notNull(), // pending, paid, ignored
+    isFixed: boolean("is_fixed").default(false).notNull(), // deprecated
+    fixedTransactionId: uuid("fixed_transaction_id").references(() => fixedTransactions.id),
+    installmentCurrent: integer("installment_current"),
+    installmentTotal: integer("installment_total"),
+    parentTransactionId: integer("parent_transaction_id").references((): AnyPgColumn => transactions.id),
+    installmentParentId: integer("installment_parent_id").references((): AnyPgColumn => transactions.id),
+    observations: varchar("observations", { length: 500 }),
+    paidAt: timestamp("paid_at"),
+    importHash: varchar("import_hash", { length: 255 }).unique(),
+    invoiceMonth: varchar("invoice_month", { length: 7 }),
+    loanId: uuid("loan_id").references(() => loans.id, { onDelete: "cascade" }),
+    consumptionNature: varchar("consumption_nature", { length: 32 }),
+    consumptionNatureSource: varchar("consumption_nature_source", { length: 32 }),
+    consumptionClassifiedAt: timestamp("consumption_classified_at"),
+  },
+  (table) => [
+    index("idx_transactions_user_launch_type")
+      .on(table.userId, table.launchDate, table.type)
+      .where(sql`${table.status} <> 'ignored'`),
+    index("idx_transactions_user_installment_parent")
+      .on(table.userId, table.installmentParentId)
+      .where(sql`${table.installmentParentId} IS NOT NULL`),
+    index("idx_transactions_user_manual_nature")
+      .on(table.userId, table.consumptionNatureSource)
+      .where(sql`${table.consumptionNatureSource} = 'manual'`),
+  ],
+);
 
 export const importLogs = pgTable("import_logs", {
   id: uuid("id").defaultRandom().primaryKey(),

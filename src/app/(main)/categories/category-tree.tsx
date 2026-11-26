@@ -10,19 +10,27 @@ import {
   updateCategoryName,
   updateSubcategoryName,
 } from "@/app/actions/categories";
+import { updateCategoryDefaultConsumptionNature } from "@/app/actions/consumption-intelligence";
 import { CATEGORY_ICONS_LIST, CategoryIcon } from "@/components/category-icon";
+import { NATURE_META, SELECTABLE_NATURES } from "@/components/consumption-intelligence/constants";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { isDefaultConsumptionNature, type DefaultConsumptionNature } from "@/lib/consumption-types";
+import { cn } from "@/lib/utils";
 import { Plus, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 export type Subcategory = {
   id: number;
   name: string;
   isPredictable: boolean;
+  defaultConsumptionNature: DefaultConsumptionNature | null;
 };
 
 export type Category = {
@@ -31,6 +39,7 @@ export type Category = {
   icon: string;
   type: string;
   isPredictable: boolean;
+  defaultConsumptionNature: DefaultConsumptionNature | null;
   subcategories: Subcategory[];
 };
 
@@ -45,11 +54,21 @@ export function CategoryTree({ categories }: { categories: Category[] }) {
 }
 
 function CategoryAccordionItem({ category }: { category: Category }) {
+  const router = useRouter();
   const [isEditingName, setIsEditingName] = useState(false);
   const [name, setName] = useState(category.name);
+  const [defaultNature, setDefaultNature] = useState<DefaultConsumptionNature | null>(
+    category.defaultConsumptionNature,
+  );
+  const [prevCatNature, setPrevCatNature] = useState(category.defaultConsumptionNature);
   const [isPending, setIsPending] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  if (category.defaultConsumptionNature !== prevCatNature) {
+    setPrevCatNature(category.defaultConsumptionNature);
+    setDefaultNature(category.defaultConsumptionNature);
+  }
 
   useEffect(() => {
     if (isEditingName && inputRef.current) {
@@ -87,6 +106,29 @@ function CategoryAccordionItem({ category }: { category: Category }) {
     if (!res.success) alert(res.error || "Erro ao atualizar previsão");
   };
 
+  const handleNatureChange = async (value: string) => {
+    const nextNature = value === "__none__" ? null : isDefaultConsumptionNature(value) ? value : null;
+    const prev = defaultNature;
+    setDefaultNature(nextNature);
+    setIsPending(true);
+    const res = await updateCategoryDefaultConsumptionNature({
+      categoryId: category.id,
+      nature: nextNature,
+    });
+    setIsPending(false);
+    if (!res.success) {
+      setDefaultNature(prev);
+      toast.error(res.error || "Erro ao atualizar natureza da categoria.");
+      return;
+    }
+    toast.success(
+      nextNature
+        ? `Natureza padrão de "${category.name}" definida como ${NATURE_META[nextNature].label}.`
+        : `Natureza padrão de "${category.name}" definida como Não definido.`,
+    );
+    router.refresh();
+  };
+
   const handleDelete = async () => {
     if (!confirm(`Tem certeza que deseja excluir a categoria ${category.name}?`)) return;
     setIsPending(true);
@@ -100,8 +142,8 @@ function CategoryAccordionItem({ category }: { category: Category }) {
       value={category.id.toString()}
       className="border border-white/[0.08] rounded-2xl bg-card/85 backdrop-blur-md text-card-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_8px_rgba(0,0,0,0.3)] px-4 mb-2.5 transition-all hover:bg-card/95 hover:border-white/15 overflow-hidden"
     >
-      <div className="flex items-center justify-between py-2">
-        <div className="flex flex-1 items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+        <div className="flex flex-1 items-center gap-3 min-w-[160px]">
           {/* Ícone via Popover */}
           <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
             <PopoverTrigger asChild>
@@ -150,7 +192,7 @@ function CategoryAccordionItem({ category }: { category: Category }) {
             />
           ) : (
             <span
-              className="text-lg font-semibold cursor-text hover:bg-muted/50 px-2 py-0.5 rounded transition-colors"
+              className="text-lg font-semibold cursor-text hover:bg-muted/50 px-2 py-0.5 rounded transition-colors truncate"
               onClick={(e) => {
                 e.stopPropagation();
                 setIsEditingName(true);
@@ -161,9 +203,47 @@ function CategoryAccordionItem({ category }: { category: Category }) {
           )}
         </div>
 
-        <div className="flex items-center gap-4 shrink-0">
+        <div className="flex flex-wrap items-center gap-3 shrink-0 ml-auto">
+          {category.type === "expense" && (
+            <div onClick={(e) => e.stopPropagation()}>
+              <Select
+                value={defaultNature ?? "__none__"}
+                onValueChange={handleNatureChange}
+                disabled={isPending}
+              >
+                <SelectTrigger
+                  aria-label={`Natureza de consumo padrão de ${category.name}`}
+                  className={cn(
+                    "h-8 w-[165px] text-xs font-medium",
+                    defaultNature
+                      ? NATURE_META[defaultNature].badgeClass
+                      : "bg-white/[0.03] border-white/[0.08] text-muted-foreground",
+                  )}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__" className="text-xs text-muted-foreground">
+                    Não definido
+                  </SelectItem>
+                  {SELECTABLE_NATURES.map((nat) => (
+                    <SelectItem key={nat} value={nat} className="text-xs">
+                      <span className="inline-flex items-center gap-2">
+                        <span
+                          className="h-2 w-2 rounded-full shrink-0"
+                          style={{ backgroundColor: NATURE_META[nat].dotColor }}
+                        />
+                        <span>{NATURE_META[nat].label}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-            <span className="text-sm text-muted-foreground">Previsão</span>
+            <span className="text-xs sm:text-sm text-muted-foreground">Previsão</span>
             <Switch checked={category.isPredictable} onCheckedChange={handleTogglePrediction} disabled={isPending} />
           </div>
           <Button
@@ -184,11 +264,17 @@ function CategoryAccordionItem({ category }: { category: Category }) {
       </div>
 
       <AccordionContent className="pt-2 pb-4">
-        <div className="pl-12 space-y-2">
+        <div className="pl-4 sm:pl-12 space-y-2">
           {category.subcategories && category.subcategories.length > 0 ? (
             <ul className="space-y-1">
               {category.subcategories.map((sub) => (
-                <SubcategoryItem key={sub.id} subcategory={sub} />
+                <SubcategoryItem
+                  key={sub.id}
+                  subcategory={sub}
+                  categoryId={category.id}
+                  categoryType={category.type}
+                  parentNature={defaultNature}
+                />
               ))}
             </ul>
           ) : (
@@ -201,11 +287,31 @@ function CategoryAccordionItem({ category }: { category: Category }) {
   );
 }
 
-function SubcategoryItem({ subcategory }: { subcategory: Subcategory }) {
+function SubcategoryItem({
+  subcategory,
+  categoryId,
+  categoryType,
+  parentNature,
+}: {
+  subcategory: Subcategory;
+  categoryId: number;
+  categoryType: string;
+  parentNature: DefaultConsumptionNature | null;
+}) {
+  const router = useRouter();
   const [isEditingName, setIsEditingName] = useState(false);
   const [name, setName] = useState(subcategory.name);
+  const [subNature, setSubNature] = useState<DefaultConsumptionNature | null>(
+    subcategory.defaultConsumptionNature,
+  );
+  const [prevSubNature, setPrevSubNature] = useState(subcategory.defaultConsumptionNature);
   const [isPending, setIsPending] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  if (subcategory.defaultConsumptionNature !== prevSubNature) {
+    setPrevSubNature(subcategory.defaultConsumptionNature);
+    setSubNature(subcategory.defaultConsumptionNature);
+  }
 
   useEffect(() => {
     if (isEditingName && inputRef.current) {
@@ -235,6 +341,30 @@ function SubcategoryItem({ subcategory }: { subcategory: Subcategory }) {
     if (!res.success) alert(res.error || "Erro ao atualizar previsão");
   };
 
+  const handleNatureChange = async (value: string) => {
+    const nextNature = value === "__inherit__" ? null : isDefaultConsumptionNature(value) ? value : null;
+    const prev = subNature;
+    setSubNature(nextNature);
+    setIsPending(true);
+    const res = await updateCategoryDefaultConsumptionNature({
+      categoryId,
+      subcategoryId: subcategory.id,
+      nature: nextNature,
+    });
+    setIsPending(false);
+    if (!res.success) {
+      setSubNature(prev);
+      toast.error(res.error || "Erro ao atualizar natureza da subcategoria.");
+      return;
+    }
+    toast.success(
+      nextNature
+        ? `"${subcategory.name}" definida como ${NATURE_META[nextNature].label}.`
+        : `"${subcategory.name}" herdará a natureza da categoria pai.`,
+    );
+    router.refresh();
+  };
+
   const handleDelete = async () => {
     if (!confirm(`Tem certeza que deseja excluir a subcategoria ${subcategory.name}?`)) return;
     setIsPending(true);
@@ -243,9 +373,14 @@ function SubcategoryItem({ subcategory }: { subcategory: Subcategory }) {
     if (!res.success) alert(res.error || "Erro ao excluir subcategoria");
   };
 
+  const effectiveNature = subNature ?? parentNature;
+  const inheritLabel = parentNature
+    ? `Herdar (${NATURE_META[parentNature].shortLabel})`
+    : "Herdar (Não definido)";
+
   return (
-    <li className="flex items-center justify-between p-2 rounded-md hover:bg-muted/30 transition-colors group">
-      <div className="flex items-center gap-2 flex-1">
+    <li className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-md hover:bg-muted/30 transition-colors group">
+      <div className="flex items-center gap-2 flex-1 min-w-[140px]">
         <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground shrink-0" />
         {isEditingName ? (
           <Input
@@ -273,7 +408,45 @@ function SubcategoryItem({ subcategory }: { subcategory: Subcategory }) {
         )}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5 ml-auto">
+        {categoryType === "expense" && (
+          <Select
+            value={subNature ?? "__inherit__"}
+            onValueChange={handleNatureChange}
+            disabled={isPending}
+          >
+            <SelectTrigger
+              aria-label={`Natureza de consumo de ${subcategory.name}`}
+              className={cn(
+                "h-7 w-[170px] text-[11px] font-medium",
+                subNature
+                  ? NATURE_META[subNature].badgeClass
+                  : effectiveNature
+                    ? "bg-white/[0.02] border-white/[0.08] text-foreground/80"
+                    : "bg-white/[0.02] border-white/[0.08] text-muted-foreground",
+              )}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__inherit__" className="text-xs text-muted-foreground">
+                {inheritLabel}
+              </SelectItem>
+              {SELECTABLE_NATURES.map((nat) => (
+                <SelectItem key={nat} value={nat} className="text-xs">
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className="h-2 w-2 rounded-full shrink-0"
+                      style={{ backgroundColor: NATURE_META[nat].dotColor }}
+                    />
+                    <span>{NATURE_META[nat].label}</span>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
         <Switch checked={subcategory.isPredictable} onCheckedChange={handleTogglePrediction} disabled={isPending} />
         <Button
           variant="ghost"

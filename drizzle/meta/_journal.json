@@ -85,6 +85,20 @@
       "when": 1794536400000,
       "tag": "0011_global_budgets",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795560000000,
+      "tag": "0012_consumption_intelligence",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1795646400000,
+      "tag": "0013_consumption_installment_nature",
+      "breakpoints": true
     }
   ]
 }
